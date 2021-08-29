@@ -1,0 +1,26 @@
+{
+  "special_coupons": [
+    {
+      "uniqueID": "44149",
+      "title": "KING Sundae",
+      "price": 0,
+      "staticReducedPercent": 100,
+      "source": 7,
+      "imageURL": "https://www.picflash.org/viewer.php?img=44149_KING_Sundae7XHGGE.jpg",
+      "description": "Achtung! Wird nicht überall akzeptiert siehe: https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058\nFalls der Deal als abgelaufen markiert wurde: Diverse Filialen akzeptieren diese Coupons noch immer!",
+      "expire_date": "2021-07-31",
+      "enforce_is_new_override_until_date": "2021-06-08"
+    },
+    {
+      "uniqueID": "51011",
+      "title": "Coca-Cola",
+      "price": 0,
+      "static_reduced_percent": 100,
+      "source": 7,
+      "imageURL": "https://www.picflash.org/viewer.php?img=51011_CocaCola2JKO9O.jpg",
+      "description": "Achtung! Wird nicht überall akzeptiert siehe: https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058\nFalls der Deal als abgelaufen markiert wurde: Diverse Filialen akzeptieren diese Coupons noch immer!",
+      "expire_date": "2021-07-31",
+      "enforce_is_new_override_until_date": "2021-06-08"
+    }
+  ]
+}
