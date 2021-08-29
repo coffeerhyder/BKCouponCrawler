@@ -255,7 +255,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
                         # Update DB
                         infoDBDoc.store(infoDB)
                 for page in range(1, maxPage + 1):
-                    logging.info("Sending on category page: " + str(page) + "/" + str(maxPage))
+                    logging.info("Sending category page: " + str(page) + "/" + str(maxPage))
                     couponOverviewText = "<b>[" + str(len(coupons)) + " Stück] " + couponCategory.nameSingular + " Übersicht"
                     if couponCategory.displayDescription:
                         couponOverviewText += "\n" + couponCategory.description

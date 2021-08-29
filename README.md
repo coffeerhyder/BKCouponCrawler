@@ -94,6 +94,7 @@ ID | Interne Bezeichnung | Beschreibung
 * App Coupons testen, die gerade nicht in der App sind aber noch gültig sein müssten
 
 # Feature Ideen
+* Bot: "Erweiterte Couponliste": Ähnliche Coupon-Liste wie im Channel, jedoch mit ausgeschriebenen Produktnamen
 * PayBack Aktionen integrieren? https://www.mydealz.de/deals/20-fach-payback-punkte-coupon-bei-burger-king-1709510 --> Schwierig bis unmöglich zu automatisieren
 * Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen (sonst werden es ggf. über die Zeit immer mehr)
 
