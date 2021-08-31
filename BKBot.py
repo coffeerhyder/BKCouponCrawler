@@ -258,7 +258,10 @@ class BKBot:
         # Delete last message containing menu as it is of no use for us anymore
         self.deleteMessage(chat_id=update.effective_user.id, messageID=update.callback_query.message.message_id)
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
-        self.updater.bot.send_message(chat_id=update.effective_user.id, text="Alle " + str(len(activeCoupons)) + " Coupons als Liste mit langen Titeln", reply_markup=reply_markup)
+        menuText = "<b>Alle " + str(len(activeCoupons)) + " Coupons als Liste mit langen Titeln</b>"
+        if self.getPublicChannelName() is not None:
+            menuText += "\nAlle Verlinkungen führen in den " + self.getPublicChannelHyperlinkWithCustomizedText("Channel") + "."
+        self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode="HTML", reply_markup=reply_markup, disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
     def botDisplayCoupons(self, update: Update, context: CallbackContext):
