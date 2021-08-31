@@ -13,7 +13,7 @@ from json import loads
 
 from BotUtils import Config
 from Helper import *
-from Helper import getPathImagesOffers, getPathImagesProducts, INFO_DB, couponTitleContainsFriesOrCoke, isCouponShortPLU, isValidImageFile
+from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, isCouponShortPLU, isValidImageFile
 from Models import CouponFilter
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid

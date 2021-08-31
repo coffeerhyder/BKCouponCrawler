@@ -197,3 +197,107 @@ def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
         if coupon.price is not None:
             totalSum += coupon.price
     return totalSum
+
+
+def getCouponsSeparatedByType(coupons: dict) -> dict:
+    couponsSeparatedByType = {}
+    for couponSource in BotAllowedCouponSources:
+        couponsTmp = list(filter(lambda x: x[Coupon.source.name] == couponSource, list(coupons.values())))
+        couponsSeparatedByType[couponSource] = couponsTmp
+    return couponsSeparatedByType
+
+
+def generateCouponShortText(coupon: Coupon) -> str:
+    """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
+    text = couponDBGetPLUOrUniqueID(coupon) + " | " + coupon.titleShortened
+    priceFormatted = couponDBGetPriceFormatted(coupon)
+    if priceFormatted is not None:
+        text += " | " + priceFormatted
+    return text
+
+
+def generateCouponShortTextFormatted(coupon: Coupon) -> str:
+    """ Returns e.g. "<b>Y15</b> | 2Whopper+M🍟+0,4Cola | 8,99€" """
+    text = "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | " + coupon.titleShortened
+    priceFormatted = couponDBGetPriceFormatted(coupon)
+    if priceFormatted is not None:
+        text += " | " + priceFormatted
+    return text
+
+
+def generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon: Coupon, publicChannelName: str, messageID: int) -> str:
+    """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
+    text = "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
+        messageID) + "\">" + coupon.titleShortened + "</a>"
+    priceFormatted = couponDBGetPriceFormatted(coupon)
+    if priceFormatted is not None:
+        text += " | " + priceFormatted
+    return text
+
+
+def generateCouponLongText(coupon: Coupon) -> str:
+    """ Returns e.g. "2 Whopper + Mittlere Pommes + 0,4L Cola
+    Y15 | 8,99€ | -25% " """
+    text = coupon.title
+    text += "\n" + couponDBGetPLUOrUniqueID(coupon)
+    priceFormatted = couponDBGetPriceFormatted(coupon)
+    if priceFormatted is not None:
+        text += " | " + priceFormatted
+    percentReduced = couponDBGetReducedPercentageFormatted(coupon)
+    if percentReduced is not None:
+        text += " | " + percentReduced
+    return text
+
+
+def generateCouponLongTextFormatted(coupon: Coupon) -> str:
+    """ Returns e.g. "2 Whopper + Mittlere Pommes + 0,4L Cola
+     <b>Y15</b> | 8,99€ | -25% " """
+    text = coupon.title
+    text += "\n<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b>"
+    priceFormatted = couponDBGetPriceFormatted(coupon)
+    if priceFormatted is not None:
+        text += " | " + priceFormatted
+    percentReduced = couponDBGetReducedPercentageFormatted(coupon)
+    if percentReduced is not None:
+        text += " | " + percentReduced
+    return text
+
+
+def generateCouponLongTextFormattedWithHyperlinkToChannelPost(coupon: Coupon, publicChannelName: str, messageID: int) -> str:
+    """ Returns e.g. "2 Whopper + Mittlere Pommes +0,4L Cola (https://t.me/betterkingpublic/1054)
+     <b>Y15</b> | 8,99€ | -25% " """
+    text = "<a href=\"https://t.me/" + publicChannelName + '/' + str(
+        messageID) + "\">" + coupon.title + "</a>"
+    text += "\n<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b>"
+    priceFormatted = couponDBGetPriceFormatted(coupon)
+    if priceFormatted is not None:
+        text += " | " + priceFormatted
+    percentReduced = couponDBGetReducedPercentageFormatted(coupon)
+    if percentReduced is not None:
+        text += " | " + percentReduced
+    return text
+
+
+def generateCouponLongTextFormattedWithDescription(coupon: Coupon):
+    """
+    :param coupon: Coupon
+    :return: E.g. "<b>B3</b> | 1234 | 13.99€ | -50%\nGültig bis:19.06.2021\nCoupon.description"
+    """
+    price = couponDBGetPriceFormatted(coupon)
+    couponText = coupon.title + '\n'
+    if coupon.plu is not None:
+        couponText += '<b>' + coupon.plu + '</b>' + ' | ' + coupon.id
+    else:
+        couponText += '<b>' + coupon.id + '</b>'
+    if price is not None:
+        couponText += ' | ' + price
+    reducedPercentage = couponDBGetReducedPercentageFormatted(coupon)
+    if reducedPercentage is not None:
+        couponText += " | " + reducedPercentage
+    """ Expire date should be always given but we can't be 100% sure! """
+    expireDateFormatted = couponDBGetExpireDateFormatted(coupon)
+    if expireDateFormatted is not None:
+        couponText += '\nGültig bis ' + expireDateFormatted
+    if coupon.description is not None:
+        couponText += "\n" + coupon.description
+    return couponText
