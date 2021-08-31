@@ -5,6 +5,7 @@ import traceback
 from typing import Tuple, Union, List
 
 import schedule
+from couchdb import Database
 from furl import furl, urllib
 from telegram import Update, InlineKeyboardButton, InputMediaPhoto, Message, ReplyMarkup
 from telegram.error import RetryAfter, Unauthorized, BadRequest
@@ -20,9 +21,11 @@ from Helper import *
 from Crawler import BKCrawler, sortCouponsByPrice
 from Models import CouponFilter
 
-from UtilsCouponsDB import couponDBGetExpireDateFormatted, couponDBGetUniqueCouponID, \
-    couponDBGetTitleShortened, couponDBGetUniqueIdentifier, couponDBGetPriceFormatted, couponDBGetImageQR, couponDBGetReducedPercentageFormatted, isValidBotCoupon, \
-    couponDBGetImagePath, couponDBGetPLUOrUniqueID, Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice
+from UtilsCouponsDB import couponDBGetUniqueCouponID, \
+    couponDBGetTitleShortened, couponDBGetUniqueIdentifier, couponDBGetPriceFormatted, couponDBGetImageQR, isValidBotCoupon, \
+    couponDBGetImagePath, couponDBGetPLUOrUniqueID, Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, generateCouponLongTextFormatted, \
+    generateCouponLongTextFormattedWithDescription, generateCouponShortText, generateCouponShortTextFormatted, generateCouponShortTextFormattedWithHyperlinkToChannelPost, \
+    generateCouponLongTextFormattedWithHyperlinkToChannelPost, getCouponsSeparatedByType
 from CouponCategory import CouponCategory, BotAllowedCouponSources, CouponSource
 from UtilsOffers import offerGetImagePath
 
@@ -87,6 +90,7 @@ class BKBot:
                 CallbackVars.MENU_MAIN: [
                     # Main menu
                     CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),  # E.g. "back" button on error -> Go back to main menu
+                    CallbackQueryHandler(self.botDisplayAllCouponsListWithFullTitles, pattern='^' + CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES + '$'),
                     CallbackQueryHandler(self.botDisplayCoupons, pattern='.*a=dcs.*'),
                     CallbackQueryHandler(self.botDisplayCouponsWithImagesFavorites, pattern='^' + CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES + '$'),
                     CallbackQueryHandler(self.botDisplayOffers, pattern='^' + CallbackVars.MENU_OFFERS + '$'),
@@ -204,14 +208,15 @@ class BKBot:
         userDB = self.crawler.getUsersDB()
         """ New user --> Add userID to DB. """
         if str(update.effective_user.id) not in userDB:
-            # Add user to DB
+            # Add user to DB for the first time
             user = User(
                 id=str(update.effective_user.id)
             )
             user.store(userDB)
         allButtons = []
         if self.getPublicChannelName() is not None:
-            allButtons.append([InlineKeyboardButton('Alle Coupons + Pics + News', url='https://t.me/' + self.getPublicChannelName())])
+            allButtons.append([InlineKeyboardButton('Alle Coupons Liste + Pics + News', url='https://t.me/' + self.getPublicChannelName())])
+            allButtons.append([InlineKeyboardButton('Alle Coupons Liste lange Titel + Pics', callback_data=CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES)])
         if len(self.crawler.cachedAvailableCouponSources) != 1:
             # Only show these two buttons if more than one coupon source is available and also if none is available (else our main menu would be nearly completely empty which would probably confuse our users)
             allButtons.append([InlineKeyboardButton('Alle Coupons', callback_data="?a=dcs&m=" + CouponDisplayMode.ALL + "&cs=")])
@@ -244,6 +249,18 @@ class BKBot:
             self.sendMessage(chat_id=update.effective_message.chat_id, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
         return CallbackVars.MENU_MAIN
 
+    def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
+        """ Send list containing all coupons with long titles linked to coupon channel to user. This may result in up to 10 messages being sent! """
+        update.callback_query.answer()
+        activeCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+        self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True, channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None,
+                                                allowMessageEdit=False)
+        # Delete last message containing menu as it is of no use for us anymore
+        self.deleteMessage(chat_id=update.effective_user.id, messageID=update.callback_query.message.message_id)
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
+        self.updater.bot.send_message(chat_id=update.effective_user.id, text="Alle " + str(len(activeCoupons)) + " Coupons als Liste mit langen Titeln", reply_markup=reply_markup)
+        return CallbackVars.MENU_MAIN
+
     def botDisplayCoupons(self, update: Update, context: CallbackContext):
         """ Displays all coupons in a pre selected mode """
         callbackVar = update.callback_query.data
@@ -258,24 +275,29 @@ class BKBot:
             menuText = None
             highlightFavorites = True
             user = User.load(self.couchdb[DATABASES.TELEGRAM_USERS], str(update.effective_user.id))
-            displayHiddenCouponsWithinOtherCategories = None if (user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
+            displayHiddenCouponsWithinOtherCategories = None if (
+                        user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
             if mode == CouponDisplayMode.ALL:
                 # Display all coupons
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories))
+                coupons = self.getFilteredCoupons(
+                    CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories))
                 menuText = '<b>' + str(len(coupons)) + ' Coupons verfügbar:</b>'
             elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                 # Display all coupons without menu
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
+                coupons = self.getFilteredCoupons(
+                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
                 menuText = '<b>' + str(len(coupons)) + ' Coupons ohne Menü verfügbar:</b>'
             elif mode == CouponDisplayMode.CATEGORY:
                 # Display all coupons of a particular category
                 couponSrc = int(urlinfo['cs'])
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories))
+                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=None,
+                                                               isHidden=displayHiddenCouponsWithinOtherCategories))
                 menuText = '<b>' + str(len(coupons)) + ' ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' verfügbar:</b>'
             elif mode == CouponDisplayMode.CATEGORY_WITHOUT_MENU:
                 # Display all coupons of a particular category without menu
                 couponSrc = int(urlinfo['cs'])
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
+                coupons = self.getFilteredCoupons(
+                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
                 menuText = '<b>' + str(len(coupons)) + ' ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' ohne Menü verfügbar:</b>'
             elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                 # Display all hidden App coupons (ONLY)
@@ -329,6 +351,7 @@ class BKBot:
                     unavailableCouponsText += ' | ' + couponDBGetPriceFormatted(coupon)
                 numberofUnavailableFavorites += 1
         if len(validFavoriteCoupons) == 0:
+            # Edge case
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
             menuText = SYMBOLS.WARNING + '\n<b>Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' favorisierten Coupons verfügbar:</b>'
             menuText += unavailableCouponsText
@@ -390,7 +413,7 @@ class BKBot:
             if uniqueCouponID in userFavoritesDict:
                 buttonText += SYMBOLS.STAR
                 containsAtLeastOneFavoriteCoupon = True
-            buttonText += self.generateCouponShortText(coupon)
+            buttonText += generateCouponShortText(coupon)
 
             buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + uniqueCouponID + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
             index += 1
@@ -623,7 +646,7 @@ class BKBot:
         """
         favoriteKeyboard = self.getCouponFavoriteKeyboard(isFavorite, coupon.id, CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING)
         replyMarkupWithoutBackButton = InlineKeyboardMarkup([favoriteKeyboard, []])
-        couponText = self.getCouponLongText(coupon)
+        couponText = generateCouponLongTextFormattedWithDescription(coupon)
         if additionalText is not None:
             couponText += '\n' + additionalText
         msgQR = None
@@ -637,7 +660,7 @@ class BKBot:
                              disable_web_page_preview=True)
         else:
             msgCoupon = self.sendPhoto(chat_id=update.effective_message.chat_id, photo=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML',
-                                               reply_markup=replyMarkupWithoutBackButton)
+                                       reply_markup=replyMarkupWithoutBackButton)
         # Update coupon image cache
         if coupon.id not in self.couponImageCache:
             self.couponImageCache[coupon.id] = {PhotoCacheVars.UNIQUE_IDENTIFIER: couponDBGetUniqueIdentifier(coupon), PhotoCacheVars.FILE_ID: msgCoupon.photo[0].file_id,
@@ -685,50 +708,10 @@ class BKBot:
             favoriteKeyboard.append(InlineKeyboardButton(SYMBOLS.STAR + ' Favorit speichern', callback_data='plu,' + uniqueCouponID + ',togglefav,' + callbackBack))
         return favoriteKeyboard
 
-    def getCouponLongText(self, coupon: Coupon):
-        """
-        :param coupon: Coupon
-        :return: E.g. "<b>B3</b> | 1234 | 13.99€ | -50%\nGültig bis:19.06.2021\Coupon.description"
-        """
-        price = couponDBGetPriceFormatted(coupon)
-        couponText = coupon.title + '\n'
-        if coupon.plu is not None:
-            couponText += '<b>' + coupon.plu + '</b>' + ' | ' + coupon.id
-        else:
-            couponText += '<b>' + coupon.id + '</b>'
-        if price is not None:
-            couponText += ' | ' + price
-            reducedPercentage = couponDBGetReducedPercentageFormatted(coupon)
-            if reducedPercentage is not None:
-                couponText += " | " + reducedPercentage
-        """ Expire date should be always given but we can't be 100% sure! """
-        expireDateFormatted = couponDBGetExpireDateFormatted(coupon)
-        if expireDateFormatted is not None:
-            couponText += '\nGültig bis ' + expireDateFormatted
-        if coupon.description is not None:
-            couponText += "\n" + coupon.description
-        return couponText
-
     def generateCouponShortTextWithHyperlinkToChannelPost(self, coupon: Coupon, messageID: int) -> str:
-        """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4LCola (https://t.me/betterkingpublic/1054) | 8,99€" """
+        """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         text = "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
             messageID) + "\">" + coupon.titleShortened + "</a>"
-        priceFormatted = couponDBGetPriceFormatted(coupon)
-        if priceFormatted is not None:
-            text += " | " + priceFormatted
-        return text
-
-    def generateCouponShortText(self, coupon: Coupon) -> str:
-        """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4LCola | 8,99€" """
-        text = couponDBGetPLUOrUniqueID(coupon) + " | " + coupon.titleShortened
-        priceFormatted = couponDBGetPriceFormatted(coupon)
-        if priceFormatted is not None:
-            text += " | " + priceFormatted
-        return text
-
-    def generateCouponShortTextFormatted(self, coupon: Coupon) -> str:
-        """ Returns e.g. "<b>Y15</b> | 2Whopper+M🍟+0,4LCola | 8,99€" """
-        text = "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | " + coupon.titleShortened
         priceFormatted = couponDBGetPriceFormatted(coupon)
         if priceFormatted is not None:
             text += " | " + priceFormatted
@@ -844,14 +827,15 @@ class BKBot:
             if coupon.id in channelDB:
                 messageIDs = ChannelCoupon.load(channelDB, coupon.id).messageIDs
                 if len(messageIDs) > 0:
-                    couponText = self.generateCouponShortTextWithHyperlinkToChannelPost(coupon, messageIDs[0])
+                    couponText = generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon, self.getPublicChannelName(), messageIDs[0])
                 else:
                     # This should never happen but we'll allow it to
                     logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
-                    couponText = self.generateCouponShortTextFormatted(coupon)
+                    couponText = generateCouponShortTextFormatted(coupon)
             else:
+                # This should never happen but we'll allow it to anyways
                 logging.warning("Can't hyperlink coupon because it is not in channelDB: " + coupon.id)
-                couponText = self.generateCouponShortTextFormatted(coupon)
+                couponText = generateCouponShortTextFormatted(coupon)
             infoText += '\n' + couponText
 
             if index == maxNewCouponsDescriptionLines - 1:
@@ -949,6 +933,130 @@ class BKBot:
                 logging.info("Deleting cache item " + str(cacheID) + " as it was last used before: " + str(cacheItemAge) + " seconds")
                 del cacheDict[cacheID]
 
+    def sendCouponOverviewWithChannelLinks(self, chat_id: Union[int, str], coupons: dict, useLongCouponTitles: bool, channelDB: Database, infoDB: Union[None, Database],
+                                           infoDBDoc: Union[None, InfoEntry], allowMessageEdit: bool):
+        """ Sends all given coupons to given chat_id separated by source and split into multiple messages as needed. """
+        couponsSeparatedByType = getCouponsSeparatedByType(coupons)
+        """ Update/re-send coupon overview(s), spread this information on multiple pages if needed. """
+        for couponSourceIndex in range(len(BotAllowedCouponSources)):
+            couponSource = BotAllowedCouponSources[couponSourceIndex]
+            couponCategory = CouponCategory(couponSource)
+            logging.info("Working on coupon overview update " + str(couponSourceIndex + 1) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.nameSingular)
+            hasAddedSeparatorAfterCouponsWithoutMenu = False
+            listContainsAtLeastOneItemWithoutMenu = False
+            dbKeyMessageIDsCouponType = INFO_DB.DB_INFO_channel_last_coupon_type_overview_message_ids + str(couponSource)
+            messageIDsForThisCategory = None if infoDBDoc is None else infoDBDoc.setdefault(dbKeyMessageIDsCouponType, [])
+            if couponSource in couponsSeparatedByType:
+                # allowMessageEdit == True --> Handling untested!
+                coupons = couponsSeparatedByType[couponSource]
+                # Depends on the max entities per post limit of Telegram and we're not only using hyperlinks but also the "<b>" tag so we do not have 50 hyperlinks left but 49.
+                maxCouponsPerPage = 49
+                maxPage = math.ceil(len(coupons) / maxCouponsPerPage)
+                if allowMessageEdit and messageIDsForThisCategory is not None:
+                    # Delete pages if there are too many
+                    if len(messageIDsForThisCategory) > maxPage:
+                        deleteStartIndex = (len(messageIDsForThisCategory) - (len(messageIDsForThisCategory) - maxPage)) - 1
+                        for index in range(deleteStartIndex, len(messageIDsForThisCategory)):
+                            infoDBDoc.messageIDsToDelete.append(messageIDsForThisCategory[index])
+                        # Update our array as we fill it again later
+                        del messageIDsForThisCategory[deleteStartIndex: len(messageIDsForThisCategory)]
+                        # Update DB
+                        infoDBDoc.store(infoDB)
+                elif messageIDsForThisCategory is not None and len(messageIDsForThisCategory) > 0 and infoDBDoc is not None:
+                    # Delete all old pages for current coupon type
+                    # Save old messages for later deletion
+                    infoDBDoc[InfoEntry.messageIDsToDelete.name] += messageIDsForThisCategory
+                    messageIDsForThisCategory.clear()
+                    # Update DB
+                    infoDBDoc.store(infoDB)
+                for page in range(1, maxPage + 1):
+                    logging.info("Sending category page: " + str(page) + "/" + str(maxPage))
+                    couponOverviewText = "<b>[" + str(len(coupons)) + " Stück] " + couponCategory.nameSingular + " Übersicht"
+                    if couponCategory.displayDescription:
+                        couponOverviewText += "\n" + couponCategory.description
+                    if maxPage > 1:
+                        couponOverviewText += " Teil " + str(page) + " / " + str(maxPage)
+                    couponOverviewText += "</b>"
+                    startIndex = page * maxCouponsPerPage - maxCouponsPerPage
+                    for couponIndex in range(startIndex, startIndex + maxCouponsPerPage):
+                        coupon = coupons[couponIndex]
+                        """ Add a little separator so it is easier for the user to distinguish between coupons with- and without menu. 
+                        This only works as "simple" as that because we pre-sorted these coupons!
+                        """
+                        if not coupon.containsFriesOrCoke:
+                            listContainsAtLeastOneItemWithoutMenu = True
+                        elif not hasAddedSeparatorAfterCouponsWithoutMenu and listContainsAtLeastOneItemWithoutMenu:
+                            couponOverviewText += '\n<b>' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + 'Coupons mit Menü' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + '</b>'
+                            hasAddedSeparatorAfterCouponsWithoutMenu = True
+                        """ Generates e.g. "Y15 | 2Whopper+M🍟+0,4LCola | 8,99€"
+                        Returns the same with hyperlink if a chat_id is given for this coupon e.g.:
+                        "Y15 | 2Whopper+M🍟+0,4LCola (https://t.me/betterkingpublic/1054) | 8,99€"
+                        """
+                        if coupon.id in channelDB:
+                            channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
+                            if len(channelCoupon.messageIDs) > 0:
+                                if useLongCouponTitles:
+                                    couponText = generateCouponLongTextFormattedWithHyperlinkToChannelPost(coupon, self.getPublicChannelName(), channelCoupon.messageIDs[0])
+                                else:
+                                    couponText = generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon, self.getPublicChannelName(), channelCoupon.messageIDs[0])
+                            else:
+                                # This should never happen but we'll allow it to
+                                logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
+                                if useLongCouponTitles:
+                                    couponText = generateCouponLongTextFormatted(coupon)
+                                else:
+                                    couponText = generateCouponShortTextFormatted(coupon)
+                        else:
+                            # This should never happen but we'll allow it to
+                            logging.warning("Can't hyperlink coupon because it is not in channelDB: " + coupon.id)
+                            if useLongCouponTitles:
+                                couponText = generateCouponLongTextFormatted(coupon)
+                            else:
+                                couponText = generateCouponShortTextFormatted(coupon)
+
+                        couponOverviewText += '\n' + couponText
+                        # Exit loop after last coupon info has been added
+                        if couponIndex == len(coupons) - 1:
+                            break
+                    if allowMessageEdit and page - 1 <= len(messageIDsForThisCategory) - 1:
+                        # Edit last post of current page
+                        msgIDToEdit = messageIDsForThisCategory[page - 1]
+                        self.editMessage(chat_id=chat_id, message_id=msgIDToEdit, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True)
+                    else:
+                        # Send new post containing current page
+                        msg = self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
+                                                disable_notification=True)
+                        if messageIDsForThisCategory is not None:
+                            messageIDsForThisCategory.append(msg.message_id)
+                        if infoDBDoc is not None:
+                            # Update DB
+                            infoDBDoc.store(infoDB)
+            elif messageIDsForThisCategory is not None and len(messageIDsForThisCategory) > 0:
+                """ Cleanup chat:
+                Typically needed if a complete supported coupon type was there but is not existant anymore e.g. paper coupons were there but aren't existant anymore -> Delete old overview-message(s) """
+                self.deleteMessages(chat_id=chat_id, messageIDs=messageIDsForThisCategory)
+                if infoDBDoc is not None:
+                    del infoDBDoc[dbKeyMessageIDsCouponType]
+                    infoDBDoc.store(infoDB)
+            else:
+                # Rare case
+                logging.info("Nothing to do: No coupons of this type available and no old ones to delete :)")
+
+        pass
+
+    def deleteMessages(self, chat_id: Union[int, str], messageIDs: Union[List[int], None]):
+        """ Deletes array of messageIDs. """
+        if messageIDs is None:
+            return
+        index = 0
+        for msgID in messageIDs:
+            logging.info("Deleting message " + str(index + 1) + " / " + str(len(messageIDs)) + " | " + str(msgID))
+            self.deleteMessage(chat_id=chat_id, messageID=msgID)
+            index += 1
+
+    def editMessage(self, chat_id: Union[int, str], message_id: Union[int, str], text: str, parse_mode: str = None, disable_web_page_preview: bool = False):
+        self.updater.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text, parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
+
     def sendMessage(self, chat_id: Union[int, str], text: Union[str, None] = None, parse_mode: Union[None, str] = None,
                     disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
                     reply_markup: ReplyMarkup = None
@@ -969,7 +1077,7 @@ class BKBot:
         """ Wrapper """
         return self.processMessage(chat_id=chat_id, media=media, disable_notification=disable_notification)
 
-    def processMessage(self, chat_id: Union[int, str], maxRetries: int = 3, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
+    def processMessage(self, chat_id: Union[int, str], maxTries: int = 15, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
                        disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
                        reply_markup: 'ReplyMarkup' = None,
                        media: Union[None, List[
@@ -980,7 +1088,7 @@ class BKBot:
         """ This will take care of "flood control exceeded" API errors (RetryAfter Errors). """
         retryNumber = -1
         lastException = None
-        while retryNumber < maxRetries:
+        while retryNumber < maxTries:
             try:
                 retryNumber += 1
                 if media is not None:
@@ -988,7 +1096,8 @@ class BKBot:
                     return self.updater.bot.sendMediaGroup(chat_id=chat_id, disable_notification=disable_notification, media=media)
                 elif photo is not None:
                     # Photo
-                    return self.updater.bot.send_photo(chat_id=chat_id, disable_notification=disable_notification, parse_mode=parse_mode, photo=photo, reply_markup=reply_markup, caption=caption
+                    return self.updater.bot.send_photo(chat_id=chat_id, disable_notification=disable_notification, parse_mode=parse_mode, photo=photo, reply_markup=reply_markup,
+                                                       caption=caption
                                                        )
                 else:
                     # Text message
@@ -998,15 +1107,16 @@ class BKBot:
                 # https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this
                 lastException = retryError
                 """ Rate-Limit errorhandling: Wait some time and try again (one retry should do the job) """
-                logging.info("Rate limit reached, waiting " + str(retryError.retry_after) + " seconds | Retry number: " + str(retryNumber))
+                logging.info("Rate limit reached, waiting " + str(retryError.retry_after) + " seconds | Try number: " + str(retryNumber))
                 time.sleep(retryError.retry_after)
                 continue
             except BadRequest as requesterror:
                 if requesterror.message == 'Group send failed':
                     # 2021-08-17: For unknown reasons this keeps happening sometimes...
+                    # 2021-08-31: Seems like this is also some kind of rate limit or the same as the other one but no retry_after value given...
                     lastException = requesterror
                     waitseconds = 3
-                    logging.info("Group send failed, waiting " + str(waitseconds) + " seconds | Retry number: " + str(retryNumber))
+                    logging.info("Group send failed, waiting " + str(waitseconds) + " seconds | Try number: " + str(retryNumber))
                     time.sleep(3)
                     continue
                 else:
@@ -1040,6 +1150,10 @@ if __name__ == '__main__':
     """ Always run bot first. """
     bkbot.startBot()
     """ Check for special flag to force-run batch process immediately. """
+    # First the ones which can be combined with others and need to be executed first
+    if 'crawl' in sys.argv:
+        bkbot.crawl()
+    # Now the ones where only one is allowed
     if 'forcechannelupdate' in sys.argv:
         bkbot.updatePublicChannel()
         bkbot.cleanupPublicChannel()
@@ -1064,8 +1178,6 @@ if __name__ == '__main__':
         cleanupChannel(bkbot)
     elif 'migrate' in sys.argv:
         bkbot.crawler.migrateDBs()
-    elif 'crawl' in sys.argv:
-        bkbot.crawl()
     # schedule.every(10).seconds.do(bkbot.startBot)
     while True:
         schedule.run_pending()

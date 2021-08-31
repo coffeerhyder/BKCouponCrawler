@@ -1,6 +1,6 @@
 from telegram import InlineKeyboardMarkup
 
-VERSION = '1.3.7'
+VERSION = '1.3.8'
 
 
 def getBotImpressum() -> str:
@@ -25,6 +25,7 @@ class Config:
 
 class CallbackVars:
     MENU_MAIN = 'menu_main'
+    MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES = 'menu_display_all_coupons_list_with_full_titles'
     MENU_DISPLAY_COUPON = 'menu_display_coupon'
     MENU_COUPONS_WITH_IMAGES = 'menu_coupons_with_images'
     MENU_COUPONS_FAVORITES_WITH_IMAGES = 'menu_coupon_favorites_with_images'
