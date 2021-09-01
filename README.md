@@ -4,6 +4,11 @@ Burger King Coupon Telegram Bot
 <html><img src="https://www.picflash.org/viewer.php?img=Logo36AUIGS.jpg" width="220" height="216" /> </br>
 <img src="https://www.picflash.org/viewer.php?img=2021_01_24_Showcase_21OL5XA.png" width="360" height="640" /> </br> </html>
 
+# Features
+* Alle Burger King Coupons ohne App & Accountzwang
+* Crawler und Bot getrennt: Crawler kann einfach für andere Projekte verwendet werden
+* Coupons sortiert, aufgeräumt und teils mit zusätzlichen Informationen (Originalpreis, Rabatt, Typ)
+
 **Video:**  
 https://www.bitchute.com/video/eoMYCfag5oiM/
 
@@ -124,6 +129,8 @@ Features:
 - Favoriten speichern & optionale Benachrichtigung bei Wiederverfügbarkeit
 - Kein Tracking
 - Offline verwendbar (sofern Bilder vorher geladen wurden)
+- Source: github.com/BetterKingBot/BKCouponCrawler
+Made with ❤ and 🍻 during 😷
 ```
 
 ### Channel Description
@@ -131,6 +138,7 @@ Features:
 Made with ❤ and 🍻 during 😷
 Zum Bot: @BetterKingBot
 Feedback/Support: bkfeedback@pm.me
+Source: github.com/BetterKingBot/BKCouponCrawler
 ```
 
 ### Channel angepinnter Post mit Papiercoupons Datei & Verlinkung
