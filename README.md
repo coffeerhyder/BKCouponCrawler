@@ -4,6 +4,11 @@ Burger King Coupon Telegram Bot
 <html><img src="https://www.picflash.org/viewer.php?img=Logo36AUIGS.jpg" width="220" height="216" /> </br>
 <img src="https://www.picflash.org/viewer.php?img=2021_01_24_Showcase_21OL5XA.png" width="360" height="640" /> </br> </html>
 
+# Features
+* Alle Burger King Coupons ohne App & Accountzwang
+* Crawler und Bot getrennt: Crawler kann einfach für andere Projekte verwendet werden
+* Coupons sortiert, aufgeräumt und teils mit zusätzlichen Informationen (Originalpreis, Rabatt, Typ)
+
 **Video:**  
 https://www.bitchute.com/video/eoMYCfag5oiM/
 
@@ -20,8 +25,7 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 5. `config.json.default` in `config.json` umbenennen und eigene Daten eintragen (siehe unten).
 6. Eine wichtige couchDB Einstellung festlegen:
 ``` max_document_id_number ``` --> Auf 1000 setzen siehe: https://docs.couchdb.org/en/latest/config/misc.html#purge
-7. `Crawler.py` einmalig durchlaufen lassen.  
-8. `BKBot.py` starten.
+7. `BKBot.py` einmalig mit dem Parameter `crawl` aufrufen.
 
 
 # config.json (siehe config.json.default)
@@ -84,6 +88,21 @@ ID | Interne Bezeichnung | Beschreibung
 6 | ONLINE_ONLY_STORE_SPECIFIC | Coupons, die nur in bestimmten Filialen einlösbar sind -> Derzeit ist das nur ein Platzhalter
 7 | SPECIAL | Spezielle Coupons, die manuell über die ``config_special_coupons.json`` eingefügt werden können.
 
+### Codebeispiel Crawler
+```
+crawler = BKCrawler()
+# Nur für den Bot geeignete Coupons crawlen oder alle?
+crawler.setCrawlOnlyBotCompatibleCoupons(True)
+# CSV Export bei jedem Crawlvorgang?
+crawler.setExportCSVs(False)
+# Coupons crawlen und Bilder herunterladen
+crawler.crawlAndProcessData()
+# Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
+activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+# Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
+activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=CouponSource.APP, containsFriesAndCoke=None, isHidden=True))
+```
+
 # TODOs
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
@@ -124,6 +143,8 @@ Features:
 - Favoriten speichern & optionale Benachrichtigung bei Wiederverfügbarkeit
 - Kein Tracking
 - Offline verwendbar (sofern Bilder vorher geladen wurden)
+- Source: github.com/BetterKingBot/BKCouponCrawler
+Made with ❤ and 🍻 during 😷
 ```
 
 ### Channel Description
@@ -131,6 +152,7 @@ Features:
 Made with ❤ and 🍻 during 😷
 Zum Bot: @BetterKingBot
 Feedback/Support: bkfeedback@pm.me
+Source: github.com/BetterKingBot/BKCouponCrawler
 ```
 
 ### Channel angepinnter Post mit Papiercoupons Datei & Verlinkung
