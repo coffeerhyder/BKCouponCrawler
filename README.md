@@ -25,8 +25,7 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 5. `config.json.default` in `config.json` umbenennen und eigene Daten eintragen (siehe unten).
 6. Eine wichtige couchDB Einstellung festlegen:
 ``` max_document_id_number ``` --> Auf 1000 setzen siehe: https://docs.couchdb.org/en/latest/config/misc.html#purge
-7. `Crawler.py` einmalig durchlaufen lassen.  
-8. `BKBot.py` starten.
+7. `BKBot.py` einmalig mit dem Parameter `crawl` aufrufen.
 
 
 # config.json (siehe config.json.default)
@@ -88,6 +87,21 @@ ID | Interne Bezeichnung | Beschreibung
 5 | ONLINE_ONLY | Coupons ohne short PLU Code, die wenn überhaupt nur online oder per QR Code (Terminal) bestellbar sind.
 6 | ONLINE_ONLY_STORE_SPECIFIC | Coupons, die nur in bestimmten Filialen einlösbar sind -> Derzeit ist das nur ein Platzhalter
 7 | SPECIAL | Spezielle Coupons, die manuell über die ``config_special_coupons.json`` eingefügt werden können.
+
+### Codebeispiel Crawler
+```
+crawler = BKCrawler()
+# Nur für den Bot geeignete Coupons crawlen oder alle?
+crawler.setCrawlOnlyBotCompatibleCoupons(True)
+# CSV Export bei jedem Crawlvorgang?
+crawler.setExportCSVs(False)
+# Coupons crawlen und Bilder herunterladen
+crawler.crawlAndProcessData()
+# Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
+activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+# Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
+activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=CouponSource.APP, containsFriesAndCoke=None, isHidden=True))
+```
 
 # TODOs
 * resumechannelupdate verbessern

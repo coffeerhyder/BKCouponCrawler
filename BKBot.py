@@ -305,7 +305,7 @@ class BKBot:
             elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                 # Display all hidden App coupons (ONLY)
                 couponSrc = int(urlinfo['cs'])
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=None, isHidden=True))
+                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[CouponSource.APP], containsFriesAndCoke=None, isHidden=True))
                 menuText = '<b>' + str(len(coupons)) + ' versteckte ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' verfügbar:</b>'
             elif mode == CouponDisplayMode.FAVORITES:
                 coupons, unavailableCouponsText = self.getValidUserFavoritesAndUnavailableFavoritesString(user)

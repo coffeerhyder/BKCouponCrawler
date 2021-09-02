@@ -15,7 +15,10 @@
 from furl import furl, urllib
 from urllib.parse import urlparse, parse_qs
 
-from UtilsCouponsDB import Coupon, ChannelCoupon, InfoEntry
+from CouponCategory import BotAllowedCouponSources, CouponSource
+from Crawler import BKCrawler
+from Models import CouponFilter
+from UtilsCouponsDB import Coupon, ChannelCoupon, InfoEntry, CouponSortMode
 
 url = "?action=displaycoupons&which=favorites&page=3"
 o = urlparse(url)
@@ -56,3 +59,18 @@ cp = ChannelCoupon(messageIDs=[4, 5, 6])
 # infoDoc.messageIDsToDelete += cp.messageIDs
 infoDoc[InfoEntry.messageIDsToDelete.name] += cp[ChannelCoupon.messageIDs.name]
 print(str(infoDoc.messageIDsToDelete))
+
+# Crawler example code for readme.md
+
+crawler = BKCrawler()
+# Nur für den Bot geeignete Coupons crawlen oder alle
+crawler.setCrawlOnlyBotCompatibleCoupons(True)
+# CSV Export bei jedem Crawlvorgang (de-)aktivieren
+crawler.setExportCSVs(False)
+# Coupons crawlen
+crawler.crawlAndProcessData()
+# Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
+activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+# Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
+activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=CouponSource.APP, containsFriesAndCoke=None, isHidden=True))
+
