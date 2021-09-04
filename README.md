@@ -63,6 +63,7 @@ Siehe config_special_coupons.json
 ```  
 
 ### Mögliche Start-Parameter für `BKBot.py`:  
+Die meisten Parameter sind nur einzeln verwendbar.  
 
 Parameter | Beschreibung
 --- | ---
@@ -91,11 +92,14 @@ ID | Interne Bezeichnung | Beschreibung
 ### Codebeispiel Crawler
 ```
 crawler = BKCrawler()
-# Nur für den Bot geeignete Coupons crawlen oder alle?
+""" Nur für den Bot geeignete Coupons crawlen oder alle?
+ Wenn du den Bot 'produktiv' einsetzt, solltest du alle ressourcenhungrigen Schalter deaktivieren (= default). """
 crawler.setCrawlOnlyBotCompatibleCoupons(True)
-# CSV Export bei jedem Crawlvorgang?
+# History Datenbank aufbauen z.B. zur späteren Auswertung?
+crawler.setKeepHistory(True)
+# CSV Export bei jedem Crawlvorgang (de-)aktivieren
 crawler.setExportCSVs(False)
-# Coupons crawlen und Bilder herunterladen
+# Coupons crawlen
 crawler.crawlAndProcessData()
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
 activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))

@@ -63,8 +63,11 @@ print(str(infoDoc.messageIDsToDelete))
 # Crawler example code for readme.md
 
 crawler = BKCrawler()
-# Nur für den Bot geeignete Coupons crawlen oder alle
+""" Nur für den Bot geeignete Coupons crawlen oder alle?
+ Wenn du den Bot 'produktiv' einsetzt, solltest du alle ressourcenhungrigen Schalter deaktivieren (= default). """
 crawler.setCrawlOnlyBotCompatibleCoupons(True)
+# History Datenbank aufbauen z.B. zur späteren Auswertung?
+crawler.setKeepHistory(True)
 # CSV Export bei jedem Crawlvorgang (de-)aktivieren
 crawler.setExportCSVs(False)
 # Coupons crawlen
