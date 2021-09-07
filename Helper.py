@@ -236,12 +236,12 @@ def getFilenameFromURL(url: str) -> str:
     return filenameURL
 
 
-def couponTitleContainsFriesOrCoke(title: str) -> bool:
+def couponTitleContainsFriesOrCoke(titleLower: str) -> bool:
     # title to lowercase for more thoughtless string comparison
-    title = title.lower()
-    if re.compile(r'(?i).*king\s*jr\s*\.?\s*meal.*').search(title):
+    titleLower = titleLower.lower()
+    if re.compile(r'.*king\s*jr\s*\.?\s*meal.*').search(titleLower):
         return True
-    elif '+' in title and (('pommes' in title or 'fries' in title) and 'cola' in title):  # 2021-04-13: Chili Cheese Fries are now treated the same way as normal fries are!
+    elif '+' in titleLower and (('pommes' in titleLower or 'fries' in titleLower) and ('cola' in titleLower or re.compile(r'red\s*bull').search(titleLower))):  # 2021-04-13: Chili Cheese Fries are now treated the same way as normal fries are!
         return True
     else:
         return False
