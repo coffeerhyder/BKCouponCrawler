@@ -308,7 +308,7 @@ class BKBot:
                 coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[CouponSource.APP], containsFriesAndCoke=None, isHidden=True))
                 menuText = '<b>' + str(len(coupons)) + ' versteckte ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' verfügbar:</b>'
             elif mode == CouponDisplayMode.FAVORITES:
-                coupons, unavailableCouponsText = self.getValidUserFavoritesAndUnavailableFavoritesString(user)
+                coupons, unavailableCouponsText = self.getFavoritesInfo2(user)
                 menuText = SYMBOLS.STAR + str(len(coupons)) + ' Favoriten verfügbar ' + SYMBOLS.STAR
                 numberofCouponsWithoutPrice = 0
                 totalSum = 0
@@ -329,48 +329,6 @@ class BKBot:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_MAIN
 
-    def getValidUserFavoritesAndUnavailableFavoritesString(self, user: User) -> Tuple[List[Coupon], str]:
-        """
-        Returns favorites of current user. Raises Exception if e.g. user has no favorites or all of his favorites are expired.
-        """
-        if len(user.favoriteCoupons) == 0:
-            menuText = '<b>Du hast noch keine Favoriten!</b>'
-            raise BetterBotException(menuText, InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
-        # Prefer custom code over crawler function as it requires less CPU cycles
-        # Collect users' currently existing favorite coupons
-        validFavoriteCoupons = []
-        unavailableCouponsText = ''
-        numberofUnavailableFavorites = 0
-        productiveCouponDB = self.crawler.getCouponDB()
-        for uniqueCouponID, coupon in user.favoriteCoupons.items():
-            couponFromProductiveDB = Coupon.load(productiveCouponDB, uniqueCouponID)
-            if couponFromProductiveDB is not None and isValidBotCoupon(couponFromProductiveDB):
-                validFavoriteCoupons.append(couponFromProductiveDB)
-            else:
-                # User chosen favorite coupon has expired or is not in DB
-                coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
-                unavailableCouponsText += '\n' + uniqueCouponID + ' | ' + couponDBGetTitleShortened(coupon)
-                if coupon.price is not None:
-                    unavailableCouponsText += ' | ' + couponDBGetPriceFormatted(coupon)
-                numberofUnavailableFavorites += 1
-        if len(validFavoriteCoupons) == 0:
-            # Edge case
-            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
-            menuText = SYMBOLS.WARNING + '\n<b>Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' favorisierten Coupons verfügbar:</b>'
-            menuText += unavailableCouponsText
-            raise BetterBotException(menuText, reply_markup)
-        if len(unavailableCouponsText) > 0:
-            unavailableCouponsText = '\n' + SYMBOLS.WARNING + str(numberofUnavailableFavorites) + ' deiner Favoriten sind abgelaufen:' + '\n' + unavailableCouponsText.strip()
-            if user.settings.notifyWhenFavoritesAreBack:
-                # 2021-08-27: Removed this text to purify the favorites overview -> It contains a lot of text already!
-                # unavailableCouponsText += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
-                pass
-            else:
-                unavailableCouponsText += '\n' + SYMBOLS.INFORMATION + 'Schau in die Einstellungen: Lasse dich benachrichtigen, wenn abgelaufene Coupons wieder verfügbar sind oder lösche diese mit einem Klick.'
-                # unavailableCouponsText += '\nEbenfalls kannst du abgelaufene Favoriten in den Einstellungen löschen.'
-        validFavoriteCoupons = sortCouponsByPrice(validFavoriteCoupons)
-        return validFavoriteCoupons, unavailableCouponsText
-
     def getUnavailableFavoriteCouponIDs(self, user: User) -> list:
         """ Returns all couponIDs which the user has set as favorite but which are not available (expired) at this moment. """
         if len(user.favoriteCoupons) == 0:
@@ -386,6 +344,57 @@ class BKBot:
             elif not isValidBotCoupon(coupon):
                 inactiveFavoriteCouponIDs.append(favoriteCouponID)
         return inactiveFavoriteCouponIDs
+
+    def getFavoritesInfo(self, user: User, productiveCouponDB: Database):
+        availableFavoriteCoupons = []
+        unavailableFavoriteCoupons = []
+        unavailableCouponsText = ''
+        numberofUnavailableFavorites = 0
+        for uniqueCouponID, coupon in user.favoriteCoupons.items():
+            couponFromProductiveDB = Coupon.load(productiveCouponDB, uniqueCouponID)
+            if couponFromProductiveDB is not None and isValidBotCoupon(couponFromProductiveDB):
+                availableFavoriteCoupons.append(couponFromProductiveDB)
+            else:
+                # User chosen favorite coupon has expired or is not in DB
+                coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
+                unavailableFavoriteCoupons.append(coupon)
+                if len(unavailableCouponsText) > 0:
+                    unavailableCouponsText += '\n'
+                unavailableCouponsText += uniqueCouponID + ' | ' + couponDBGetTitleShortened(coupon)
+                if coupon.price is not None:
+                    unavailableCouponsText += ' | ' + couponDBGetPriceFormatted(coupon)
+                numberofUnavailableFavorites += 1
+        return availableFavoriteCoupons, unavailableFavoriteCoupons, unavailableCouponsText
+
+    def getFavoritesInfo2(self, user: User) -> Tuple[List[Coupon], str]:
+        """
+        Returns price-sorted list of favorites of current user along with a text containing all unavailable favorites.
+        Raises Exception if e.g. user has no favorites or all of his favorites are expired.
+        """
+        if len(user.favoriteCoupons) == 0:
+            menuText = '<b>Du hast noch keine Favoriten!</b>'
+            raise BetterBotException(menuText, InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
+        # Prefer custom code over crawler function as it requires less CPU cycles
+        # Collect users' currently existing favorite coupons
+        productiveCouponDB = self.crawler.getCouponDB()
+        availableFavoriteCoupons, unavailableFavoriteCoupons, unavailableCouponsText = self.getFavoritesInfo(user, productiveCouponDB)
+        if len(availableFavoriteCoupons) == 0:
+            # Edge case
+            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
+            menuText = SYMBOLS.WARNING + '\n<b>Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' favorisierten Coupons verfügbar:</b>'
+            menuText += unavailableCouponsText
+            raise BetterBotException(menuText, reply_markup)
+        if len(unavailableFavoriteCoupons) > 0:
+            unavailableCouponsText = '\n' + SYMBOLS.WARNING + str(len(unavailableFavoriteCoupons)) + ' deiner Favoriten sind abgelaufen:' + '\n' + unavailableCouponsText.strip()
+            if user.settings.notifyWhenFavoritesAreBack:
+                # 2021-08-27: Removed this text to purify the favorites overview -> It contains a lot of text already!
+                # unavailableCouponsText += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
+                pass
+            else:
+                unavailableCouponsText += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
+                # unavailableCouponsText += '\nEbenfalls kannst du abgelaufene Favoriten in den Einstellungen löschen.'
+        availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
+        return availableFavoriteCoupons, unavailableCouponsText
 
     def displayCouponsAsButtons(self, update: Update, user: Union[User, None], coupons: list, menuText: str, urlquery, highlightFavorites: bool):
         if len(coupons) == 0:
@@ -462,7 +471,7 @@ class BKBot:
 
     def botDisplayCouponsWithImagesFavorites(self, update: Update, context: CallbackContext):
         try:
-            coupons, unavailableCouponsText = self.getValidUserFavoritesAndUnavailableFavoritesString(User.load(self.crawler.getUsersDB(), str(update.effective_user.id)))
+            coupons, unavailableCouponsText = self.getFavoritesInfo2(User.load(self.crawler.getUsersDB(), str(update.effective_user.id)))
         except BetterBotException as botError:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_DISPLAY_COUPON
@@ -579,14 +588,16 @@ class BKBot:
             else:
                 keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         unavailableCoupons = self.getUnavailableFavoriteCouponIDs(user)
+        availableFavoriteCoupons, unavailableFavoriteCoupons, unavailableCouponsText = self.getFavoritesInfo(user, self.crawler.getCouponDB())
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>\n"
         menuText += "Nicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
         menuText += "\n** Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
-        if len(unavailableCoupons) > 0:
-            keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(unavailableCoupons)) + ")?***",
+        if len(unavailableFavoriteCoupons) > 0:
+            keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(unavailableFavoriteCoupons)) + ")?***",
                                                   callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
-            menuText += "\n***Achtung: Abgelaufene Favoriten werden beim Drücken des Buttons sofort ohne Bestätigung gelöscht!"
+            menuText += "\n" + SYMBOLS.DENY + "***Löschbare abgelaufene Favoriten:"
+            menuText += "\n" + unavailableCouponsText
         # Back button
         keyboard.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
         update.callback_query.edit_message_text(text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard), disable_web_page_preview=True)
