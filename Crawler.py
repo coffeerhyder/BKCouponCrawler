@@ -1,11 +1,11 @@
 import csv
 import logging
 import traceback
-from typing import List
+from typing import List, Union, Dict
 
 import qrcode
 import requests
-from couchdb import Document
+from couchdb import Document, Database
 from hyper import HTTP20Connection  # we're using hyper instead of requests because of its' HTTP/2.0 capability
 
 import couchdb
@@ -21,7 +21,7 @@ from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponIsValid, couponGetStartTimestamp
 from UtilsCouponsDB import couponDBIsValid, couponDBGetUniqueCouponID, couponDBGetComparableValue, \
     couponDBGetExpireDateFormatted, couponDBGetPriceFormatted, couponDBGetImagePathQR, isValidBotCoupon, getImageBasePath, \
-    couponDBGetImagePath, Coupon, User, InfoEntry, CouponSortMode
+    couponDBGetImagePath, Coupon, User, InfoEntry, CouponSortMode, couponDBGetTitleShortened
 from CouponCategory import CouponSource, BotAllowedCouponSources
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -29,6 +29,20 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 HEADERS = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
 """ Enable this to crawl from localhost instead of API. Useful if there is a lot of testing to do! """
 DEBUGCRAWLER = False
+
+
+class UserFavorites:
+    """ Small helper class """
+    def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None, favoritesUnavailable: Union[List[Coupon], None] = None, unavailableFavoritesText=None, unavailableFavoritesTextUserSpecific=None):
+        # Do not allow null values when arrays are expected. This makes it easier to work with this.
+        if favoritesAvailable is None:
+            favoritesAvailable = []
+        if favoritesUnavailable is None:
+            favoritesUnavailable = []
+        self.couponsAvailable = favoritesAvailable
+        self.couponsUnavailable = favoritesUnavailable
+        self.couponsUnavailableText = unavailableFavoritesText
+        self.couponsUnavailableTextUserSpecific = unavailableFavoritesTextUserSpecific
 
 
 class BKCrawler:
@@ -704,8 +718,10 @@ class BKCrawler:
             if coupon.plu is not None and (len(coupon.plu) > 0 and (coupon.plu[0] == 'S' or coupon.plu[0] == 'Z')) and coupon.source != CouponSource.APP:
                 # Debugtest
                 print(
-                    'Coupon contains app coupon char but is not available in app anymore: ' + ("N/A" if coupon.plu is None else coupon.plu) + " | " + coupon.id + " | " + coupon.title + " | " + couponDBGetPriceFormatted(
-                        coupon, "??€") + " | " + ("NO_EXPIRE_DATE_2" if coupon.dateFormattedExpire2 is None else coupon.dateFormattedExpire2) + " | " + ("NO_EXPIRE_DATE_" if coupon.dateFormattedExpire is None else coupon.dateFormattedExpire))
+                    'Coupon contains app coupon char but is not available in app anymore: ' + (
+                        "N/A" if coupon.plu is None else coupon.plu) + " | " + coupon.id + " | " + coupon.title + " | " + couponDBGetPriceFormatted(
+                        coupon, "??€") + " | " + ("NO_EXPIRE_DATE_2" if coupon.dateFormattedExpire2 is None else coupon.dateFormattedExpire2) + " | " + (
+                        "NO_EXPIRE_DATE_" if coupon.dateFormattedExpire is None else coupon.dateFormattedExpire))
         logging.info("API Crawling 2 done | Total number of coupons in DB: " + str(len(couponDB)))
         logging.info("Total coupons2 crawl time: " + getFormattedPassedTime(timestampStart))
 
@@ -1012,8 +1028,10 @@ class BKCrawler:
                                  'PLU': (coupon.plu if coupon.plu is not None else "N/A"), 'PLU2': coupon.id,
                                  'TYPE': coupon.source,
                                  'PRICE': coupon.get(Coupon.price.name, -1), 'PRICE_COMPARE': coupon.get(Coupon.priceCompare.name, -1),
-                                 'START': (coupon.dateFormattedStart if coupon.dateFormattedStart is not None else "N/A"), 'EXP': (coupon.dateFormattedExpire if coupon.dateFormattedExpire is not None else "N/A"),
-                                 'EXP2': (coupon.dateFormattedExpire2 if coupon.dateFormattedExpire2 is not None else "N/A"), 'EXP_PRODUCTIVE': couponDBGetExpireDateFormatted(coupon)
+                                 'START': (coupon.dateFormattedStart if coupon.dateFormattedStart is not None else "N/A"),
+                                 'EXP': (coupon.dateFormattedExpire if coupon.dateFormattedExpire is not None else "N/A"),
+                                 'EXP2': (coupon.dateFormattedExpire2 if coupon.dateFormattedExpire2 is not None else "N/A"),
+                                 'EXP_PRODUCTIVE': couponDBGetExpireDateFormatted(coupon)
                                  })
 
     def couponCsvExport2(self):
@@ -1206,6 +1224,50 @@ class BKCrawler:
             if offerIsValid(offer):
                 offers.append(offer)
         return offers
+
+    def getUserFavorites(self, user: User, coupons: Union[dict, None]=None) -> UserFavorites:
+        """
+        Gathers information about the given users' favorite available/unavailable coupons.
+        """
+        if len(user.favoriteCoupons) == 0:
+            # User does not have any favorites set --> There is no point to look for the additional information
+            return UserFavorites()
+        # Get coupons if they're not given already
+        if coupons is None:
+            coupons = self.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
+        availableFavoriteCoupons = []
+        unavailableFavoriteCoupons = []
+        for uniqueCouponID, coupon in user.favoriteCoupons.items():
+            couponFromProductiveDB = coupons.get(uniqueCouponID)
+            if couponFromProductiveDB is not None and isValidBotCoupon(couponFromProductiveDB):
+                availableFavoriteCoupons.append(couponFromProductiveDB)
+            else:
+                # User chosen favorite coupon has expired or is not in DB
+                coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
+                unavailableFavoriteCoupons.append(coupon)
+        availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
+        # TODO: Move this into UserFavorites class
+        unavailableFavoritesText = None
+        unavailableFavoritesTextUserSpecifc = None
+        if len(unavailableFavoriteCoupons) > 0:
+            unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
+            unavailableFavoritesText = ''
+            for coupon in unavailableFavoriteCoupons:
+                if len(unavailableFavoritesText) > 0:
+                    unavailableFavoritesText += '\n'
+                unavailableFavoritesText += couponDBGetUniqueCouponID(coupon) + ' | ' + couponDBGetTitleShortened(coupon)
+                if coupon.price is not None:
+                    unavailableFavoritesText += ' | ' + couponDBGetPriceFormatted(coupon)
+            unavailableFavoritesTextUserSpecifc = SYMBOLS.WARNING + str(len(unavailableFavoriteCoupons)) + ' deiner Favoriten sind abgelaufen:'
+            unavailableFavoritesTextUserSpecifc += '\n' + unavailableFavoritesText
+            if user.settings.notifyWhenFavoritesAreBack:
+                # 2021-08-27: Removed this text to purify the favorites overview -> It contains a lot of text already!
+                # unavailableCouponsText += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
+                pass
+            else:
+                unavailableFavoritesTextUserSpecifc += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
+                # unavailableCouponsText += '\nEbenfalls kannst du abgelaufene Favoriten in den Einstellungen löschen.'
+        return UserFavorites(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons, unavailableFavoritesText=unavailableFavoritesText, unavailableFavoritesTextUserSpecific=unavailableFavoritesTextUserSpecifc)
 
 
 def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:
