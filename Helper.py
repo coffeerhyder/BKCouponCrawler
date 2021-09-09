@@ -84,7 +84,7 @@ def shortenProductNames(couponTitle: str) -> str:
     if regexKingAfterProductName:
         couponTitle = couponTitle.replace(regexKingAfterProductName.group(0), regexKingAfterProductName.group(1) + " K")
     """ E.g. "KING Shake" --> "Shake" """
-    regexKingInFrontOfProductTitle = re.compile(r"(?i)KING\s*(Jr\.?\\s*Meal|Shake|Nuggets?|Wings?)").search(couponTitle)
+    regexKingInFrontOfProductTitle = re.compile(r"(?i)KING\s*(Jr\.?\s*Meal|Shake|Nuggets?|Wings?)").search(couponTitle)
     if regexKingInFrontOfProductTitle:
         couponTitle = couponTitle.replace(regexKingInFrontOfProductTitle.group(0), regexKingInFrontOfProductTitle.group(1))
     """ 'Meta' replaces """
@@ -102,14 +102,14 @@ def shortenProductNames(couponTitle: str) -> str:
         couponTitle = couponTitle.replace(chickenNuggetsFix.group(0), "Nuggets")
     burgerFix = re.compile(r'(?i)(b)urger').search(couponTitle)
     if burgerFix:
-        # Keep first letter of "burger" as it is sometimes used as part of one word e.g. "Cheeseburger"
+        # Keep first letter of "burger" as it is (lower-/uppercase) sometimes used as part of one word e.g. "Cheeseburger"
         b = burgerFix.group(1)
         couponTitle = replaceCaseInsensitive(burgerFix.group(0), b + 'rgr', couponTitle)
 
     # Assume that all users know that "Cheddar" is cheese so let's remove this double entry
     couponTitle = replaceRegex(re.compile(r'(?i)Cheddar\s*Cheese'), 'Cheddar', couponTitle)
     couponTitle = replaceCaseInsensitive('Chicken', 'Ckn', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)Chili\s*Cheese'), 'CC', couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)Chili[\s-]*Cheese'), 'CC', couponTitle)
     couponTitle = replaceRegex(re.compile(r'(?i)Coca[\s-]*Cola'), 'Cola', couponTitle)
     couponTitle = replaceCaseInsensitive('Deluxe', 'Dlx', couponTitle)
     couponTitle = replaceCaseInsensitive('Dips', 'Dip', couponTitle)
