@@ -33,7 +33,7 @@ DEBUGCRAWLER = False
 
 class UserFavorites:
     """ Small helper class """
-    def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None, favoritesUnavailable: Union[List[Coupon], None] = None, unavailableFavoritesText=None, unavailableFavoritesTextUserSpecific=None):
+    def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None, favoritesUnavailable: Union[List[Coupon], None] = None):
         # Do not allow null values when arrays are expected. This makes it easier to work with this.
         if favoritesAvailable is None:
             favoritesAvailable = []
@@ -41,8 +41,19 @@ class UserFavorites:
             favoritesUnavailable = []
         self.couponsAvailable = favoritesAvailable
         self.couponsUnavailable = favoritesUnavailable
-        self.couponsUnavailableText = unavailableFavoritesText
-        self.couponsUnavailableTextUserSpecific = unavailableFavoritesTextUserSpecific
+
+    def getUnavailableFavoritesText(self) -> Union[str, None]:
+        if len(self.couponsUnavailable) == 0:
+            return None
+        else:
+            unavailableFavoritesText = ''
+            for coupon in self.couponsUnavailable:
+                if len(unavailableFavoritesText) > 0:
+                    unavailableFavoritesText += '\n'
+                unavailableFavoritesText += couponDBGetUniqueCouponID(coupon) + ' | ' + couponDBGetTitleShortened(coupon)
+                if coupon.price is not None:
+                    unavailableFavoritesText += ' | ' + couponDBGetPriceFormatted(coupon)
+            return unavailableFavoritesText
 
 
 class BKCrawler:
@@ -1246,28 +1257,7 @@ class BKCrawler:
                 coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
                 unavailableFavoriteCoupons.append(coupon)
         availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
-        # TODO: Move this into UserFavorites class
-        unavailableFavoritesText = None
-        unavailableFavoritesTextUserSpecifc = None
-        if len(unavailableFavoriteCoupons) > 0:
-            unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
-            unavailableFavoritesText = ''
-            for coupon in unavailableFavoriteCoupons:
-                if len(unavailableFavoritesText) > 0:
-                    unavailableFavoritesText += '\n'
-                unavailableFavoritesText += couponDBGetUniqueCouponID(coupon) + ' | ' + couponDBGetTitleShortened(coupon)
-                if coupon.price is not None:
-                    unavailableFavoritesText += ' | ' + couponDBGetPriceFormatted(coupon)
-            unavailableFavoritesTextUserSpecifc = SYMBOLS.WARNING + str(len(unavailableFavoriteCoupons)) + ' deiner Favoriten sind abgelaufen:'
-            unavailableFavoritesTextUserSpecifc += '\n' + unavailableFavoritesText
-            if user.settings.notifyWhenFavoritesAreBack:
-                # 2021-08-27: Removed this text to purify the favorites overview -> It contains a lot of text already!
-                # unavailableCouponsText += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
-                pass
-            else:
-                unavailableFavoritesTextUserSpecifc += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
-                # unavailableCouponsText += '\nEbenfalls kannst du abgelaufene Favoriten in den Einstellungen löschen.'
-        return UserFavorites(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons, unavailableFavoritesText=unavailableFavoritesText, unavailableFavoritesTextUserSpecific=unavailableFavoritesTextUserSpecifc)
+        return UserFavorites(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
 
 
 def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:

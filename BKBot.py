@@ -2,7 +2,7 @@ import math
 import sys
 import time
 import traceback
-from typing import Union, List
+from typing import Union, List, Tuple
 
 import schedule
 from couchdb import Database
@@ -309,21 +309,8 @@ class BKBot:
                 coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[CouponSource.APP], containsFriesAndCoke=None, isHidden=True))
                 menuText = '<b>' + str(len(coupons)) + ' versteckte ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' verfügbar:</b>'
             elif mode == CouponDisplayMode.FAVORITES:
-                userFavorites = self.getUserFavorites(user, enableExceptionHandling=True)
+                userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user)
                 coupons = userFavorites.couponsAvailable
-                menuText = SYMBOLS.STAR + str(len(coupons)) + ' Favoriten verfügbar ' + SYMBOLS.STAR
-                numberofCouponsWithoutPrice = 0
-                totalSum = 0
-                for coupon in coupons:
-                    if coupon.price is not None:
-                        totalSum += coupon.price
-                    else:
-                        numberofCouponsWithoutPrice += 1
-                menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalSum)
-                if numberofCouponsWithoutPrice > 0:
-                    menuText += "*\n* exklusive " + str(numberofCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
-                if userFavorites.couponsUnavailableTextUserSpecific is not None:
-                    menuText += '\n' + userFavorites.couponsUnavailableTextUserSpecific
                 highlightFavorites = False
             self.displayCouponsAsButtons(update, user, coupons, menuText, urlQuery, highlightFavorites=highlightFavorites)
             return CallbackVars.MENU_DISPLAY_COUPON
@@ -333,19 +320,36 @@ class BKBot:
 
     def getUnavailableFavoriteCouponIDs(self, user: User) -> list:
         """ Returns all couponIDs which the user has set as favorite but which are not available (expired) at this moment. """
-        if len(user.favoriteCoupons) == 0:
-            # Saves one DB request if user has no favorites at all :)
-            return []
+        userFavorites = self.getUserFavorites(user=user, enableExceptionHandling = False)
         inactiveFavoriteCouponIDs = []
-        productiveCouponDB = self.crawler.getCouponDB()
-        for favoriteCouponID in user.favoriteCoupons:
-            coupon = Coupon.load(productiveCouponDB, favoriteCouponID)
-            if coupon is None:
-                # Favorite couponID is not present anymore in DB -> Counts as expired!
-                inactiveFavoriteCouponIDs.append(favoriteCouponID)
-            elif not isValidBotCoupon(coupon):
-                inactiveFavoriteCouponIDs.append(favoriteCouponID)
+        for unavailableCoupon in userFavorites.couponsUnavailable:
+            inactiveFavoriteCouponIDs.append(couponDBGetUniqueCouponID(unavailableCoupon))
         return inactiveFavoriteCouponIDs
+
+    def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavorites, str]:
+        userFavorites = self.getUserFavorites(user=user, coupons=coupons, enableExceptionHandling=True)
+        menuText = SYMBOLS.STAR + str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar ' + SYMBOLS.STAR
+        numberofCouponsWithoutPrice = 0
+        totalSum = 0
+        for coupon in userFavorites.couponsAvailable:
+            if coupon.price is not None:
+                totalSum += coupon.price
+            else:
+                numberofCouponsWithoutPrice += 1
+        menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalSum)
+        if numberofCouponsWithoutPrice > 0:
+            menuText += "*\n* exklusive " + str(numberofCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
+        if len(userFavorites.couponsUnavailable) > 0:
+            menuText += '\n' + SYMBOLS.WARNING + str(len(userFavorites.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
+            menuText += '\n' + userFavorites.getUnavailableFavoritesText()
+            if user.settings.notifyWhenFavoritesAreBack:
+                # 2021-08-27: Removed this text to purify the favorites overview -> It contains a lot of text already!
+                # unavailableCouponsText += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
+                pass
+            else:
+                menuText += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
+                # unavailableCouponsText += '\nEbenfalls kannst du abgelaufene Favoriten in den Einstellungen löschen.'
+        return userFavorites, menuText
 
     def getUserFavorites(self, user: User, coupons: Union[dict, None] = None, enableExceptionHandling: bool = False) -> UserFavorites:
         """
@@ -417,7 +421,7 @@ class BKBot:
                 navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_RIGHT, callback_data=urlquery_callbackBack.url))
             else:
                 # Add dummy button for a consistent button layout
-                # Easter egg: Trigger it if there are at least two pages AND user is on the last page AND that page contains at least one favorite coupon
+                # Easter egg: Trigger it if there are at least two pages available AND user is currently on the last page AND that page contains at least one user-favorited coupon.
                 if containsAtLeastOneFavoriteCoupon and desiredPage > 1:
                     navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data=CallbackVars.EASTER_EGG))
                 else:
@@ -439,17 +443,13 @@ class BKBot:
 
     def botDisplayCouponsWithImagesFavorites(self, update: Update, context: CallbackContext):
         try:
-            userFavorites = self.getUserFavorites(user=User.load(self.crawler.getUsersDB(), str(update.effective_user.id)))
+            userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(user=User.load(self.crawler.getUsersDB(), str(update.effective_user.id)))
         except BetterBotException as botError:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_DISPLAY_COUPON
         query = update.callback_query
         query.answer()
-        bottomMsgText = ''
-        if userFavorites.couponsUnavailableTextUserSpecific is not None:
-            bottomMsgText += userFavorites.couponsUnavailableTextUserSpecific + '\n'
-        bottomMsgText += '<b>Guten Hunger!</b>'
-        self.displayCouponsWithImagesAndBackButton(update, context, userFavorites.couponsAvailable, topMsgText='<b>Alle Favoriten mit Bildern:</b>', bottomMsgText=bottomMsgText)
+        self.displayCouponsWithImagesAndBackButton(update, context, userFavorites.couponsAvailable, topMsgText='<b>Alle Favoriten mit Bildern:</b>', bottomMsgText=favoritesInfoText)
         # Delete last message containing menu
         context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
         return CallbackVars.MENU_DISPLAY_COUPON
@@ -564,7 +564,7 @@ class BKBot:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavorites.couponsUnavailable)) + ")?***",
                                                   callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
             menuText += "\n" + SYMBOLS.DENY + "***Löschbare abgelaufene Favoriten:"
-            menuText += "\n" + userFavorites.couponsUnavailableText
+            menuText += "\n" + userFavorites.getUnavailableFavoritesText()
         # Back button
         keyboard.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
         update.callback_query.edit_message_text(text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard), disable_web_page_preview=True)
