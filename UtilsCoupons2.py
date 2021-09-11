@@ -67,9 +67,6 @@ def coupon2FixProductTitle(productTitle: str) -> str:
     if nuggetsFix2:
         newNuggets2 = nuggetsFix2.group(1) + " Chicken Nuggets"
         newProductTitle = newProductTitle.replace(nuggetsFix2.group(0), newNuggets2)
-    if 'medium' in newProductTitle:
-        # print("WTF")
-        pass
     cocaColaMediumFix = re.compile(r"(?i)Coca[\s-]*Cola\s*®?\s*medium").search(newProductTitle)
     if cocaColaMediumFix:
         newProductTitle = newProductTitle.replace(cocaColaMediumFix.group(0), '0,4L Coca-Cola')
