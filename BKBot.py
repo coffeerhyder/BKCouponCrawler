@@ -922,7 +922,7 @@ class BKBot:
         for couponSourceIndex in range(len(BotAllowedCouponSources)):
             couponSource = BotAllowedCouponSources[couponSourceIndex]
             couponCategory = CouponCategory(couponSource)
-            logging.info("Working on coupon overview update " + str(couponSourceIndex + 1) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.nameSingular)
+            logging.info("Working on coupon overview " + str(couponSourceIndex + 1) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.nameSingular)
             hasAddedSeparatorAfterCouponsWithoutMenu = False
             listContainsAtLeastOneItemWithoutMenu = False
             dbKeyMessageIDsCouponType = INFO_DB.DB_INFO_channel_last_coupon_type_overview_message_ids + str(couponSource)
