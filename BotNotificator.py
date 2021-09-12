@@ -184,10 +184,10 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             logging.info("Working on coupon " + str(index + 1) + "/" + str(len(couponsToSendOut)) + " | " + coupon.id)
             if bkbot.getCouponImage(coupon) is None:
                 # This should never happen
-                raise Exception("WTF failed to find coupon image")
+                raise Exception("WTF failed to find coupon image for coupon " + coupon.id)
             elif bkbot.getCouponImageQR(coupon) is None:
                 # This should never happen
-                raise Exception("WTF failed to find QR image")
+                raise Exception("WTF failed to find QR image for coupon " + coupon.id)
             if coupon.id not in channelDB:
                 channelDB[coupon.id] = {}
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
