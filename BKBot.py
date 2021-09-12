@@ -967,7 +967,7 @@ class BKBot:
                         if not coupon.containsFriesOrCoke:
                             listContainsAtLeastOneItemWithoutMenu = True
                         elif not hasAddedSeparatorAfterCouponsWithoutMenu and listContainsAtLeastOneItemWithoutMenu:
-                            couponOverviewText += '\n<b>' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + 'Coupons mit Menü' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + '</b>'
+                            couponOverviewText += '\n<b>' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + couponCategory.namePluralWithoutSymbol + ' mit Menü' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + '</b>'
                             hasAddedSeparatorAfterCouponsWithoutMenu = True
                         """ Generates e.g. "Y15 | 2Whopper+M🍟+0,4LCola | 8,99€"
                         Returns the same with hyperlink if a chat_id is given for this coupon e.g.:
