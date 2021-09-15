@@ -70,7 +70,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
                     "Channel") + " und mit /start ins Hauptmenü des Bots."
             if remainingEntities < 0:
                 usertext += "\n" + SYMBOLS.WARNING + "Wegen Telegram Limits konnten nicht alle Coupons verlinkt werden."
-                usertext += "\nDas ist nicht weiter tragisch und du findest alle im Bot/Channel."
+                usertext += "\nDas ist nicht weiter tragisch. Du findest alle Coupons im Bot/Channel."
             # Store text to send to user and send it later
             usersNotify[userIDStr] = usertext
     if len(usersNotify) == 0:
@@ -87,7 +87,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
 
 class ChannelUpdateMode(Enum):
     """ Different modes that can be used to perform a channel update """
-    # This mode would only work if TG bots were able to delete messages older than 48 hours!
+    # Dummy entry: This mode would only work if TG bots were able to delete messages older than 48 hours!
     UPDATE = 1
     # Delete- and re-send all coupons into our channel
     RESEND_ALL = 2
@@ -139,13 +139,14 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         if uniqueCouponID not in activeCoupons:
             channelCoupon = ChannelCoupon.load(channelDB, uniqueCouponID)
             infoDBDoc[InfoEntry.messageIDsToDelete.name] += channelCoupon[ChannelCoupon.messageIDs.name]
+            # Collect it here so we can delete it with only one DB request later.
             deletedChannelCoupons.append(channelCoupon)
     # Update DB
     if len(deletedChannelCoupons) > 0:
         channelDB.purge(deletedChannelCoupons)
-        # Save this so we always remember which messageIDs we need to delete later on
+        # Save this so we always remember which messageIDs we need to delete later.
         infoDBDoc.store(infoDB)
-    # Collect coupons to send out in this run
+    # Collect coupons to send out in this run.
     if updateMode == ChannelUpdateMode.RESEND_ALL:
         couponsToSendOut = activeCoupons
     elif updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE:
@@ -155,9 +156,6 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             if channelCoupon is None or datetime.now().timestamp() - channelCoupon.timestampMessagesPosted > 6 * 60 * 60:
                 # Coupon has not been posted into channel yet or has been posted in there too long ago -> Add to list of coupons to re-send later
                 couponsToSendOut[coupon.id] = coupon
-    elif updateMode == ChannelUpdateMode.UPDATE:
-        # TODO: Add functionality
-        pass
     else:
         logging.warning("Unsupported ChannelUpdateMode! Developer mistake?!")
     # Send relevant coupons into chat
@@ -182,6 +180,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
                 break
             index += 1
             logging.info("Working on coupon " + str(index + 1) + "/" + str(len(couponsToSendOut)) + " | " + coupon.id)
+            # Check for missing images: This can only ever happen if they get deleted from the outside at exactly the wrong point of time.
             if bkbot.getCouponImage(coupon) is None:
                 # This should never happen
                 raise Exception("WTF failed to find coupon image for coupon " + coupon.id)
@@ -208,14 +207,15 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             couponTextMsg = bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=couponText, parse_mode='HTML', disable_notification=True,
                                               disable_web_page_preview=True)
             channelCoupon.messageIDs.append(couponTextMsg.message_id)
-            # Update DB
             # Save timestamp so we roughly know when these messages have been posted
             channelCoupon.timestampMessagesPosted = datetime.now().timestamp()
+            # Update DB
             channelCoupon.store(channelDB)
 
-    # Update channel if needed
+    # Update channel information message if needed
     if len(updatedCoupons) > 0 or len(deletedChannelCoupons) > 0 or len(
             couponsToSendOut) > 0 or updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE or DEBUGNOTIFICATOR:
+        # TODO: Remove everything related to ChannelUpdateMode.UPDATE
         allowMessageEdit = len(newCoupons) > 0 and updateMode == ChannelUpdateMode.UPDATE and not DEBUGNOTIFICATOR
         bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB, infoDBDoc=infoDBDoc, allowMessageEdit=False)
 

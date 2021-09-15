@@ -879,13 +879,6 @@ class BKBot:
             traceback.print_exc()
             logging.warning("Resume of public channel update failed")
 
-    def updatePublicChannel(self):
-        try:
-            updatePublicChannel(self, updateMode=ChannelUpdateMode.UPDATE)
-        except:
-            traceback.print_exc()
-            logging.warning("Update of public channel failed")
-
     def cleanupPublicChannel(self):
         try:
             cleanupChannel(self)
@@ -1096,9 +1089,9 @@ class BKBot:
                     # 2021-08-17: For unknown reasons this keeps happening sometimes...
                     # 2021-08-31: Seems like this is also some kind of rate limit or the same as the other one but no retry_after value given...
                     lastException = requesterror
-                    waitseconds = 3
+                    waitseconds = 5
                     logging.info("Group send failed, waiting " + str(waitseconds) + " seconds | Try number: " + str(retryNumber))
-                    time.sleep(3)
+                    time.sleep(waitseconds)
                     continue
                 else:
                     raise requesterror
@@ -1135,10 +1128,7 @@ if __name__ == '__main__':
     if 'crawl' in sys.argv:
         bkbot.crawl()
     # Now the ones where only one is allowed
-    if 'forcechannelupdate' in sys.argv:
-        bkbot.updatePublicChannel()
-        bkbot.cleanupPublicChannel()
-    elif 'forcechannelupdatewithresend' in sys.argv:
+    if 'forcechannelupdatewithresend' in sys.argv:
         bkbot.renewPublicChannel()
         bkbot.cleanupPublicChannel()
     elif 'resumechannelupdate' in sys.argv:
