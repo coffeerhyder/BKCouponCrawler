@@ -239,7 +239,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         if updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE:
             infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
         if DEBUGNOTIFICATOR:
-            infoText += '\n<b>Debug Modus!!!</b>'
+            infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!! ' + SYMBOLS.WARNING + '</b>'
         infoText += '\n<b>------</b>'
         infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
         infoText += "\nStören dich die Benachrichtigungen?"
