@@ -277,8 +277,8 @@ class BKBot:
         try:
             coupons = None
             menuText = None
-            highlightFavorites = True
             user = User.load(self.couchdb[DATABASES.TELEGRAM_USERS], str(update.effective_user.id))
+            highlightFavorites = user.settings.highlightFavoriteCouponsInContextOfNormalCouponLists
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
             if mode == CouponDisplayMode.ALL:
@@ -552,7 +552,7 @@ class BKBot:
             if user.settings.get(settingKey, dummyUser.settings[settingKey]):
                 # Add symbol to enabled settings button text so user can see which settings are currently enabled
                 keyboard.append(
-                    [InlineKeyboardButton(SYMBOLS.CONFIRM + " " + description, callback_data=settingKey)])
+                    [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
             else:
                 keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         userFavorites = self.getUserFavorites(user=user)

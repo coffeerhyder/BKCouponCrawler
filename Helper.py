@@ -326,5 +326,9 @@ USER_SETTINGS_ON_OFF = {
     "displayHiddenAppCouponsWithinGenericCategories": {
         "description": "Versteckte App Coupons in Kategorien zeigen**",
         "default": False
+    },
+    "highlightFavoriteCouponsInContextOfNormalCouponLists": {
+        "description": "Favoriten in Listen mit " + SYMBOLS.STAR + " markieren",
+        "default": True
     }
 }

@@ -1,6 +1,5 @@
 import logging
 import time
-import traceback
 from datetime import datetime
 from enum import Enum
 from typing import Union, List
@@ -22,6 +21,9 @@ DEBUGNOTIFICATOR = False
 
 
 def notifyUsersAboutNewCoupons(bkbot) -> None:
+    """
+    Notifies user about new coupons and users' expired favorite coupons that are back (well = also new coupons).
+    """
     logging.info("Checking for pending new coupons notifications")
     timestampStart = datetime.now().timestamp()
     userDB = bkbot.crawler.getUsersDB()
@@ -36,9 +38,8 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     for userIDStr in userDB:
         user = User.load(userDB, userIDStr)
         usertext = ""
-        # Do not forget about Telegram entity limits...
-        remainingEntitiesMax = 50
-        remainingEntities = remainingEntitiesMax
+        # Obey Telegram entity limits...
+        remainingEntities = 50
         if user.settings.notifyWhenFavoritesAreBack:
             # Check if user has favorites that are new (back/valid again)
             userNewCoupons = {}
@@ -81,14 +82,14 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     for userIDStr, postText in usersNotify.items():
         index += 1
         logging.info("Sending user notification " + str(index + 1) + " / " + str(len(usersNotify)) + " to user " + userIDStr)
-        bkbot.send_message(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
+        bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 
 class ChannelUpdateMode(Enum):
     """ Different modes that can be used to perform a channel update """
     # Dummy entry: This mode would only work if TG bots were able to delete messages older than 48 hours!
-    UPDATE = 1
+    UPDATE = 1  # Deprecated
     # Delete- and re-send all coupons into our channel
     RESEND_ALL = 2
     # This will only re-send all items older than X hours - can be used to resume channel update if it was e.g. interrupted due to a connection loss
@@ -117,23 +118,27 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
+    # All coupons we want to send out this run
     couponsToSendOut = {}
-    """ This contains only 'real' new items! Doesn't contain items that get re-sent for channel update! """
+    # All new coupons
     newCoupons = {}
+    numberOfCouponsNewToThisChannel = 0
     updatedCoupons = {}
-    # Collect new + updated items
+    # Collect new and updated items
     for coupon in activeCoupons.values():
         if coupon.id not in channelDB:
             # New coupon - save information into both dicts
             couponsToSendOut[coupon.id] = coupon
-            newCoupons[coupon.id] = coupon
+            if coupon.isNew:
+                newCoupons[coupon.id] = coupon
+            numberOfCouponsNewToThisChannel += 1
         elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != couponDBGetUniqueIdentifier(coupon):
             # Current/new coupon data differs from coupon we've posted in channel (same unique ID but coupon data has changed)
             updatedCoupons[coupon.id] = coupon
     if len(infoDBDoc.messageIDsToDelete) > 0:
         # This can happen but should only be a rare occurance!
         logging.warning("Found " + str(len(infoDBDoc.messageIDsToDelete)) + " leftover messageIDs to delete")
-    # Collect- and delete deleted coupons from channel
+    # Collect deleted coupons from channel
     deletedChannelCoupons = []
     for uniqueCouponID in channelDB:
         if uniqueCouponID not in activeCoupons:
@@ -141,7 +146,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             infoDBDoc[InfoEntry.messageIDsToDelete.name] += channelCoupon[ChannelCoupon.messageIDs.name]
             # Collect it here so we can delete it with only one DB request later.
             deletedChannelCoupons.append(channelCoupon)
-    # Update DB
+    # Update DB if needed
     if len(deletedChannelCoupons) > 0:
         channelDB.purge(deletedChannelCoupons)
         # Save this so we always remember which messageIDs we need to delete later.
@@ -158,6 +163,10 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
                 couponsToSendOut[coupon.id] = coupon
     else:
         logging.warning("Unsupported ChannelUpdateMode! Developer mistake?!")
+
+    if numberOfCouponsNewToThisChannel != len(newCoupons):
+        # During normal usage this should never happen
+        logging.warning("Developer mistake or DB has been updated without sending channel update for at least 2 days: Real number of new coupons: " + str(len(newCoupons)) + " | Number of 'new' coupons to send into channel: " + str(numberOfCouponsNewToThisChannel))
     # Send relevant coupons into chat
     if len(couponsToSendOut) > 0:
         logging.info("Sending out " + str(len(couponsToSendOut)) + " coupons...")
@@ -215,8 +224,6 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Update channel information message if needed
     if len(updatedCoupons) > 0 or len(deletedChannelCoupons) > 0 or len(
             couponsToSendOut) > 0 or updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE or DEBUGNOTIFICATOR:
-        # TODO: Remove everything related to ChannelUpdateMode.UPDATE
-        allowMessageEdit = len(newCoupons) > 0 and updateMode == ChannelUpdateMode.UPDATE and not DEBUGNOTIFICATOR
         bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB, infoDBDoc=infoDBDoc, allowMessageEdit=False)
 
         """ Generate new information message text. """
@@ -249,16 +256,13 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         Edit our last message if existant so the user won't receive a new notification!
         """
         oldInfoMsgID = infoDBDoc.get(INFO_DB.DB_INFO_channel_last_information_message_id)
-        if allowMessageEdit and oldInfoMsgID is not None:
-            # Edit previous message
-            editMessageAndWait(bkbot, oldInfoMsgID, infoText)
-        else:
-            # Post new message and store old for later deletion
-            if oldInfoMsgID is not None:
-                infoDBDoc.messageIDsToDelete.append(oldInfoMsgID)
-            newMsg = bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True)
-            infoDBDoc[INFO_DB.DB_INFO_channel_last_information_message_id] = newMsg.message_id
-            infoDBDoc.store(infoDB)
+        # Post new message and store old for later deletion
+        if oldInfoMsgID is not None:
+            infoDBDoc.messageIDsToDelete.append(oldInfoMsgID)
+        newMsg = bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True)
+        # Store new messageID
+        infoDBDoc[INFO_DB.DB_INFO_channel_last_information_message_id] = newMsg.message_id
+        infoDBDoc.store(infoDB)
     logging.info("Channel update done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
 
