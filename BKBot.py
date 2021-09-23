@@ -277,8 +277,8 @@ class BKBot:
         try:
             coupons = None
             menuText = None
-            highlightFavorites = True
             user = User.load(self.couchdb[DATABASES.TELEGRAM_USERS], str(update.effective_user.id))
+            highlightFavorites = user.settings.highlightFavoriteCouponsInContextOfNormalCouponLists
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
             if mode == CouponDisplayMode.ALL:
@@ -552,7 +552,7 @@ class BKBot:
             if user.settings.get(settingKey, dummyUser.settings[settingKey]):
                 # Add symbol to enabled settings button text so user can see which settings are currently enabled
                 keyboard.append(
-                    [InlineKeyboardButton(SYMBOLS.CONFIRM + " " + description, callback_data=settingKey)])
+                    [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
             else:
                 keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         userFavorites = self.getUserFavorites(user=user)
@@ -879,13 +879,6 @@ class BKBot:
             traceback.print_exc()
             logging.warning("Resume of public channel update failed")
 
-    def updatePublicChannel(self):
-        try:
-            updatePublicChannel(self, updateMode=ChannelUpdateMode.UPDATE)
-        except:
-            traceback.print_exc()
-            logging.warning("Update of public channel failed")
-
     def cleanupPublicChannel(self):
         try:
             cleanupChannel(self)
@@ -922,7 +915,7 @@ class BKBot:
         for couponSourceIndex in range(len(BotAllowedCouponSources)):
             couponSource = BotAllowedCouponSources[couponSourceIndex]
             couponCategory = CouponCategory(couponSource)
-            logging.info("Working on coupon overview update " + str(couponSourceIndex + 1) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.nameSingular)
+            logging.info("Working on coupon overview " + str(couponSourceIndex + 1) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.nameSingular)
             hasAddedSeparatorAfterCouponsWithoutMenu = False
             listContainsAtLeastOneItemWithoutMenu = False
             dbKeyMessageIDsCouponType = INFO_DB.DB_INFO_channel_last_coupon_type_overview_message_ids + str(couponSource)
@@ -1096,9 +1089,9 @@ class BKBot:
                     # 2021-08-17: For unknown reasons this keeps happening sometimes...
                     # 2021-08-31: Seems like this is also some kind of rate limit or the same as the other one but no retry_after value given...
                     lastException = requesterror
-                    waitseconds = 3
+                    waitseconds = 5
                     logging.info("Group send failed, waiting " + str(waitseconds) + " seconds | Try number: " + str(retryNumber))
-                    time.sleep(3)
+                    time.sleep(waitseconds)
                     continue
                 else:
                     raise requesterror
@@ -1135,10 +1128,7 @@ if __name__ == '__main__':
     if 'crawl' in sys.argv:
         bkbot.crawl()
     # Now the ones where only one is allowed
-    if 'forcechannelupdate' in sys.argv:
-        bkbot.updatePublicChannel()
-        bkbot.cleanupPublicChannel()
-    elif 'forcechannelupdatewithresend' in sys.argv:
+    if 'forcechannelupdatewithresend' in sys.argv:
         bkbot.renewPublicChannel()
         bkbot.cleanupPublicChannel()
     elif 'resumechannelupdate' in sys.argv:

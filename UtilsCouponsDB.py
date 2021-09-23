@@ -42,7 +42,8 @@ class User(Document):
             # displayHiddenAppCoupons=BooleanField(default=True),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
-            notifyWhenNewCouponsAreAvailable=BooleanField(default=False)
+            notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
+            highlightFavoriteCouponsInContextOfNormalCouponLists=BooleanField(default=True)
         )
     )
     favoriteCoupons = DictField()
@@ -57,6 +58,7 @@ class InfoEntry(Document):
 
 
 class ChannelCoupon(Document):
+    # names are given to ensure compatibility to older DB versions. TODO: Remove this whenever possible. To do this, channel needs to be manually wiped with current/older version. Then these names can be removed and channel update can be sent out.
     uniqueIdentifier = TextField(name="coupon_unique_identifier")
     messageIDs = ListField(IntegerField(), name="coupon_message_ids")
     timestampMessagesPosted = FloatField(name="timestamp_tg_messages_posted", default=-1)

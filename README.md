@@ -67,7 +67,6 @@ Die meisten Parameter sind nur einzeln verwendbar.
 
 Parameter | Beschreibung
 --- | ---
-forcechannelupdate | Sofortiges Channelupdate
 forcechannelupdatewithresend | Sofortiges Channelupdates mit löschen- und neu Einsenden aller Coupons.
 resumechannelupdate | Channelupdate fortsetzen: Coupons ergänzen, die nicht rausgeschickt wurden und Couponübersicht erneuern. Nützlich um ein Channelupdate bei einem Abbruch genau an derselben Stelle fortzusetzen.
 forcebatchprocess | Alle drei Aktionen ausführen, die eigentlich nur täglich 1x durchlaufen: Crawler, User Favoriten Benachrichtigungen rausschicken und Channelupdate mit Löschen- und neu Einsenden.
@@ -76,6 +75,13 @@ nukechannel | Alle Nachrichten im Channel automatisiert löschen (debug/dev Funk
 cleanupchannel | Zu löschende alte Coupon-Posts aus dem Channel löschen
 migrate | DB Migrationen ausführen falls verfügbar
 crawl | Crawler beim Start des Bots einmalig ausführen
+
+### Bot mit Systemstart starten (Linux)
+1. Sichergehen, dass BKBot.py ausführbar ist. Falls nötig: ``chmod a+b BKBot.py``.
+2. Per ``crontab -e`` in crontab wechseln.
+3. Neue Zeile erstellen mit: ``@reboot sleep 10 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1``  
+Die Wartezeit wird benötigt, damit CouchDB auf jeden Fall vor dem Start des Bots läuft.  
+4. Beenden mit ``pkill python3`` (vereinfachte Variante).
 
 ### Interne Coupon-Typen und Beschreibung
 ID | Interne Bezeichnung | Beschreibung
