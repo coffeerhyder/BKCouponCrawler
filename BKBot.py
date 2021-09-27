@@ -217,7 +217,9 @@ class BKBot:
         if self.getPublicChannelName() is not None:
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste + Pics + News', url='https://t.me/' + self.getPublicChannelName())])
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste lange Titel + Pics', callback_data=CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES)])
-        if len(self.crawler.cachedAvailableCouponSources) != 1:
+        # 2021-09-27: Reverted decision to hide 'all coupons' buttons if only one coupon category is available as it feels kinda inconsistent.
+        alwaysDisplayButtonsForAllCoupons = True
+        if len(self.crawler.cachedAvailableCouponSources) != 1 or alwaysDisplayButtonsForAllCoupons:
             # Only show these two buttons if more than one coupon source is available and also if none is available (else our main menu would be nearly completely empty which would probably confuse our users)
             allButtons.append([InlineKeyboardButton('Alle Coupons', callback_data="?a=dcs&m=" + CouponDisplayMode.ALL + "&cs=")])
             allButtons.append([InlineKeyboardButton('Alle Coupons ohne Menü', callback_data="?a=dcs&m=" + CouponDisplayMode.ALL_WITHOUT_MENU + "&cs=")])

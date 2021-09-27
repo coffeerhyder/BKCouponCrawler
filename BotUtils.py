@@ -1,6 +1,6 @@
 from telegram import InlineKeyboardMarkup
 
-VERSION = '1.4.1'
+VERSION = '1.4.2'
 
 
 def getBotImpressum() -> str:

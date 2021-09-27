@@ -135,8 +135,10 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != couponDBGetUniqueIdentifier(coupon):
             # Current/new coupon data differs from coupon we've posted in channel (same unique ID but coupon data has changed)
             updatedCoupons[coupon.id] = coupon
+    # TODO: messageIDsToDelete can contain duplicates. This is not a fatal issue but we should avoid this anyways!
     if len(infoDBDoc.messageIDsToDelete) > 0:
         # This can happen but should only be a rare occurance!
+        # TODO: There might be a bug? This array is never empty?
         logging.warning("Found " + str(len(infoDBDoc.messageIDsToDelete)) + " leftover messageIDs to delete")
     # Collect deleted coupons from channel
     deletedChannelCoupons = []
