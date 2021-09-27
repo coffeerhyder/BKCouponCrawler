@@ -365,8 +365,8 @@ class BKBot:
         if len(userFavorites.couponsAvailable) == 0 and enableExceptionHandling:
             # Edge case
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
-            menuText = SYMBOLS.WARNING + '\n<b>Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' favorisierten Coupons verfügbar:</b>'
-            menuText += userFavorites.couponsUnavailableText
+            menuText = '\n<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' favorisierten Coupons verfügbar:</b>'
+            menuText += '\n' + userFavorites.getUnavailableFavoritesText()
             raise BetterBotException(menuText, reply_markup)
         return userFavorites
 
