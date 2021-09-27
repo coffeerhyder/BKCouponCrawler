@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Union, List
 
 from telegram import InputMediaPhoto
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Unauthorized
 
 from BotUtils import getBotImpressum
 from Helper import INFO_DB, DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
@@ -82,7 +82,13 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     for userIDStr, postText in usersNotify.items():
         index += 1
         logging.info("Sending user notification " + str(index + 1) + " / " + str(len(usersNotify)) + " to user " + userIDStr)
-        bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
+        try:
+            bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
+        except Unauthorized as botBlocked:
+            # TODO: Maybe auto-delete users who blocked the bot in DB.
+            # Almost certainly it will be "Forbidden: bot was blocked by the user"
+            logging.warning(botBlocked.message + " --> chat_id: " + userIDStr)
+            continue
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 
