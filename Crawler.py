@@ -660,7 +660,6 @@ class BKCrawler:
             highestPaperPLUNumber = paperCouponNumbersList[len(paperCouponNumbersList) - 1]
             # Now collect possibly missing paper coupons
             # Even if all "real" paper coupons are found, it may happen that the last one, usually number 47 is not found as thart is a dedicated Payback coupon
-            paybackCouponNumber = 47
             if highestPaperPLUNumber != len(paperCouponNumbersList):
                 missingPaperPLUs = []
                 missingPaperPLUsButPresentInDB = []
