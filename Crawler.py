@@ -409,7 +409,7 @@ class BKCrawler:
             if coupon.source == CouponSource.APP and couponDBIsValid(coupon):
                 pluChar = re.compile(r"([A-Za-z]+)\d+.*").search(coupon.plu).group(1)
                 if pluChar not in appCouponCharList:
-                    appCouponCharList.append(pluChar)
+                    appCouponCharList.append(pluChar.upper())
         numberofNewCoupons = 0
         numberofUpdatedCoupons = 0
         allProducts2 = {}
@@ -482,6 +482,13 @@ class BKCrawler:
                     allCoupons2[uniqueCouponID] = coupon
                 # Fix- and sanitize title: Again BK has a very 'dirty' DB!
                 title = coupon2FixProductTitle(title)
+                # TODO: This won't work. Check- and maybe fix this.
+                # # 2021-09-27: Small workaround for paper coupons listed by them starting with "F" while they're supposed to start with "A".
+                # pluWithF = re.compile(r'(?i)F([0-9]+)').search(plu)
+                # if pluWithF:
+                #     newplu = "A" + pluWithF.group(1)
+                #     logging.info(plu + ' --> ' + newplu)
+                #     plu = newplu
                 # Try to find a meaningful compare price (the hard way...)
                 priceCompare = -1
                 if 'combo_groups' in product:
@@ -596,26 +603,28 @@ class BKCrawler:
             # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
             pluCharMap = {}
             for uniqueCouponID, coupon in coupons2LeftToProcess.items():
-                pluRegEx = re.compile(r"(?i)([A-Z]{1,2})\d+.*").search(coupon.plu)
+                # Make sure that we got a valid PLU
+                pluRegEx = REGEX_PLU.search(coupon.plu)
                 if not pluRegEx:
                     # Skip invalid items
                     continue
-                elif coupon.source in appCouponCharList:
-                    # Do not collect app coupon chars - paper coupons have to have different chars!!
-                    continue
                 else:
-                    pluCharMap.setdefault(pluRegEx.group(1), []).append(coupon)
+                    pluCharMap.setdefault(pluRegEx.group(1).upper(), []).append(coupon)
             paperCharCandidates = []
             for pluChar, coupons in pluCharMap.items():
-                # Usually, 45-47 paper coupons are available at once
-                if 40 < len(coupons) <= 55:
-                    paperCharCandidates.append(pluChar)
+                # Usually, exactly 46 paper coupons are available at once.
+                if 45 <= len(coupons) <= 48:
+                    # Ignore app coupons
+                    if pluChar not in appCouponCharList:
+                        paperCharCandidates.append(pluChar)
             if len(paperCharCandidates) == 0:
-                logging.info("Failed to auto find paper coupons")
-            elif len(paperCharCandidates) > 1:
-                print("Found multiple possible paper coupon chars | " + str(paperCharCandidates) + " --> Using none")
+                logging.info("Failed to auto find any paper coupons")
             else:
-                # Multiple valid paper coupon chars is theoretically possible but let's not trust our auto handling here yet.
+                logging.info("Auto-found the following " + str(len(paperCharCandidates)) + " possible paper coupon chars:")
+                for paperCharCandidate in paperCharCandidates:
+                    logging.info(paperCharCandidate + " [" + str(len(pluCharMap[paperCharCandidate])) + "]")
+            # Multiple valid paper coupon chars is theoretically possible but let's not trust our auto handling for that yet.
+            if len(paperCharCandidates) == 1:
                 paperPluChar = paperCharCandidates[0]
                 logging.info("Auto assigned paper coupon char is: " + paperPluChar)
                 # Update data of these coupons and add them to DB later
@@ -634,6 +643,8 @@ class BKCrawler:
                     # Update these ones too
                     coupons2LeftToProcess[paperCoupon.id] = paperCoupon
                 foundPaperCouponMap[paperPluChar] = paperCoupons
+            else:
+                logging.warning("Found multiple possible paper coupon chars --> We cannot trust our result --> Adding none!")
 
         # Check for missing paper coupons based on the ones we found
         for paperChar, paperCoupons in foundPaperCouponMap.items():
@@ -643,10 +654,13 @@ class BKCrawler:
                 couponNumber = int(coupon.plu[1:])
                 if couponNumber not in paperCouponNumbersList:
                     paperCouponNumbersList.append(couponNumber)
+            # Sort list to easily find highest number
             paperCouponNumbersList.sort()
             logging.info("Successfully found " + str(len(paperCouponNumbersList)) + " paper coupons with expire-date: " + paperCoupons[0].dateFormattedExpire2)
             highestPaperPLUNumber = paperCouponNumbersList[len(paperCouponNumbersList) - 1]
+            # Now collect possibly missing paper coupons
             # Even if all "real" paper coupons are found, it may happen that the last one, usually number 47 is not found as thart is a dedicated Payback coupon
+            paybackCouponNumber = 47
             if highestPaperPLUNumber != len(paperCouponNumbersList):
                 missingPaperPLUs = []
                 missingPaperPLUsButPresentInDB = []
@@ -658,12 +672,17 @@ class BKCrawler:
                             missingPaperPLUsButPresentInDB.append(plu)
                         else:
                             missingPaperPLUs.append(plu)
+                paybackDummyPLU = paperChar + '47'
                 if len(missingPaperPLUs) > 0:
-                    logging.info("Possibly missing paper PLUs: " + str(missingPaperPLUs))
+                    if len(missingPaperPLUs) == 1 and missingPaperPLUs[0] == paybackDummyPLU:
+                        # Our 'missing' PLU seems to be the dummy Payback PLU --> Looks like we found all paper coupons :)
+                        logging.info("Ok: Seems like we found all paper coupons with char: " + paperChar)
+                    else:
+                        logging.info("Possibly missing paper PLUs: " + str(missingPaperPLUs))
                 if len(missingPaperPLUsButPresentInDB) > 0:
                     logging.info("Paper PLUs that are present in DB but not in API: " + str(missingPaperPLUsButPresentInDB))
             else:
-                # This is what we want
+                # Looks like we found all paper coupons :)
                 print("Ok: Seems like we found all paper coupons with char: " + paperChar)
         couponsToAddToDB = {}
         # Collect items we want to add to DB

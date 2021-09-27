@@ -241,17 +241,21 @@ def couponTitleContainsFriesOrCoke(titleLower: str) -> bool:
     titleLower = titleLower.lower()
     if re.compile(r'.*king\s*jr\s*\.?\s*meal.*').search(titleLower):
         return True
-    elif '+' in titleLower and (('pommes' in titleLower or 'fries' in titleLower) and ('cola' in titleLower or re.compile(r'red\s*bull').search(titleLower))):  # 2021-04-13: Chili Cheese Fries are now treated the same way as normal fries are!
+    elif '+' in titleLower and (('pommes' in titleLower or 'fries' in titleLower) and (
+            'cola' in titleLower or re.compile(r'red\s*bull').search(titleLower))):  # 2021-04-13: Chili Cheese Fries are now treated the same way as normal fries are!
         return True
     else:
         return False
+
+
+REGEX_PLU = re.compile(r'(?i)^([A-Z]+)\d+[A-Z]?$')
 
 
 def isCouponShortPLU(plu: str) -> bool:
     """ 2021-04-13: Examples of allowed shortPLUs: "X11", "X11B"
     2021-05-25: New e.g. "KDM2"
     """
-    return plu is not None and re.compile('(?i)^[A-Z]+\\d+[A-Z]?$').search(plu) is not None
+    return plu is not None and REGEX_PLU.search(plu) is not None
 
 
 def generateFeedbackCode() -> str:
