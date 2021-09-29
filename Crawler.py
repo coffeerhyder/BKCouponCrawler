@@ -400,16 +400,14 @@ class BKCrawler:
             logging.warning("Error during loading paper coupon extra data")
             traceback.print_exc()
         # Collect all app coupon chars e.g. "Z13" -> "Z"
-        dbAllPLUsList = []
-        appCouponCharList = []
+        dbAllPLUsList = set()
+        appCouponCharList = set()
         for uniqueCouponID in couponDB:
             coupon = Coupon.load(couponDB, uniqueCouponID)
-            if coupon.plu is not None and coupon.plu not in dbAllPLUsList:
-                dbAllPLUsList.append(coupon.plu)
+            dbAllPLUsList.add(coupon.plu)
             if coupon.source == CouponSource.APP and couponDBIsValid(coupon):
                 pluChar = re.compile(r"([A-Za-z]+)\d+.*").search(coupon.plu).group(1)
-                if pluChar not in appCouponCharList:
-                    appCouponCharList.append(pluChar.upper())
+                appCouponCharList.add(pluChar.upper())
         numberofNewCoupons = 0
         numberofUpdatedCoupons = 0
         allProducts2 = {}
@@ -482,13 +480,6 @@ class BKCrawler:
                     allCoupons2[uniqueCouponID] = coupon
                 # Fix- and sanitize title: Again BK has a very 'dirty' DB!
                 title = coupon2FixProductTitle(title)
-                # TODO: This won't work. Check- and maybe fix this.
-                # # 2021-09-27: Small workaround for paper coupons listed by them starting with "F" while they're supposed to start with "A".
-                # pluWithF = re.compile(r'(?i)F([0-9]+)').search(plu)
-                # if pluWithF:
-                #     newplu = "A" + pluWithF.group(1)
-                #     logging.info(plu + ' --> ' + newplu)
-                #     plu = newplu
                 # Try to find a meaningful compare price (the hard way...)
                 priceCompare = -1
                 if 'combo_groups' in product:
@@ -577,17 +568,10 @@ class BKCrawler:
                     elif plu.isdecimal():
                         # "Secret" coupon -> Only online orderable 'type 2'
                         newCoupon.source = CouponSource.ONLINE_ONLY
-                    elif plu[0] in paperCouponCharsToValidExpireTimestamp.keys() and paperCouponCharsToValidExpireTimestamp[plu[0]] > getCurrentDate().timestamp():
-                        # Assumed "Paper coupon"
-                        pluChar = plu[0]
-                        expireTimestamp = paperCouponCharsToValidExpireTimestamp[pluChar]
-                        newCoupon.source = CouponSource.PAPER
-                        newCoupon.timestampExpire2 = expireTimestamp
-                        newCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(expireTimestamp))
-                        foundPaperCouponMap.setdefault(pluChar, []).append(newCoupon)
                     elif plu[0] in appCouponCharList:
                         newCoupon.source = CouponSource.APP_SAME_CHAR_AS_CURRENT_APP_COUPONS
                     else:
+                        # Assumed "unsafe paper coupon" --> This may be changed later on!
                         newCoupon.source = CouponSource.PAPER_UNSAFE
                     newCoupon.imageURL = image_url
                     coupons2LeftToProcess[uniqueCouponID] = newCoupon
@@ -595,58 +579,87 @@ class BKCrawler:
             if storeIndex + 1 >= maxNumberofStoresToCrawlCouponsFrom:
                 logging.info("Stopping store coupon crawling because reached store limit of: " + str(maxNumberofStoresToCrawlCouponsFrom))
                 break
+        # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
+        pluCharMap = {}
+        for uniqueCouponID, coupon in coupons2LeftToProcess.items():
+            # Make sure that we got a valid PLU
+            pluRegEx = REGEX_PLU.search(coupon.plu)
+            if not pluRegEx:
+                # Skip invalid items
+                continue
+            else:
+                pluCharMap.setdefault(pluRegEx.group(1).upper(), []).append(coupon)
+        # Remove all results that cannot be paper coupoons by length
+        for pluChar, coupons in pluCharMap.copy().items():
+            if pluChar in appCouponCharList:
+                # App coupons cannot be paper coupons
+                del pluCharMap[pluChar]
+            elif len(coupons) <= 45 or len(coupons) > 48:
+                logging.info("Removing paper char candidate because of bad length: " + pluChar + " [" + str(len(coupons)) + "]")
+                del pluCharMap[pluChar]
+        """ Now do some workarounds/corrections of our results.
+         This was necessary because as of 09-2021 e.g., current paper coupons' PLUs started with letter "A" but were listed with letter "F" in the BK DB.
+         """
+        corrections = {"F": "A"}
+        for oldChar, newChar in corrections.items():
+            if oldChar in pluCharMap and newChar in paperCouponCharsToValidExpireTimestamp.keys():
+                logging.info("Correcting " + oldChar + " --> " + newChar)
+                if newChar in pluCharMap:
+                    # Edge case: This is very very unlikely going to happen!
+                    logging.warning("Correction failed due to possible collision: " + newChar + " already exists in our results!")
+                    continue
+                else:
+                    coupons = pluCharMap[oldChar]
+                    for coupon in coupons:
+                        coupon.plu = newChar + coupon.plu[1:]
+                    del pluCharMap[oldChar]
+                    pluCharMap[newChar] = coupons
+        if len(pluCharMap) == 0:
+            logging.info("Failed to find any paper coupon candidates")
+        else:
+            logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon chars:")
+            # More logging
+            for paperPluChar, coupons in pluCharMap.items():
+                logging.info(paperPluChar + " [" + str(len(coupons)) + "]")
+            # Evaluate our findings
+            for paperPluChar, paperCoupons in pluCharMap.items():
+                if paperPluChar in paperCouponCharsToValidExpireTimestamp.keys():
+                    # We safely detected this set of
+                    logging.info("Safely detected paper coupon char is: " + paperPluChar)
+                    # Update data of these coupons and add them to DB later
+                    expireTimestamp = paperCouponCharsToValidExpireTimestamp[paperPluChar]
+                    for paperCoupon in paperCoupons:
+                        paperCoupon.source = CouponSource.PAPER
+                        paperCoupon.timestampExpire2 = expireTimestamp
+                        paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(expireTimestamp))
+                        # Update these ones too
+                        coupons2LeftToProcess[paperCoupon.id] = paperCoupon
+                    foundPaperCouponMap[paperPluChar] = paperCoupons
+                else:
+                    logging.info("Auto assigned paper coupon char is: " + paperPluChar)
+                    # Update data of these coupons and add them to DB later
+                    # https://www.quora.com/In-Python-what-is-the-cleanest-way-to-get-a-datetime-for-the-start-of-today
+                    today = datetime.today()  # or datetime.now to use local timezone
+                    todayDayEnd = datetime(year=today.year, month=today.month,
+                                           day=today.day + 2, hour=23, minute=59, second=59)
+                    artificialExpireTimestamp = todayDayEnd.timestamp()
+                    for paperCoupon in paperCoupons:
+                        paperCoupon.source = CouponSource.PAPER
+                        paperCoupon.timestampExpire2 = artificialExpireTimestamp
+                        paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
+                        paperCoupon.isUnsafeExpiredate = True
+                        paperCoupon.description = SYMBOLS.INFORMATION + "Das hier eingetragene Ablaufdatum ist vorläufig und wird zeitnah korrigiert!"
+                        # Update these ones too
+                        coupons2LeftToProcess[paperCoupon.id] = paperCoupon
+                    foundPaperCouponMap[paperPluChar] = paperCoupons
         if len(paperCouponCharsToValidExpireTimestamp) > 0 and len(foundPaperCouponMap) == 0:
             # This should never happen
             logging.warning("Failed to find any paper coupons alhough we expect some to be there!")
-        if len(foundPaperCouponMap) == 0:
-            logging.info("Failed to find any paper coupons --> Trying to auto find them")
-            # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
-            pluCharMap = {}
-            for uniqueCouponID, coupon in coupons2LeftToProcess.items():
-                # Make sure that we got a valid PLU
-                pluRegEx = REGEX_PLU.search(coupon.plu)
-                if not pluRegEx:
-                    # Skip invalid items
-                    continue
-                else:
-                    pluCharMap.setdefault(pluRegEx.group(1).upper(), []).append(coupon)
-            paperCharCandidates = []
-            for pluChar, coupons in pluCharMap.items():
-                # Usually, exactly 46 paper coupons are available at once.
-                if 45 <= len(coupons) <= 48:
-                    # Ignore app coupons
-                    if pluChar not in appCouponCharList:
-                        paperCharCandidates.append(pluChar)
-            if len(paperCharCandidates) == 0:
-                logging.info("Failed to auto find any paper coupons")
-            else:
-                logging.info("Auto-found the following " + str(len(paperCharCandidates)) + " possible paper coupon chars:")
-                for paperCharCandidate in paperCharCandidates:
-                    logging.info(paperCharCandidate + " [" + str(len(pluCharMap[paperCharCandidate])) + "]")
-            # Multiple valid paper coupon chars is theoretically possible but let's not trust our auto handling for that yet.
-            if len(paperCharCandidates) == 1:
-                paperPluChar = paperCharCandidates[0]
-                logging.info("Auto assigned paper coupon char is: " + paperPluChar)
-                # Update data of these coupons and add them to DB later
-                paperCoupons = pluCharMap[paperPluChar]
-                # https://www.quora.com/In-Python-what-is-the-cleanest-way-to-get-a-datetime-for-the-start-of-today
-                today = datetime.today()  # or datetime.now to use local timezone
-                todayDayEnd = datetime(year=today.year, month=today.month,
-                                       day=today.day + 2, hour=23, minute=59, second=59)
-                artificialExpireTimestamp = todayDayEnd.timestamp()
-                for paperCoupon in paperCoupons:
-                    paperCoupon.source = CouponSource.PAPER
-                    paperCoupon.timestampExpire2 = artificialExpireTimestamp
-                    paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
-                    paperCoupon.isUnsafeExpiredate = True
-                    paperCoupon.description = SYMBOLS.INFORMATION + "Das hier eingetragene Ablaufdatum ist vorläufig und wird zeitnah korrigiert!"
-                    # Update these ones too
-                    coupons2LeftToProcess[paperCoupon.id] = paperCoupon
-                foundPaperCouponMap[paperPluChar] = paperCoupons
-            else:
-                logging.warning("Found multiple possible paper coupon chars --> We cannot trust our result --> Adding none!")
 
-        # Check for missing paper coupons based on the ones we found
+        """ Check for missing paper coupons based on the ones we found.
+        2021-09-29: Now we do filter by array size before so this handling is pretty much useless but let's keep it anyways.
+        """
+        logging.info("Looking for missing paper coupons...")
         for paperChar, paperCoupons in foundPaperCouponMap.items():
             # Now get a list of the numbers only and consider: paperCoupons may contain duplicates but we don't want those in paperCouponNumbersList!
             paperCouponNumbersList = []
@@ -675,7 +688,7 @@ class BKCrawler:
                 if len(missingPaperPLUs) > 0:
                     if len(missingPaperPLUs) == 1 and missingPaperPLUs[0] == paybackDummyPLU:
                         # Our 'missing' PLU seems to be the dummy Payback PLU --> Looks like we found all paper coupons :)
-                        logging.info("Ok: Seems like we found all paper coupons with char: " + paperChar)
+                        logging.info("OK: Seems like we found all paper coupons with char: " + paperChar)
                     else:
                         logging.info("Possibly missing paper PLUs: " + str(missingPaperPLUs))
                 if len(missingPaperPLUsButPresentInDB) > 0:
@@ -711,6 +724,7 @@ class BKCrawler:
         if len(dbUpdates) > 0:
             couponDB.update(dbUpdates)
         logging.info("Number of crawled coupons2: " + str(len(couponsToAddToDB)))
+        # Update history if needed
         if self.keepHistory:
             timestampHistoryDBUpdateStart = datetime.now().timestamp()
             logging.info("Updating history DBs... 1/2: products2")
@@ -724,13 +738,28 @@ class BKCrawler:
             logging.info("Time it took to update coupons2 history DBs: " + getFormattedPassedTime(timestampHistoryDBUpdateStart))
         # Cleanup DB: Remove all non-App coupons that do not exist in API anymore
         deleteCouponDocs = {}
-        for uniqueCouponID in couponDB:
-            couponDoc = Coupon.load(couponDB, uniqueCouponID)
-            # 2021-05-26: Allow 'valid' paper coupons to stay in DB as long as they're not expired. This makes sense as BK sometimes removes them from DB for some time even though they're still valid...
-            if couponDoc.source == CouponSource.PAPER and couponDBIsValid(couponDoc):
-                continue
-            elif couponDoc.source != CouponSource.APP and uniqueCouponID not in allCoupons2.keys():
-                deleteCouponDocs[uniqueCouponID] = couponDoc
+        if self.crawlOnlyBotCompatibleCoupons:
+            # Allow to clean paper coupons if we found new/current ones in this run
+            if len(foundPaperCouponMap) > 0:
+                cleanupPapercoupons = True
+            else:
+                cleanupPapercoupons = False
+            for uniqueCouponID in couponDB:
+                couponDoc = Coupon.load(couponDB, uniqueCouponID)
+                if cleanupPapercoupons and couponDoc.source == CouponSource.PAPER and uniqueCouponID not in couponsToAddToDB:
+                    # Remove paper coupon regardless of validity because we found new paper coupons this run
+                    deleteCouponDocs[uniqueCouponID] = couponDoc
+                if couponDoc.source == CouponSource.PAPER and couponDBIsValid(couponDoc):
+                    # 2021-05-26: Allow 'valid' paper coupons to stay in DB as long as they're not expired. This makes sense as BK sometimes removes them from DB for some time even though they're still valid...
+                    continue
+                elif couponDoc.source != CouponSource.APP and uniqueCouponID not in allCoupons2.keys():
+                    deleteCouponDocs[uniqueCouponID] = couponDoc
+        else:
+            # Less 'intelligent' cleanup
+            for uniqueCouponID in couponDB:
+                couponDoc = Coupon.load(couponDB, uniqueCouponID)
+                if couponDoc.source != CouponSource.APP and uniqueCouponID not in allCoupons2.keys():
+                    deleteCouponDocs[uniqueCouponID] = couponDoc
         if len(deleteCouponDocs) > 0:
             couponDB.purge(deleteCouponDocs.values())
         self.genericCouponDBCleanup(couponDB)
