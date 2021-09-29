@@ -594,7 +594,7 @@ class BKCrawler:
             if pluChar in appCouponCharList:
                 # App coupons cannot be paper coupons
                 del pluCharMap[pluChar]
-            elif len(coupons) <= 45 or len(coupons) > 48:
+            elif len(coupons) == 46 or len(coupons) == 47:
                 logging.info("Removing paper char candidate because of bad length: " + pluChar + " [" + str(len(coupons)) + "]")
                 del pluCharMap[pluChar]
         """ Now do some workarounds/corrections of our results.
@@ -603,7 +603,7 @@ class BKCrawler:
         corrections = {"F": "A"}
         for oldChar, newChar in corrections.items():
             if oldChar in pluCharMap and newChar in paperCouponCharsToValidExpireTimestamp.keys():
-                logging.info("Correcting " + oldChar + " --> " + newChar)
+                logging.info("Correcting paper coupons starting with " + oldChar + " --> " + newChar)
                 if newChar in pluCharMap:
                     # Edge case: This is very very unlikely going to happen!
                     logging.warning("Correction failed due to possible collision: " + newChar + " already exists in our results!")
@@ -619,8 +619,12 @@ class BKCrawler:
         else:
             logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon chars:")
             # More logging
+            couponCharsLogtext = ''
             for paperPluChar, coupons in pluCharMap.items():
-                logging.info(paperPluChar + " [" + str(len(coupons)) + "]")
+                if len(couponCharsLogtext) > 0:
+                    couponCharsLogtext += ', '
+                couponCharsLogtext += paperPluChar + "[" + str(len(coupons)) + "]"
+            logging.info(couponCharsLogtext)
             # Evaluate our findings
             for paperPluChar, paperCoupons in pluCharMap.items():
                 if paperPluChar in paperCouponCharsToValidExpireTimestamp.keys():
