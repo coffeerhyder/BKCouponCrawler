@@ -1097,9 +1097,6 @@ class BKBot:
                     continue
                 else:
                     raise requesterror
-            except Unauthorized as wtf:
-                logging.warning("User has blocked bot (?): " + str(chat_id))
-                raise wtf
         raise lastException
 
     def deleteMessage(self, chat_id: Union[int, str], messageID: Union[int, None]):
