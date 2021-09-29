@@ -582,8 +582,8 @@ class BKCrawler:
         # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
         pluCharMap = {}
         for uniqueCouponID, coupon in coupons2LeftToProcess.items():
-            # Make sure that we got a valid PLU
-            pluRegEx = REGEX_PLU.search(coupon.plu)
+            # Make sure that we got a valid "paper PLU"
+            pluRegEx = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
             if not pluRegEx:
                 # Skip invalid items
                 continue
@@ -594,8 +594,8 @@ class BKCrawler:
             if pluChar in appCouponCharList:
                 # App coupons cannot be paper coupons
                 del pluCharMap[pluChar]
-            elif len(coupons) == 46 or len(coupons) == 47:
-                logging.info("Removing paper char candidate because of bad length: " + pluChar + " [" + str(len(coupons)) + "]")
+            elif len(coupons) != 46 and len(coupons) != 47:
+                logging.info("Removing paper char candidate because of bad length:" + pluChar + " [" + str(len(coupons)) + "]")
                 del pluCharMap[pluChar]
         """ Now do some workarounds/corrections of our results.
          This was necessary because as of 09-2021 e.g., current paper coupons' PLUs started with letter "A" but were listed with letter "F" in the BK DB.
@@ -645,8 +645,8 @@ class BKCrawler:
                     # https://www.quora.com/In-Python-what-is-the-cleanest-way-to-get-a-datetime-for-the-start-of-today
                     today = datetime.today()  # or datetime.now to use local timezone
                     todayDayEnd = datetime(year=today.year, month=today.month,
-                                           day=today.day + 2, hour=23, minute=59, second=59)
-                    artificialExpireTimestamp = todayDayEnd.timestamp()
+                                           day=today.day, hour=23, minute=59, second=59)
+                    artificialExpireTimestamp = todayDayEnd.timestamp() + 2 * 24 * 60
                     for paperCoupon in paperCoupons:
                         paperCoupon.source = CouponSource.PAPER
                         paperCoupon.timestampExpire2 = artificialExpireTimestamp

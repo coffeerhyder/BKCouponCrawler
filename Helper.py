@@ -249,6 +249,8 @@ def couponTitleContainsFriesOrCoke(titleLower: str) -> bool:
 
 
 REGEX_PLU = re.compile(r'(?i)^([A-Z]+)\d+[A-Z]?$')
+# Paper coupons usually only contain one char followed by a 1-2 digit number.
+REGEX_PLU_ONLY_ONE_LETTER = re.compile(r'(?i)^([A-Z])\d+$')
 
 
 def isCouponShortPLU(plu: str) -> bool:
