@@ -136,16 +136,17 @@ tschau - 🚫 Meine Daten löschen
 
 ### Bot About
 ```
+Burger King Coupons auf Telegram
 Made with ❤ and 🍻 during 😷
-News-Channel & alle aktuellen Coupons: @BetterKingPublic
-Feedback/Support: bkfeedback@pm.me
+Channel: @BetterKingPublic
+Kontakt: bkfeedback@pm.me
 ```
 
 ### Bot Description
 ```
-Hilft beim Zunehmen ;)
-- News-Channel & alle aktuellen Coupons: @BetterKingPublic
-- Feedback & Support: bkfeedback@pm.me
+Burger King Coupons auf Telegram
+- Channel: @BetterKingPublic
+- Kontakt: bkfeedback@pm.me
 Features:
 - Alle BK Coupons immer aktuell (auch Papiercoupons)
 - MyBK Coupons ohne Account und unendlich oft einlösbar
@@ -153,15 +154,16 @@ Features:
 - Favoriten speichern & optionale Benachrichtigung bei Wiederverfügbarkeit
 - Kein Tracking
 - Offline verwendbar (sofern Bilder vorher geladen wurden)
-- Source: github.com/BetterKingBot/BKCouponCrawler
+- Open source: github.com/BetterKingBot/BKCouponCrawler
 Made with ❤ and 🍻 during 😷
 ```
 
 ### Channel Description
 ```
+Burger King Coupons auf Telegram
 Made with ❤ and 🍻 during 😷
 Zum Bot: @BetterKingBot
-Feedback/Support: bkfeedback@pm.me
+Kontakt: bkfeedback@pm.me
 Source: github.com/BetterKingBot/BKCouponCrawler
 ```
 
