@@ -114,6 +114,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
+* Logik zur Erkennung neuer Coupons verbessern: Channel- und Bot erzeugen derzeit unterschiedliche Ausgaben (auch wenn es eigentlich "Sinn ergibt")!
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
 * Feedback Codes / Gratis Kaffee einbauen
