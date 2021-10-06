@@ -565,7 +565,7 @@ class BKBot:
         if len(userFavorites.couponsUnavailable) > 0:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavorites.couponsUnavailable)) + ")?***",
                                                   callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
-            menuText += "\n" + SYMBOLS.DENY + "***Löschbare abgelaufene Favoriten:"
+            menuText += "\n***" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
             menuText += "\n" + userFavorites.getUnavailableFavoritesText()
         # Back button
         keyboard.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
