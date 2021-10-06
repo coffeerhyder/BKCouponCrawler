@@ -173,7 +173,8 @@ class BKCrawler:
         # Use last state so we can compare them against the new data
         timestampStart = datetime.now().timestamp()
         self.migrateDBs()
-        lastValidCoupons = self.filterCoupons(CouponFilter(activeOnly=True))
+        # Get all coupons, also invalid ones (they could become valid again after crawling so we need them in this list otherwise such coupons could be tagged as new although they are not!)
+        lastValidCoupons = self.filterCoupons(CouponFilter(activeOnly=False))
         self.crawl()
         if self.exportCSVs:
             self.couponCsvExport()
@@ -187,11 +188,11 @@ class BKCrawler:
         self.updateCache()
         logging.info("Total crawl duration: " + getFormattedPassedTime(timestampStart))
 
-    def updateIsNewFlags(self, lastValidCoupons: dict):
+    def updateIsNewFlags(self, lastCoupons: dict):
         """ Tags coupons as "NEW" if they haven't been in the DB before by comparing current DB to the last state before crawling. """
         logging.info("Updating IS_NEW flags...")
-        if len(lastValidCoupons) == 0:
-            # Edge case e.g. first start of the crawler
+        if len(lastCoupons) == 0:
+            # Edge case e.g. first start of the crawler -> We do not want to flag all items as new!
             logging.info("DB was empty before --> Not setting any IS_NEW flags")
             return
         couponDB = self.getCouponDB()
@@ -200,21 +201,24 @@ class BKCrawler:
         dbUpdates = []
         for couponID in couponDB:
             coupon = Coupon.load(couponDB, couponID)
-            if self.crawlOnlyBotCompatibleCoupons and couponID not in lastValidCoupons:
-                newCouponIDs.append(couponID)
-                coupon.isNew = True
-                dbUpdates.append(coupon)
-            elif not self.crawlOnlyBotCompatibleCoupons and couponDBIsValid(coupon) and (couponID not in lastValidCoupons or not couponDBIsValid(lastValidCoupons[couponID])):
-                newCouponIDs.append(couponID)
-                coupon.isNew = True
-                dbUpdates.append(coupon)
-            elif coupon.isNew:
+            if coupon.isNew:
                 # Remove IS_NEW flag if it has been set before!
                 coupon.isNew = False
                 dbUpdates.append(coupon)
                 numberofCouponsNewFlagRemoved += 1
+            elif self.crawlOnlyBotCompatibleCoupons and couponID not in lastCoupons:
+                newCouponIDs.append(couponID)
+                coupon.isNew = True
+                dbUpdates.append(coupon)
+            elif not self.crawlOnlyBotCompatibleCoupons and couponDBIsValid(coupon) and (couponID not in lastCoupons or not couponDBIsValid(lastCoupons[couponID])):
+                newCouponIDs.append(couponID)
+                coupon.isNew = True
+                dbUpdates.append(coupon)
+            else:
+                # Coupon is not new isNew default == False
+                pass
+        # Update DB if needed
         if len(dbUpdates) > 0:
-            # Update DB
             couponDB.update(dbUpdates)
             if len(newCouponIDs) > 0:
                 logging.info(str(len(newCouponIDs)) + " IS_NEW flags were issued: " + str(newCouponIDs))
@@ -595,7 +599,7 @@ class BKCrawler:
                 # App coupons cannot be paper coupons
                 del pluCharMap[pluChar]
             elif len(coupons) != 46 and len(coupons) != 47:
-                logging.info("Removing paper char candidate because of bad length:" + pluChar + " [" + str(len(coupons)) + "]")
+                logging.debug("Removing paper char candidate because of bad length:" + pluChar + " [" + str(len(coupons)) + "]")
                 del pluCharMap[pluChar]
         """ Now do some workarounds/corrections of our results.
          This was necessary because as of 09-2021 e.g., current paper coupons' PLUs started with letter "A" but were listed with letter "F" in the BK DB.
@@ -617,18 +621,17 @@ class BKCrawler:
         if len(pluCharMap) == 0:
             logging.info("Failed to find any paper coupon candidates")
         else:
-            logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon chars:")
             # More logging
             couponCharsLogtext = ''
             for paperPluChar, coupons in pluCharMap.items():
                 if len(couponCharsLogtext) > 0:
                     couponCharsLogtext += ', '
                 couponCharsLogtext += paperPluChar + "[" + str(len(coupons)) + "]"
-            logging.info(couponCharsLogtext)
+            logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon char(s): " + couponCharsLogtext)
             # Evaluate our findings
             for paperPluChar, paperCoupons in pluCharMap.items():
                 if paperPluChar in paperCouponCharsToValidExpireTimestamp.keys():
-                    # We safely detected this set of
+                    # We safely detected this set of paper coupons
                     logging.info("Safely detected paper coupon char is: " + paperPluChar)
                     # Update data of these coupons and add them to DB later
                     expireTimestamp = paperCouponCharsToValidExpireTimestamp[paperPluChar]
@@ -636,16 +639,15 @@ class BKCrawler:
                         paperCoupon.source = CouponSource.PAPER
                         paperCoupon.timestampExpire2 = expireTimestamp
                         paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(expireTimestamp))
-                        # Update these ones too
-                        coupons2LeftToProcess[paperCoupon.id] = paperCoupon
-                    foundPaperCouponMap[paperPluChar] = paperCoupons
                 else:
+                    # We assume that these coupons are paper coupons
                     logging.info("Auto assigned paper coupon char is: " + paperPluChar)
                     # Update data of these coupons and add them to DB later
                     # https://www.quora.com/In-Python-what-is-the-cleanest-way-to-get-a-datetime-for-the-start-of-today
                     today = datetime.today()  # or datetime.now to use local timezone
                     todayDayEnd = datetime(year=today.year, month=today.month,
                                            day=today.day, hour=23, minute=59, second=59)
+                    # Add them with fake validity of 2 days
                     artificialExpireTimestamp = todayDayEnd.timestamp() + 2 * 24 * 60
                     for paperCoupon in paperCoupons:
                         paperCoupon.source = CouponSource.PAPER
@@ -653,9 +655,7 @@ class BKCrawler:
                         paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
                         paperCoupon.isUnsafeExpiredate = True
                         paperCoupon.description = SYMBOLS.INFORMATION + "Das hier eingetragene Ablaufdatum ist vorläufig und wird zeitnah korrigiert!"
-                        # Update these ones too
-                        coupons2LeftToProcess[paperCoupon.id] = paperCoupon
-                    foundPaperCouponMap[paperPluChar] = paperCoupons
+                foundPaperCouponMap[paperPluChar] = paperCoupons
         if len(paperCouponCharsToValidExpireTimestamp) > 0 and len(foundPaperCouponMap) == 0:
             # This should never happen
             logging.warning("Failed to find any paper coupons alhough we expect some to be there!")
@@ -673,7 +673,6 @@ class BKCrawler:
                     paperCouponNumbersList.append(couponNumber)
             # Sort list to easily find highest number
             paperCouponNumbersList.sort()
-            logging.info("Successfully found " + str(len(paperCouponNumbersList)) + " paper coupons with expire-date: " + paperCoupons[0].dateFormattedExpire2)
             highestPaperPLUNumber = paperCouponNumbersList[len(paperCouponNumbersList) - 1]
             # Now collect possibly missing paper coupons
             # Even if all "real" paper coupons are found, it may happen that the last one, usually number 47 is not found as thart is a dedicated Payback coupon
@@ -692,14 +691,16 @@ class BKCrawler:
                 if len(missingPaperPLUs) > 0:
                     if len(missingPaperPLUs) == 1 and missingPaperPLUs[0] == paybackDummyPLU:
                         # Our 'missing' PLU seems to be the dummy Payback PLU --> Looks like we found all paper coupons :)
-                        logging.info("OK: Seems like we found all paper coupons with char: " + paperChar)
+                        logging.info("Paper coupons OK: " + paperChar + "[" + str(len(paperCoupons)) + "]")
                     else:
                         logging.info("Possibly missing paper PLUs: " + str(missingPaperPLUs))
+                        logging.info("Paper coupons NOT OK: " + paperChar + " [" + str(len(paperCoupons)) + "] | Possibly missing PLUs: " + str(missingPaperPLUs))
+                # Rare case: BK has deleted the paper coupons in their API already but we still got them in our DB because they should still be valid!
                 if len(missingPaperPLUsButPresentInDB) > 0:
                     logging.info("Paper PLUs that are present in DB but not in API: " + str(missingPaperPLUsButPresentInDB))
             else:
                 # Looks like we found all paper coupons :)
-                print("Ok: Seems like we found all paper coupons with char: " + paperChar)
+                logging.info("Paper coupons OK: " + paperChar + " [" + str(len(paperCoupons)) + "]")
         couponsToAddToDB = {}
         # Collect items we want to add to DB
         if self.crawlOnlyBotCompatibleCoupons:
@@ -801,7 +802,6 @@ class BKCrawler:
         """ Adds special coupons which are manually added via config_special_coupons.json.
          Make sure to execute this AFTER DB cleanup so this can set IS_NEW flags without them being removed immediately afterwards!
          This will only add VALID coupons to DB! """
-        logging.info("Adding special coupons...")
         specialCouponData = loadJson(BotProperty.specialCouponConfigPath)
         specialCoupons = specialCouponData["special_coupons"]
         couponsToAdd = {}
@@ -832,6 +832,7 @@ class BKCrawler:
                         newCoupon.isNew = True
                 couponsToAdd[specialCoupon[Coupon.uniqueID.name]] = newCoupon
         if len(couponsToAdd) > 0:
+            logging.info("Adding special coupons...")
             # Only do DB request if we want to add stuff
             couponDB = self.getCouponDB()
             dbUpdates = []
@@ -841,7 +842,7 @@ class BKCrawler:
                     coupon["_rev"] = existantCoupon.rev
                 dbUpdates.append(coupon)
             couponDB.update(dbUpdates)
-        logging.info("Number of special coupons added: " + str(len(couponsToAdd)))
+            logging.info("Number of special coupons added: " + str(len(couponsToAdd)))
 
     def updateHistoryEntry(self, historyDB, primaryKey: str, newData):
         """ Adds/Updates entry inside given database. """
