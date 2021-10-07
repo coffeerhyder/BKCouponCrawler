@@ -114,9 +114,9 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
+* FAQ live schalten (Channel)
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
-* Feedback Codes / Gratis Kaffee einbauen
 * User, die den Bot geblockt haben keine Benachrichtigungen mehr versuchen zu schicken (könnte passieren, wenn ein User Favoriten speichert. Benachrichtigungen aktiviert und dannach den Bot blockiert, TG Exception Unauthorized)
 * Herausfinden, ob "Store-spezifische Coupons" offline vor Ort doch in allen Stores gehen oder die Akzeptanz gleich der der App ist
 * App DB per Proxy in der originalen BK App modifizieren?
@@ -180,6 +180,23 @@ mydealz.de/gutscheine/burger-king-coupons-bundesweit-gultig-bis-05032021-1731958
 ```
 Aktuelle Papiercoupons (gültig bis 24.09.2021):
 mydealz.de/gutscheine/burger-king-papier-coupons-bis-2409-1840299
+```
+
+### Channel FAQ
+```
+Welche Daten speichert der Bot?
+Deine Benutzer-ID und deine Einstellungen.
+Diese Daten werden nicht ausgewertet und du kannst sie jederzeit mit dem Befehl '/tschau' löschen.
+
+Meine BK Filiale verlangt original Papier/App Coupons, wie kann ich die aus dem Channel dennoch verwenden?
+- Versuche, die Kurz-Codes einfach zu sagen
+- Fahre durch den Drive hier werden idR. alle genommen
+
+Wo finde ich den Quellcode?
+Hier: github.com/BetterKingBot/BKCouponCrawler
+
+Wie kann ich Fehler melden oder Feedback einreichen?
+Per Mail: bkfeedback@pm.me
 ```
 
 ### Test Cases
