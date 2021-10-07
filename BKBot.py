@@ -8,7 +8,7 @@ import schedule
 from couchdb import Database
 from furl import furl, urllib
 from telegram import Update, InlineKeyboardButton, InputMediaPhoto, Message, ReplyMarkup
-from telegram.error import RetryAfter, Unauthorized, BadRequest
+from telegram.error import RetryAfter, BadRequest
 from telegram.ext import Updater, CommandHandler, CallbackContext, ConversationHandler, CallbackQueryHandler, MessageHandler, Filters
 from telegram.utils.helpers import DEFAULT_NONE
 from telegram.utils.types import ODVInput, FileInput
@@ -22,7 +22,7 @@ from Crawler import BKCrawler, UserFavorites
 from Models import CouponFilter
 
 from UtilsCouponsDB import couponDBGetUniqueCouponID, \
-    couponDBGetUniqueIdentifier, couponDBGetPriceFormatted, couponDBGetImageQR, isValidBotCoupon, \
+    couponDBGetUniqueIdentifier, couponDBGetPriceFormatted, couponDBGetImageQR, \
     couponDBGetImagePath, couponDBGetPLUOrUniqueID, Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, generateCouponLongTextFormatted, \
     generateCouponLongTextFormattedWithDescription, generateCouponShortText, generateCouponShortTextFormatted, generateCouponShortTextFormattedWithHyperlinkToChannelPost, \
     generateCouponLongTextFormattedWithHyperlinkToChannelPost, getCouponsSeparatedByType
@@ -31,8 +31,39 @@ from UtilsOffers import offerGetImagePath
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
-# Use public API: https://gist.github.com/max1220/7f2f65be4381bc0878e64a985fd71da4
-headers = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
+# Enable this to show BETA setting to users --> Only enable this if there are beta features available
+DISPLAY_BETA_SETTING = True
+
+
+""" This is a helper for basic user on/off settings """
+USER_SETTINGS_ON_OFF = {
+    # TODO: Obtain these Keys and default values from "User" Mapping class!
+    "notifyWhenFavoritesAreBack": {
+        "description": "Favoriten Benachrichtigungen",
+        "default": False
+    },
+    "notifyWhenNewCouponsAreAvailable": {
+        "description": "Benachrichtigung bei neuen Coupons",
+        "default": False
+    },
+    "displayQR": {
+        "description": "QR Codes zeigen",
+        "default": False
+    },
+    "displayHiddenAppCouponsWithinGenericCategories": {
+        "description": "Versteckte App Coupons in Kategorien zeigen**",
+        "default": False
+    },
+    "highlightFavoriteCouponsInContextOfNormalCouponLists": {
+        "description": "Favoriten in Listen mit " + SYMBOLS.STAR + " markieren",
+        "default": True
+    }
+}
+if DISPLAY_BETA_SETTING:
+    USER_SETTINGS_ON_OFF["enableBetaFeatures"] = {
+        "description": "Beta Features aktivieren",
+        "default": False
+    }
 
 
 class CouponDisplayMode:
@@ -206,8 +237,9 @@ class BKBot:
         if query is not None:
             query.answer()
         userDB = self.crawler.getUsersDB()
+        user = User.load(userDB, str(update.effective_user.id))
         """ New user --> Add userID to DB. """
-        if str(update.effective_user.id) not in userDB:
+        if user is None:
             # Add user to DB for the first time
             user = User(
                 id=str(update.effective_user.id)
@@ -238,9 +270,10 @@ class BKBot:
         keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data="?a=dcs&m=" + CouponDisplayMode.FAVORITES),
                                     InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten + Pics' + SYMBOLS.STAR, callback_data=CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES)]
         allButtons.append(keyboardCouponsFavorites)
-        # keyboardFeedbackCodes = [InlineKeyboardButton('Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)]
         allButtons.append(
             [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS), InlineKeyboardButton('KING Finder', url='https://www.burgerking.de/kingfinder')])
+        if user.settings.enableBetaFeatures:
+            allButtons.append([InlineKeyboardButton('BETA: Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = 'Hallo ' + update.effective_user.first_name + ', <b>Bock auf Fastfood?</b>'
@@ -322,7 +355,7 @@ class BKBot:
 
     def getUnavailableFavoriteCouponIDs(self, user: User) -> list:
         """ Returns all couponIDs which the user has set as favorite but which are not available (expired) at this moment. """
-        userFavorites = self.getUserFavorites(user=user, enableExceptionHandling = False)
+        userFavorites = self.getUserFavorites(user=user, enableExceptionHandling=False)
         inactiveFavoriteCouponIDs = []
         for unavailableCoupon in userFavorites.couponsUnavailable:
             inactiveFavoriteCouponIDs.append(couponDBGetUniqueCouponID(unavailableCoupon))
@@ -451,7 +484,8 @@ class BKBot:
             return CallbackVars.MENU_DISPLAY_COUPON
         query = update.callback_query
         query.answer()
-        self.displayCouponsWithImagesAndBackButton(update, context, userFavorites.couponsAvailable, topMsgText='<b>Alle Favoriten mit Bildern:</b>', bottomMsgText=favoritesInfoText)
+        self.displayCouponsWithImagesAndBackButton(update, context, userFavorites.couponsAvailable, topMsgText='<b>Alle Favoriten mit Bildern:</b>',
+                                                   bottomMsgText=favoritesInfoText)
         # Delete last message containing menu
         context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
         return CallbackVars.MENU_DISPLAY_COUPON
@@ -529,12 +563,13 @@ class BKBot:
         query.answer()
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
         numberOfFeedbackCodesToGenerate = 3
-        text = "<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
+        text = SYMBOLS.WARNING + "<b>Achtung! BETA Feature und unklar, ob diese 'random' Codes so funktionieren!</b>" + SYMBOLS.WARNING
+        text += "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
         for index in range(numberOfFeedbackCodesToGenerate):
             text += "\n" + generateFeedbackCode()
-        text += "\nSchreibe einen Code deiner Wahl auf die Rückseine deines BK Kassenbons, um den (gratis) Artikel zu erhalten."
+        text += "\nSchreibe einen Code deiner Wahl auf die Rückseine (d)eines BK Kassenbons, um den (gratis) Artikel zu erhalten."
         text += "\nFalls du keinen Kassenbon hast und kein Schamgefühl kennst, hier ein Trick:"
-        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup (~0,20€)."
+        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ ;)"
         text += "\nDie Konditionen der Feedback Codes variieren.\nAktuell gibt es: Gratis Eiswaffel oder Kaffee(klein) [Stand 14.04.2021]"
         text += "\nDanke an <a href=\"https://edik.ch/posts/hack-the-burger-king.html\">Edik</a>!"
         query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
@@ -550,13 +585,14 @@ class BKBot:
         # TODO: Make this nicer
         dummyUser = User()
         for settingKey, setting in dummyUser["settings"].items():
-            description = USER_SETTINGS_ON_OFF[settingKey]["description"]
-            if user.settings.get(settingKey, dummyUser.settings[settingKey]):
-                # Add symbol to enabled settings button text so user can see which settings are currently enabled
-                keyboard.append(
-                    [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
-            else:
-                keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
+            if settingKey in USER_SETTINGS_ON_OFF:
+                description = USER_SETTINGS_ON_OFF[settingKey]["description"]
+                if user.settings.get(settingKey, dummyUser.settings[settingKey]):
+                    # Add symbol to enabled settings button text so user can see which settings are currently enabled
+                    keyboard.append(
+                        [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
+                else:
+                    keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         userFavorites = self.getUserFavorites(user=user)
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>\n"
         menuText += "Nicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."

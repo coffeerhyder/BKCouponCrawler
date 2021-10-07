@@ -38,12 +38,11 @@ class User(Document):
     settings = DictField(
         Mapping.build(
             displayQR=BooleanField(default=False),
-            # Deprecated 2021-08-16
-            # displayHiddenAppCoupons=BooleanField(default=True),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
-            highlightFavoriteCouponsInContextOfNormalCouponLists=BooleanField(default=True)
+            highlightFavoriteCouponsInContextOfNormalCouponLists=BooleanField(default=True),
+            enableBetaFeatures=BooleanField(default=False)
         )
     )
     favoriteCoupons = DictField()

@@ -309,32 +309,3 @@ def isValidImageFile(path: str) -> bool:
         return True
     except:
         return False
-
-
-USER_SETTINGS_ON_OFF = {
-    # TODO: Obtain these Keys and default values from "User" Mapping class!
-    "notifyWhenFavoritesAreBack": {
-        "description": "Favoriten Benachrichtigungen",
-        "default": False
-    },
-    "notifyWhenNewCouponsAreAvailable": {
-        "description": "Benachrichtigung bei neuen Coupons",
-        "default": False
-    },
-    "displayQR": {
-        "description": "QR Codes zeigen",
-        "default": False
-    },
-    # "displayHiddenAppCoupons": { # Deprecated
-    #     "description": "Versteckte App Coupons zeigen**",
-    #     "default": True
-    # },
-    "displayHiddenAppCouponsWithinGenericCategories": {
-        "description": "Versteckte App Coupons in Kategorien zeigen**",
-        "default": False
-    },
-    "highlightFavoriteCouponsInContextOfNormalCouponLists": {
-        "description": "Favoriten in Listen mit " + SYMBOLS.STAR + " markieren",
-        "default": True
-    }
-}
