@@ -183,19 +183,36 @@ mydealz.de/gutscheine/burger-king-papier-coupons-bis-2409-1840299
 
 ### Channel FAQ
 ```
+FAQ BetterKing Bot und Channel
+
+Wo finde ich die aktuellen Papiercoupons als Scan?
+Sofern es welche gibt, hier:
+mydealz.de/gutscheine/neue-burger-king-gutscheine-gultig-bis-12112021-1861962
+Gültig bis: 12.11.2021
+
 Welche Daten speichert der Bot?
 Deine Benutzer-ID und deine Einstellungen.
-Diese Daten werden nicht ausgewertet und du kannst sie jederzeit mit dem Befehl '/tschau' löschen.
+Diese Daten werden nicht ausgewertet und du kannst sie jederzeit mit dem Befehl '/tschau' endgültig aus der Datenbank löschen.
 
-Meine BK Filiale verlangt original Papier/App Coupons, wie kann ich die aus dem Channel dennoch verwenden?
-- Versuche, die Kurz-Codes einfach zu sagen
+Meine BK Filiale verlangt original Papier-/App Coupons, wie kann ich die aus dem Channel dennoch verwenden?
+Es gibt mehrere Möglichkeiten:
+- Versuche, die Kurz-Codes einfach anzusagen
 - Fahre durch den Drive hier werden idR. alle genommen
+- Falls deine BK Filiale die Vorbestellen Funktion bietet, scanne die Coupons im Bestellvorgang mit deinem Handy (Zweitgerät/Laptop benötigt)
+- Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
 
 Wo finde ich den Quellcode?
 Hier: github.com/BetterKingBot/BKCouponCrawler
 
 Wie kann ich Fehler melden oder Feedback einreichen?
 Per Mail: bkfeedback@pm.me
+
+Gibt es ähnliche open source Projekte für BK?
+Ja: Würger King: wurgerking.wfr.moe
+Quellcode: github.com/WebFreak001/WurgerKing
+
+Gibt es sowas auch für McDonalds/KFC/...?
+Mir ist kein solches Projekt bekannt.
 ```
 
 ### Test Cases
