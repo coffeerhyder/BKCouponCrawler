@@ -241,6 +241,9 @@ def generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon: Coupon, p
     priceFormatted = couponDBGetPriceFormatted(coupon)
     if priceFormatted is not None:
         text += " | " + priceFormatted
+    percentReduced = couponDBGetReducedPercentageFormatted(coupon)
+    if percentReduced is not None:
+        text += " | " + percentReduced
     return text
 
 
@@ -266,9 +269,9 @@ def generateCouponLongTextFormatted(coupon: Coupon) -> str:
     priceFormatted = couponDBGetPriceFormatted(coupon)
     if priceFormatted is not None:
         text += " | " + priceFormatted
-    percentReduced = couponDBGetReducedPercentageFormatted(coupon)
-    if percentReduced is not None:
-        text += " | " + percentReduced
+    reducedPercentage = couponDBGetReducedPercentageFormatted(coupon)
+    if reducedPercentage is not None:
+        text += " | " + reducedPercentage
     return text
 
 
@@ -281,9 +284,9 @@ def generateCouponLongTextFormattedWithHyperlinkToChannelPost(coupon: Coupon, pu
     priceFormatted = couponDBGetPriceFormatted(coupon)
     if priceFormatted is not None:
         text += " | " + priceFormatted
-    percentReduced = couponDBGetReducedPercentageFormatted(coupon)
-    if percentReduced is not None:
-        text += " | " + percentReduced
+    reducedPercentage = couponDBGetReducedPercentageFormatted(coupon)
+    if reducedPercentage is not None:
+        text += " | " + reducedPercentage
     return text
 
 
