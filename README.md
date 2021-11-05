@@ -116,7 +116,6 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 # TODOs
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
-* Feedback Codes / Gratis Kaffee einbauen
 * User, die den Bot geblockt haben keine Benachrichtigungen mehr versuchen zu schicken (könnte passieren, wenn ein User Favoriten speichert. Benachrichtigungen aktiviert und dannach den Bot blockiert, TG Exception Unauthorized)
 * Herausfinden, ob "Store-spezifische Coupons" offline vor Ort doch in allen Stores gehen oder die Akzeptanz gleich der der App ist
 * App DB per Proxy in der originalen BK App modifizieren?
@@ -182,6 +181,40 @@ Aktuelle Papiercoupons (gültig bis 24.09.2021):
 mydealz.de/gutscheine/burger-king-papier-coupons-bis-2409-1840299
 ```
 
+### Channel FAQ
+```
+FAQ BetterKing Bot und Channel
+
+Wo finde ich die aktuellen Papiercoupons als Scan?
+Sofern es welche gibt, hier:
+mydealz.de/gutscheine/neue-burger-king-gutscheine-gultig-bis-12112021-1861962
+Gültig bis: 12.11.2021
+
+Welche Daten speichert der Bot?
+Deine Benutzer-ID und deine Einstellungen.
+Diese Daten werden nicht ausgewertet und du kannst sie jederzeit mit dem Befehl '/tschau' endgültig aus der Datenbank löschen.
+
+Meine BK Filiale verlangt original Papier-/App Coupons, wie kann ich die aus dem Channel dennoch verwenden?
+Es gibt mehrere Möglichkeiten:
+- Versuche, die Kurz-Codes einfach anzusagen
+- Fahre durch den Drive hier werden idR. alle genommen
+- Falls deine BK Filiale die Vorbestellen Funktion bietet, scanne die Coupons im Bestellvorgang mit deinem Handy (Zweitgerät/Laptop benötigt)
+- Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
+
+Wo finde ich den Quellcode?
+Hier: github.com/BetterKingBot/BKCouponCrawler
+
+Wie kann ich Fehler melden oder Feedback einreichen?
+Per Mail: bkfeedback@pm.me
+
+Gibt es ähnliche open source Projekte für BK?
+Ja: Würger King: wurgerking.wfr.moe
+Quellcode: github.com/WebFreak001/WurgerKing
+
+Gibt es sowas auch für McDonalds/KFC/...?
+Mir ist kein solches Projekt bekannt.
+```
+
 ### Test Cases
 * Alle Coupon Kategorien
 * User Favoriten
@@ -220,6 +253,7 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * Es befinden sich fast alle App- UND Papiercoupons im "Filial-spezifischen" Endpoint: `mo.burgerking-app.eu/api/v2/stores/123456/menu`
 * Unterschiedliche Filialen können einen unterschiedlichen Pool von Coupons akzeptieren, aber die meisten Coupons funktionieren in allen Filialen
 * Die online aufgelisteten Gutscheine sind nicht alle, die akzeptiert werden: beispielsweise können aktuell gültige Papiercoupons teilweise fehlen, obwohl Restaurants Papiercoupons generell akzeptieren -> Bedeutet im Klartext: Manche Papiercoupons lassen sich bei manchen Restaurants nicht in der online Vorbestellung nutzen, obwohl sie offline in der Filiale funktionieren müssten -> Fehler in der BK DB?! -> Ergibt einfach keinen Sinn
+* Seit ca. September 2021 scheint die Vorbestellen Funktion bei allen BK Filialen entfernt worden zu sein. Kennt man die FilialIDs, die Vorbestellungen akzeptierten, kann man noch immer Coupons über den Endpoint abfragen.
 
 ### Danke an
 * [bkoder Projekt](https://github.com/3dik/bkoder)

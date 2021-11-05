@@ -212,8 +212,12 @@ def generateCouponShortText(coupon: Coupon) -> str:
     """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
     text = couponDBGetPLUOrUniqueID(coupon) + " | " + coupon.titleShortened
     priceFormatted = couponDBGetPriceFormatted(coupon)
+    reducedPercent = couponDBGetReducedPercentageFormatted(coupon)
     if priceFormatted is not None:
         text += " | " + priceFormatted
+    elif reducedPercent is not None:
+        # Fallback for coupons without given price (rare case) -> Show reduced percent instead (if given)
+        text += " | " + reducedPercent
     return text
 
 
@@ -221,8 +225,12 @@ def generateCouponShortTextFormatted(coupon: Coupon) -> str:
     """ Returns e.g. "<b>Y15</b> | 2Whopper+M🍟+0,4Cola | 8,99€" """
     text = "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | " + coupon.titleShortened
     priceFormatted = couponDBGetPriceFormatted(coupon)
+    reducedPercent = couponDBGetReducedPercentageFormatted(coupon)
     if priceFormatted is not None:
         text += " | " + priceFormatted
+    elif reducedPercent is not None:
+        # Fallback for coupons without given price (rare case) -> Show reduced percent instead (if given)
+        text += " | " + reducedPercent
     return text
 
 

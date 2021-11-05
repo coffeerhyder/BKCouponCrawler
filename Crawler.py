@@ -13,7 +13,7 @@ from json import loads
 
 from BotUtils import Config
 from Helper import *
-from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, isCouponShortPLU, isValidImageFile
+from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, isCouponShortPLUWithAtLeastOneLetter, isValidImageFile
 from Models import CouponFilter
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
@@ -33,6 +33,7 @@ DEBUGCRAWLER = False
 
 class UserFavorites:
     """ Small helper class """
+
     def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None, favoritesUnavailable: Union[List[Coupon], None] = None):
         # Do not allow null values when arrays are expected. This makes it easier to work with this.
         if favoritesAvailable is None:
@@ -50,7 +51,7 @@ class UserFavorites:
             for coupon in self.couponsUnavailable:
                 if len(unavailableFavoritesText) > 0:
                     unavailableFavoritesText += '\n'
-                unavailableFavoritesText += couponDBGetUniqueCouponID(coupon) + ' | ' + couponDBGetTitleShortened(coupon)
+                unavailableFavoritesText += coupon.id + ' | ' + couponDBGetTitleShortened(coupon)
                 if coupon.price is not None:
                     unavailableFavoritesText += ' | ' + couponDBGetPriceFormatted(coupon)
             return unavailableFavoritesText
@@ -409,9 +410,9 @@ class BKCrawler:
         for uniqueCouponID in couponDB:
             coupon = Coupon.load(couponDB, uniqueCouponID)
             dbAllPLUsList.add(coupon.plu)
-            if coupon.source == CouponSource.APP and couponDBIsValid(coupon):
-                pluChar = re.compile(r"([A-Za-z]+)\d+.*").search(coupon.plu).group(1)
-                appCouponCharList.add(pluChar.upper())
+            regexPLUWithOneLetter = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
+            if coupon.source == CouponSource.APP and couponDBIsValid(coupon) and regexPLUWithOneLetter is not None:
+                appCouponCharList.add(regexPLUWithOneLetter.group(1).upper())
         numberofNewCoupons = 0
         numberofUpdatedCoupons = 0
         allProducts2 = {}
@@ -470,7 +471,7 @@ class BKCrawler:
                     # This should never happen
                     logging.warning("WTF failed to find product for couponID: " + uniqueCouponID)
                     continue
-                if plu.isdecimal() and isCouponShortPLU(uniqueCouponID):
+                if plu.isdecimal() and isCouponShortPLUWithAtLeastOneLetter(uniqueCouponID):
                     # Let's fix Burger Kings database errors!
                     logging.debug("Found swapped plu/uniqueID: " + plu + " / " + uniqueCouponID)
                     newplu = uniqueCouponID
@@ -1215,7 +1216,7 @@ class BKCrawler:
                 continue
             else:
                 desiredCoupons[uniqueCouponID] = coupon
-                namesDupeMap[couponDBGetComparableValue(coupon)] = couponDBGetUniqueCouponID(coupon)
+                namesDupeMap[couponDBGetComparableValue(coupon)] = coupon.id
         if filters.sortMode is None:
             return desiredCoupons
         else:
@@ -1288,7 +1289,7 @@ class BKCrawler:
                 offers.append(offer)
         return offers
 
-    def getUserFavorites(self, user: User, coupons: Union[dict, None]=None) -> UserFavorites:
+    def getUserFavorites(self, user: User, coupons: Union[dict, None] = None) -> UserFavorites:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
         """
