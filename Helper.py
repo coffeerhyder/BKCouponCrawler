@@ -248,16 +248,20 @@ def couponTitleContainsFriesOrCoke(titleLower: str) -> bool:
         return False
 
 
-REGEX_PLU = re.compile(r'(?i)^([A-Z]+)\d+[A-Z]?$')
+REGEX_PLU_WITH_AT_LEAST_ONE_LETTER = re.compile(r'(?i)^([A-Z]+)\d+[A-Z]?$')
 # Paper coupons usually only contain one char followed by a 1-2 digit number.
 REGEX_PLU_ONLY_ONE_LETTER = re.compile(r'(?i)^([A-Z])\d+$')
 
 
-def isCouponShortPLU(plu: str) -> bool:
+# def isCouponShortPLUWithOneLetter(plu: str) -> bool:
+#     return plu is not None and REGEX_PLU_ONLY_ONE_LETTER.search(plu) is not None
+
+
+def isCouponShortPLUWithAtLeastOneLetter(plu: str) -> bool:
     """ 2021-04-13: Examples of allowed shortPLUs: "X11", "X11B"
     2021-05-25: New e.g. "KDM2"
     """
-    return plu is not None and REGEX_PLU.search(plu) is not None
+    return plu is not None and REGEX_PLU_WITH_AT_LEAST_ONE_LETTER.search(plu) is not None
 
 
 def generateFeedbackCode() -> str:

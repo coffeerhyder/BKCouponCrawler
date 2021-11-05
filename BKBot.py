@@ -363,7 +363,7 @@ class BKBot:
 
     def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavorites, str]:
         userFavorites = self.getUserFavorites(user=user, coupons=coupons, enableExceptionHandling=True)
-        menuText = SYMBOLS.STAR + str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar ' + SYMBOLS.STAR
+        menuText = SYMBOLS.STAR + str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
         numberofCouponsWithoutPrice = 0
         totalSum = 0
         for coupon in userFavorites.couponsAvailable:
@@ -424,17 +424,16 @@ class BKBot:
         # Grab all items in desired range (= on desired page)
         index = (desiredPage * maxCouponsPerPage - maxCouponsPerPage)
         # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy middle page overview button which usually does not do anything with Easter Egg functionality
-        containsAtLeastOneFavoriteCoupon = False
+        desiredPageContainsAtLeastOneFavoriteCoupon = False
         while len(buttons) < maxCouponsPerPage and index < len(coupons):
             coupon = coupons[index]
-            uniqueCouponID = couponDBGetUniqueCouponID(coupon)
             buttonText = ''
-            if uniqueCouponID in userFavoritesDict:
+            if coupon.id in userFavoritesDict:
                 buttonText += SYMBOLS.STAR
-                containsAtLeastOneFavoriteCoupon = True
+                desiredPageContainsAtLeastOneFavoriteCoupon = True
             buttonText += generateCouponShortText(coupon)
 
-            buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + uniqueCouponID + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
+            buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
             index += 1
         if paginationMax > 1:
             # Add pagination navigation buttons if needed
@@ -457,7 +456,7 @@ class BKBot:
             else:
                 # Add dummy button for a consistent button layout
                 # Easter egg: Trigger it if there are at least two pages available AND user is currently on the last page AND that page contains at least one user-favorited coupon.
-                if containsAtLeastOneFavoriteCoupon and desiredPage > 1:
+                if desiredPageContainsAtLeastOneFavoriteCoupon and desiredPage > 1:
                     navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data=CallbackVars.EASTER_EGG))
                 else:
                     navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonNextPage"))

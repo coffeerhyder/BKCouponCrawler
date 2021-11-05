@@ -174,7 +174,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
 
     if numberOfCouponsNewToThisChannel != len(newCoupons):
         # During normal usage this should never happen
-        logging.warning("Developer mistake or DB has been updated without sending channel update for at least 2 days: Real number of new coupons: " + str(len(newCoupons)) + " | Number of 'new' coupons to send into channel: " + str(numberOfCouponsNewToThisChannel))
+        logging.warning("Developer mistake or DB has been updated without sending channel update in between for at least 2 days: Number of 'new' coupons to send into channel is: " + str(numberOfCouponsNewToThisChannel) + " but should be: " + str(len(newCoupons)))
     # Send relevant coupons into chat
     if len(couponsToSendOut) > 0:
         logging.info("Sending out " + str(len(couponsToSendOut)) + " coupons...")
