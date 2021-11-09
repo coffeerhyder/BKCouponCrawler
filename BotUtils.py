@@ -1,6 +1,6 @@
 from telegram import InlineKeyboardMarkup
 
-VERSION = '1.4.7'
+VERSION = '1.4.8'
 
 
 def getBotImpressum() -> str:
@@ -36,7 +36,9 @@ class CallbackVars:
     MENU_SETTINGS = 'menu_settings'
     MENU_SETTINGS_TOGGLE_NOTIFICATIONS_FAVORITES_COUPONS = 'menu_settings_toggle_notifications_favorites_coupons'
     MENU_SETTINGS_TOGGLE_DISPLAY_QR_CODE = 'menu_settings_toggle_display_qr_code'
+    MENU_SETTINGS_RESET = 'menu_settings_reset'
     MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS = 'menu_settings_delete_unavailable_favorite_coupons'
+    MENU_SETTINGS_USER_DELETE_DATA_COMMAND = 'menu_settings_user_delete_data_command'
     MENU_SETTINGS_USER_DELETE_DATA = 'menu_settings_user_delete_data'
     MENU_SETTINGS_USER_DELETE_DATA_DONE = 'menu_settings_user_delete_data_done'
     EASTER_EGG = 'easter_egg'
