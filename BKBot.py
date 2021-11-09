@@ -150,6 +150,7 @@ class BKBot:
                     # Back to main menu
                     CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),
                     CallbackQueryHandler(self.botDisplaySettingsToggleSetting, pattern=generateCallbackRegEx(User().settings)),
+                    CallbackQueryHandler(self.botResetSettings, pattern="^" + CallbackVars.MENU_SETTINGS_RESET + "$"),
                     CallbackQueryHandler(self.botDeleteUnavailableFavoriteCoupons, pattern="^" + CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS + "$"),
                 ],
             },
@@ -159,7 +160,7 @@ class BKBot:
         dispatcher.add_handler(conv_handler)
         """ Handles deletion of userdata. """
         conv_handler2 = ConversationHandler(
-            entry_points=[CommandHandler('tschau', self.botUserDeleteSTART)],
+            entry_points=[CommandHandler('tschau', self.botUserDeleteSTART), CallbackQueryHandler(self.botUserDeleteSTART, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND + "$")],
             states={
                 CallbackVars.MENU_SETTINGS_USER_DELETE_DATA: [
                     CommandHandler('cancel', self.botUserDeleteCancel),
@@ -584,6 +585,7 @@ class BKBot:
         # TODO: Make this nicer
         dummyUser = User()
         for settingKey, setting in dummyUser["settings"].items():
+            # All settings that are in 'USER_SETTINGS_ON_OFF' are simply on/off settings and will automatically be included in users' settings.
             if settingKey in USER_SETTINGS_ON_OFF:
                 description = USER_SETTINGS_ON_OFF[settingKey]["description"]
                 if user.settings.get(settingKey, dummyUser.settings[settingKey]):
@@ -592,16 +594,22 @@ class BKBot:
                         [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
                 else:
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
-        userFavorites = self.getUserFavorites(user=user)
-        menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>\n"
-        menuText += "Nicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
+        menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
+        menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
         menuText += "\n** Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
+        # Add 'reset settings' button
+        if user.settings.__dict__ != dummyUser.settings.__dict__:
+            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + "bleiben)" + SYMBOLS.WARNING,
+                                                  callback_data=CallbackVars.MENU_SETTINGS_RESET)])
+        userFavorites = self.getUserFavorites(user=user)
         if len(userFavorites.couponsUnavailable) > 0:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavorites.couponsUnavailable)) + ")?***",
                                                   callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
             menuText += "\n***" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
             menuText += "\n" + userFavorites.getUnavailableFavoritesText()
+        keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Meine Daten löschen",
+                                              callback_data=CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND)])
         # Back button
         keyboard.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
         update.callback_query.edit_message_text(text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard), disable_web_page_preview=True)
@@ -628,8 +636,8 @@ class BKBot:
 
     def botUserDeleteSTART(self, update: Update, context: CallbackContext):
         menuText = '<b>\"Dann geh\' doch zu Netto!\"</b>\nAntworte mit deiner Benutzer-ID <b>' + str(
-            update.effective_user.id) + '</b>, um deine Benutzerdaten vom Server zu löschen.\n'
-        menuText += 'Abbruch mit /cancel'
+            update.effective_user.id) + '</b>, um deine Benutzerdaten vom Server zu löschen.'
+        menuText += '\nAbbruch mit /cancel'
         update.effective_message.reply_text(text=menuText, parse_mode='HTML')
         return CallbackVars.MENU_SETTINGS_USER_DELETE_DATA
 
@@ -640,10 +648,10 @@ class BKBot:
             """ Only delete userID if it exists -> It being nonexistant really is an edge case that doesn't happen during normal usage! """
             if str(update.effective_user.id) in userDB:
                 del userDB[str(update.effective_user.id)]
-            menuText = SYMBOLS.CONFIRM + ' Deine Daten wurden vernichtet!\n'
-            menuText += 'Du kannst diesen Chat nun löschen.\n'
-            menuText += '<b>Viel Erfolg beim Abnehmen!</b>\n'
-            menuText += '<i>In loving memory of blauelagunepb ' + SYMBOLS.HEART + '</i>'
+            menuText = SYMBOLS.CONFIRM + ' Deine Daten wurden vernichtet!'
+            menuText += '\nDu kannst diesen Chat nun löschen.'
+            menuText += '\n<b>Viel Erfolg beim Abnehmen!</b>'
+            menuText += '\nIn loving memory of <i>blauelagunepb</i> ' + SYMBOLS.HEART
             update.effective_message.reply_text(text=menuText, parse_mode='HTML')
         else:
             menuText = SYMBOLS.DENY + '<b> Falsche Antwort!</b>\n'
@@ -810,6 +818,16 @@ class BKBot:
         else:
             user.settings[settingKey] = True
         user.store(userDB)
+        return self.displaySettings(update, context, user)
+
+    def botResetSettings(self, update: Update, context: CallbackContext):
+        """ Resets users' settings to default """
+        userDB = self.crawler.getUsersDB()
+        user = User.load(userDB, str(update.effective_user.id))
+        dummyUser = User()
+        user.settings = dummyUser.settings
+        user.store(userDB)
+        # Reload settings menu
         return self.displaySettings(update, context, user)
 
     def botDeleteUnavailableFavoriteCoupons(self, update: Update, context: CallbackContext):
