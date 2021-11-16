@@ -114,6 +114,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
+* Neue API einbauen
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
 * User, die den Bot geblockt haben keine Benachrichtigungen mehr versuchen zu schicken (könnte passieren, wenn ein User Favoriten speichert. Benachrichtigungen aktiviert und dannach den Bot blockiert, TG Exception Unauthorized)

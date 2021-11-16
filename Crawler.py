@@ -624,25 +624,29 @@ class BKCrawler:
         else:
             # More logging
             couponCharsLogtext = ''
-            for paperPluChar, coupons in pluCharMap.items():
+            for paperPLUChar, coupons in pluCharMap.items():
                 if len(couponCharsLogtext) > 0:
                     couponCharsLogtext += ', '
-                couponCharsLogtext += paperPluChar + "[" + str(len(coupons)) + "]"
+                couponCharsLogtext += paperPLUChar + "[" + str(len(coupons)) + "]"
             logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon char(s): " + couponCharsLogtext)
+            allowAutoDetectedPaperCoupons = False # 2021-11-15: Added this switch as their DB is f*cked at this moment so the auto-detection found wrong coupons.
             # Evaluate our findings
-            for paperPluChar, paperCoupons in pluCharMap.items():
-                if paperPluChar in paperCouponCharsToValidExpireTimestamp.keys():
+            for paperPLUChar, paperCoupons in pluCharMap.items():
+                if paperPLUChar in paperCouponCharsToValidExpireTimestamp.keys():
                     # We safely detected this set of paper coupons
-                    logging.info("Safely detected paper coupon char is: " + paperPluChar)
+                    logging.info("Safely detected paper coupon char is: " + paperPLUChar)
                     # Update data of these coupons and add them to DB later
-                    expireTimestamp = paperCouponCharsToValidExpireTimestamp[paperPluChar]
+                    expireTimestamp = paperCouponCharsToValidExpireTimestamp[paperPLUChar]
                     for paperCoupon in paperCoupons:
                         paperCoupon.source = CouponSource.PAPER
                         paperCoupon.timestampExpire2 = expireTimestamp
                         paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(expireTimestamp))
                 else:
                     # We assume that these coupons are paper coupons
-                    logging.info("Auto assigned paper coupon char is: " + paperPluChar)
+                    logging.info("Auto detected paper coupon char is: " + paperPLUChar)
+                    if not allowAutoDetectedPaperCoupons:
+                        logging.info("WARNING: Skipping auto detected paper coupon char: " + paperPLUChar)
+                        continue
                     # Update data of these coupons and add them to DB later
                     # https://www.quora.com/In-Python-what-is-the-cleanest-way-to-get-a-datetime-for-the-start-of-today
                     today = datetime.today()  # or datetime.now to use local timezone
@@ -656,7 +660,7 @@ class BKCrawler:
                         paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
                         paperCoupon.isUnsafeExpiredate = True
                         paperCoupon.description = SYMBOLS.INFORMATION + "Das hier eingetragene Ablaufdatum ist vorläufig und wird zeitnah korrigiert!"
-                foundPaperCouponMap[paperPluChar] = paperCoupons
+                foundPaperCouponMap[paperPLUChar] = paperCoupons
         if len(paperCouponCharsToValidExpireTimestamp) > 0 and len(foundPaperCouponMap) == 0:
             # This should never happen
             logging.warning("Failed to find any paper coupons alhough we expect some to be there!")
