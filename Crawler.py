@@ -668,7 +668,7 @@ class BKCrawler:
         """ Check for missing paper coupons based on the ones we found.
         2021-09-29: Now we do filter by array size before so this handling is pretty much useless but let's keep it anyways.
         """
-        logging.info("Looking for missing paper coupons...")
+        logging.debug("Looking for missing paper coupons...")
         for paperChar, paperCoupons in foundPaperCouponMap.items():
             # Now get a list of the numbers only and consider: paperCoupons may contain duplicates but we don't want those in paperCouponNumbersList!
             paperCouponNumbersList = []

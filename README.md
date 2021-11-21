@@ -27,6 +27,13 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 ``` max_document_id_number ``` --> Auf 1000 setzen siehe: https://docs.couchdb.org/en/latest/config/misc.html#purge
 7. `BKBot.py` einmalig mit dem Parameter `crawl` aufrufen.
 
+# CouchDB manuelles Backup & Wiederherstellen
+``
+sudo -i
+cd /opt/couchdb/etc
+tar -zcvf backup.tar.gz data
+``
+
 
 # config.json (siehe config.json.default)
 Key | Datentyp | Optional | Beschreibung | Beispiel
