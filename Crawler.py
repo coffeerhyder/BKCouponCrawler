@@ -390,12 +390,10 @@ class BKCrawler:
             return
         logging.info("Found " + str(len(storeIDs)) + " stores to crawl coupons from")
         logging.info("Crawling coupons2...")
-        # Store possible paper coupon short-PLU numbers without chars e.g. {"B": [1, 2, 3], "C": [1, 2, 3] }
-        foundPaperCouponMap = {}
         paperCouponCharsToValidExpireTimestamp = {}
         try:
             """ Load file which contains some extra data which can be useful to correctly determine the "CouponSource" and expire date of paper coupons. """
-            paperExtraData = loadJson(BotProperty.paperCouponExtraDataPath)
+            paperExtraData = loadJson('config_paper_coupons.json')
             for paperChar, paperData in paperExtraData.items():
                 validuntil = datetime.strptime(paperData['expire_date'] + ' 23:59:59', '%Y-%m-%d %H:%M:%S').astimezone(getTimezone()).timestamp()
                 if validuntil > datetime.now().timestamp():
@@ -619,6 +617,8 @@ class BKCrawler:
                         coupon.plu = newChar + coupon.plu[1:]
                     del pluCharMap[oldChar]
                     pluCharMap[newChar] = coupons
+        # Store possible paper coupon short-PLU numbers without chars e.g. {"B": [1, 2, 3], "C": [1, 2, 3] }
+        foundPaperCouponMap = {}
         if len(pluCharMap) == 0:
             logging.info("Failed to find any paper coupon candidates")
         else:
@@ -629,7 +629,7 @@ class BKCrawler:
                     couponCharsLogtext += ', '
                 couponCharsLogtext += paperPLUChar + "[" + str(len(coupons)) + "]"
             logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon char(s): " + couponCharsLogtext)
-            allowAutoDetectedPaperCoupons = False # 2021-11-15: Added this switch as their DB is f*cked at this moment so the auto-detection found wrong coupons.
+            allowAutoDetectedPaperCoupons = False  # 2021-11-15: Added this switch as their DB is f*cked at this moment so the auto-detection found wrong coupons.
             # Evaluate our findings
             for paperPLUChar, paperCoupons in pluCharMap.items():
                 if paperPLUChar in paperCouponCharsToValidExpireTimestamp.keys():

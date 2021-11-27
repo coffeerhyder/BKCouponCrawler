@@ -39,7 +39,7 @@ class HISTORYDB:
     COUPONS_HISTORY_DOC = 'history'
 
 
-def loadConfig(fallback=None):
+def loadConfig(fallback: str =None):
     try:
         return loadJson(BotProperty.configPath)
     except:
@@ -47,7 +47,7 @@ def loadConfig(fallback=None):
         return fallback
 
 
-def loadJson(path):
+def loadJson(path: str):
     with open(os.path.join(os.getcwd(), path), encoding='utf-8') as infile:
         loadedJson = json.load(infile, use_decimal=True)
     return loadedJson
