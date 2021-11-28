@@ -3,6 +3,7 @@ import random
 import re
 from datetime import datetime, timedelta
 from re import Pattern
+from typing import Union
 
 import pytz
 import simplejson as json
@@ -39,7 +40,7 @@ class HISTORYDB:
     COUPONS_HISTORY_DOC = 'history'
 
 
-def loadConfig(fallback: str =None):
+def loadConfig(fallback: str = None):
     try:
         return loadJson(BotProperty.configPath)
     except:
@@ -51,6 +52,11 @@ def loadJson(path: str):
     with open(os.path.join(os.getcwd(), path), encoding='utf-8') as infile:
         loadedJson = json.load(infile, use_decimal=True)
     return loadedJson
+
+
+def saveJson(path: str, data: Union[list, dict]):
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=4, sort_keys=True)
 
 
 def couponOrOfferGetImageURL(data: dict) -> str:

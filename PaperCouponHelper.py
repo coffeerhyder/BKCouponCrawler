@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 
 import BotUtils
-from Helper import loadJson, getTimezone
+from Helper import loadJson, getTimezone, saveJson
 
 
 def getPaperCouponInfo() -> dict:
@@ -71,7 +71,6 @@ print(str(mapping))
 paperExtraData[paperChar]['mapping'] = mapping
 # Update our config
 # open(paper_coupons_config_path, mode='wb').write(paperExtraData)
-with open(BotUtils.BotProperty.paperCouponExtraDataPath, 'w') as f:
-    json.dump(paperExtraData, f)
+saveJson(BotUtils.BotProperty.paperCouponExtraDataPath, paperExtraData)
 
 sys.exit()

@@ -141,8 +141,7 @@ class BKCrawler:
             apiResponse = loads(conn.get_response().read())
             if self.storeCouponAPIDataAsJson:
                 # Save API response so we can easily use this data for local testing later on.
-                with open('crawler/coupons1.json', 'w') as outfile:
-                    json.dump(apiResponse, outfile)
+                saveJson('crawler/coupons1.json', apiResponse)
         self.crawlProcessCoupons(apiResponse)
         self.crawlProcessOffers(apiResponse)
         logging.info('App API Crawling done')
@@ -438,10 +437,8 @@ class BKCrawler:
                 apiResponse = loads(conn.get_response().read())
                 if self.storeCouponAPIDataAsJson:
                     # Save API response so we can easily use this data for local testing later on.
-                    with open('crawler/coupons2_latest.json', 'w') as outfile:
-                        json.dump(apiResponse, outfile)
-                    with open('crawler/coupons2_' + str(storeID) + '.json', 'w') as outfile:
-                        json.dump(apiResponse, outfile)
+                    saveJson('crawler/coupons2_latest.json', apiResponse)
+                    saveJson('crawler/coupons2_' + str(storeID) + '.json', apiResponse)
             products = apiResponse.get('products')
             coupons = apiResponse.get('coupons')
             if products is None or coupons is None:
