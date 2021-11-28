@@ -9,6 +9,7 @@ import pytz
 import simplejson as json
 from PIL import Image
 
+import BotUtils
 from BotUtils import BotProperty
 
 
@@ -319,3 +320,23 @@ def isValidImageFile(path: str) -> bool:
         return True
     except:
         return False
+
+
+def getActivePaperCouponInfo() -> dict:
+    return getActivePaperCouponInfo2(loadPaperCouponConfigFile())
+
+
+def getActivePaperCouponInfo2(paperCouponConfig: dict) -> dict:
+    paperCouponInfo = {}
+    """ Load file which contains some extra data which can be useful to correctly determine the "CouponSource" and expire date of paper coupons. """
+    for paperChar, paperData in paperCouponConfig.items():
+        validuntil = datetime.strptime(paperData['expire_date'] + ' 23:59:59', '%Y-%m-%d %H:%M:%S').astimezone(getTimezone()).timestamp()
+        if validuntil > datetime.now().timestamp():
+            newPaperData = paperData
+            newPaperData['expire_timestamp'] = validuntil
+            paperCouponInfo[paperChar] = newPaperData
+    return paperCouponInfo
+
+
+def loadPaperCouponConfigFile() -> dict:
+    return loadJson(BotUtils.BotProperty.paperCouponExtraDataPath)
