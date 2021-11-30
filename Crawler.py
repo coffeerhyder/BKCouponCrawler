@@ -180,7 +180,7 @@ class BKCrawler:
             self.couponCsvExport()
             self.couponCsvExport2()
         self.updateIsNewFlags(lastCoupons)
-        self.addSpecialCoupons()
+        self.addExtraCoupons()
         self.downloadProductiveCouponDBImagesAndCreateQRCodes()
         # self.checkProductiveCouponsDBImagesIntegrity()
         # self.checkProductiveOffersDBImagesIntegrity()
@@ -815,51 +815,44 @@ class BKCrawler:
             logging.info("Deleting non-allowed coupons from DB: " + str(len(deleteCouponDocs)))
             couponDB.purge(deleteCouponDocs.values())
 
-    def addSpecialCoupons(self):
-        """ Adds special coupons which are manually added via config_special_coupons.json.
+    def addExtraCoupons(self):
+        """ Adds extra coupons which have been manually put in config_extra_coupons.json.
          Make sure to execute this AFTER DB cleanup so this can set IS_NEW flags without them being removed immediately afterwards!
          This will only add VALID coupons to DB! """
-        specialCouponData = loadJson(BotProperty.specialCouponConfigPath)
-        specialCoupons = specialCouponData["special_coupons"]
+        extraCouponData = loadJson(BotProperty.extraCouponConfigPath)
+        extraCouponsJson = extraCouponData["extra_coupons"]
         couponsToAdd = {}
-        for specialCoupon in specialCoupons:
-            newCoupon = Coupon(id=specialCoupon[Coupon.uniqueID.name], uniqueID=specialCoupon[Coupon.uniqueID.name], title=sanitizeCouponTitle(specialCoupon[Coupon.title.name]),
-                               source=specialCoupon[Coupon.source.name], imageURL=specialCoupon[Coupon.imageURL.name],
-                               titleShortened=shortenProductNames(specialCoupon[Coupon.title.name]),
-                               containsFriesOrCoke=couponTitleContainsFriesOrCoke(specialCoupon[Coupon.title.name]))
-            # Add optional fields
-            if Coupon.plu.name in specialCoupon:
-                newCoupon.plu = specialCoupon[Coupon.plu.name]
-            if Coupon.price.name in specialCoupon:
-                newCoupon.price = specialCoupon[Coupon.price.name]
-            if Coupon.staticReducedPercent.name in specialCoupon:
-                newCoupon.staticReducedPercent = specialCoupon[Coupon.staticReducedPercent.name]
-            if Coupon.description.name in specialCoupon:
-                newCoupon.description = specialCoupon[Coupon.description.name]
-            expiredateStr = specialCoupon["expire_date"] + " 23:59:59"
+        for extraCouponJson in extraCouponsJson:
+            coupon = Coupon.wrap(extraCouponJson)
+            coupon.id = coupon.uniqueID  # Set custom uniqueID otherwise couchDB will create one later -> This is not what we want to happen!!
+            coupon.title = sanitizeCouponTitle(coupon.title)
+            coupon.titleShortened = shortenProductNames(coupon.title)
+            coupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(coupon.title)
+            expiredateStr = extraCouponJson["expire_date"] + " 23:59:59"
             expiredate = datetime.strptime(expiredateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
             # Only add active coupons if it is valid
             if expiredate.timestamp() > datetime.now().timestamp():
-                newCoupon.timestampExpire2 = expiredate.timestamp()
-                newCoupon.dateFormattedExpire2 = formatDateGerman(expiredate)
-                if "enforce_is_new_override_until_date" in specialCoupon:
-                    enforceIsNewOverrideUntilDateStr = specialCoupon["enforce_is_new_override_until_date"] + " 23:59:59"
+                coupon.timestampExpire2 = expiredate.timestamp()
+                coupon.dateFormattedExpire2 = formatDateGerman(expiredate)
+                enforceIsNewOverrideUntilDateStr = extraCouponJson.get('enforce_is_new_override_until_date')
+                if enforceIsNewOverrideUntilDateStr is not None:
+                    enforceIsNewOverrideUntilDateStr += " 23:59:59"
                     enforceIsNewOverrideUntilDate = datetime.strptime(enforceIsNewOverrideUntilDateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
                     if enforceIsNewOverrideUntilDate.timestamp() > datetime.now().timestamp():
-                        newCoupon.isNew = True
-                couponsToAdd[specialCoupon[Coupon.uniqueID.name]] = newCoupon
+                        coupon.isNew = True
+                couponsToAdd[coupon.uniqueID] = coupon
         if len(couponsToAdd) > 0:
-            logging.info("Adding special coupons...")
-            # Only do DB request if we want to add stuff
+            # Add items to DB
+            logging.info("Adding " + str(len(couponsToAdd)) + " extra coupons...")
             couponDB = self.getCouponDB()
             dbUpdates = []
             for uniqueCouponID, coupon in couponsToAdd.items():
                 existantCoupon = Coupon.load(couponDB, uniqueCouponID)
                 if existantCoupon is not None:
+                    # Put rev of existing coupon into 'new' object otherwise DB update will throw Exception.
                     coupon["_rev"] = existantCoupon.rev
                 dbUpdates.append(coupon)
             couponDB.update(dbUpdates)
-            logging.info("Number of special coupons added: " + str(len(couponsToAdd)))
 
     def updateHistoryEntry(self, historyDB, primaryKey: str, newData):
         """ Adds/Updates entry inside given database. """

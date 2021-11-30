@@ -2,7 +2,7 @@ import os
 import sys
 
 import BotUtils
-from Helper import saveJson, getActivePaperCouponInfo2, loadPaperCouponConfigFile
+from Helper import saveJson, loadPaperCouponConfigFile
 
 """ Helper to complete config file with data from 'paper_coupon_helper_ids.txt'. """
 

@@ -372,9 +372,10 @@ class BKBot:
                 totalSum += coupon.price
             else:
                 numberofCouponsWithoutPrice += 1
-        menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalSum)
-        if numberofCouponsWithoutPrice > 0:
-            menuText += "*\n* exklusive " + str(numberofCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
+        if totalSum > 0:
+            menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalSum)
+            if numberofCouponsWithoutPrice > 0:
+                menuText += "*\n* exklusive " + str(numberofCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
         if len(userFavorites.couponsUnavailable) > 0:
             menuText += '\n' + SYMBOLS.WARNING + str(len(userFavorites.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
             menuText += '\n' + userFavorites.getUnavailableFavoritesText()

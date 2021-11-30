@@ -13,7 +13,7 @@ def getBotImpressum() -> str:
 class BotProperty:
     configPath = 'config.json'
     paperCouponExtraDataPath = 'config_paper_coupons.json'
-    specialCouponConfigPath = 'config_special_coupons.json'
+    extraCouponConfigPath = 'config_extra_coupons.json'
 
 
 class Config:
