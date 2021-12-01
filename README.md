@@ -27,11 +27,14 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 ``` max_document_id_number ``` --> Auf 1000 setzen siehe: https://docs.couchdb.org/en/latest/config/misc.html#purge
 7. `BKBot.py` einmalig mit dem Parameter `crawl` aufrufen.
 
-# CouchDB manuelles Backup & Wiederherstellen
+# CouchDB (user-DB) manuelles Backup & Wiederherstellen
 ``
-sudo -i
-cd /opt/couchdb/etc
-tar -zcvf backup.tar.gz data
+git clone https://github.com/danielebailo/couchdb-dump
+-->
+Backup:
+bash couchdb-dump.sh -b -H 127.0.0.1 -d telegram_users -f telegram_users.json -u admin -p deinPasswort
+Restore:
+bash couchdb-dump.sh -r -H 127.0.0.1 -d telegram-users -f telegram-users.json -u admin -p deinPasswort
 ``
 
 
