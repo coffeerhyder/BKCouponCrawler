@@ -39,6 +39,7 @@ class User(Document):
         Mapping.build(
             displayQR=BooleanField(default=False),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
+            displayCouponCategoryPayback=BooleanField(default=True),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             highlightFavoriteCouponsInContextOfNormalCouponLists=BooleanField(default=True),
@@ -132,7 +133,11 @@ def couponDBGetImagePathQR(coupon: Coupon) -> str:
 
 
 def couponDBGetImagePath(coupon: Coupon) -> str:
-    return getImageBasePath() + "/" + coupon.id + "_" + getFilenameFromURL(coupon.imageURL)
+    if coupon.imageURL.startswith('file://'):
+        # Image should be present in local storage: Use pre-given path
+        return coupon.imageURL.replace('file://', '')
+    else:
+        return getImageBasePath() + "/" + coupon.id + "_" + getFilenameFromURL(coupon.imageURL)
 
 
 def couponDBGetUniqueIdentifier(coupon: Coupon) -> str:

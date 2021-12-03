@@ -13,6 +13,7 @@ class CouponSource:
     ONLINE_ONLY = 5
     ONLINE_ONLY_STORE_SPECIFIC = 6  # Placeholder - not used
     SPECIAL = 7
+    PAYBACK = 8
 
 
 class CouponCategory:
@@ -20,7 +21,7 @@ class CouponCategory:
     def __init__(self, couponSrc: Union[CouponSource, int]):
         self.couponSource = couponSrc
         self.displayDescription = False
-        self.allowsExtraSelectionForCouponsWithoutMenu = True
+        self.addMenuEntryForCouponsWithoutMenu = True
         if couponSrc == CouponSource.APP:
             self.nameSingular = "App Coupon"
             self.namePlural = "App Coupons"
@@ -51,7 +52,14 @@ class CouponCategory:
             self.namePlural = SYMBOLS.GIFT + "Special Coupons"
             self.namePluralWithoutSymbol = "Special Coupons"
             self.description = "Diese Coupons sind evtl. nicht in allen Filialen einlösbar!"
-            self.allowsExtraSelectionForCouponsWithoutMenu = False
+            self.addMenuEntryForCouponsWithoutMenu = False
+        elif couponSrc == CouponSource.PAYBACK:
+            self.nameSingular = "Payback Coupon"
+            self.namePlural = SYMBOLS.PARK + "ayback Coupons"
+            self.namePluralWithoutSymbol = "Payback Coupons"
+            self.description = "Payback Papiercoupons"
+            # No extra "Coupons ohne Menü" menu selection for Payback coupons!
+            self.addMenuEntryForCouponsWithoutMenu = False
         else:
             self.nameSingular = "Unbekannt"
             self.namePlural = "Unbekannt"
@@ -61,5 +69,5 @@ class CouponCategory:
         return self.couponSource in BotAllowedCouponSources
 
 
-# All CouponSources which will be used in our bot
-BotAllowedCouponSources = [CouponSource.APP, CouponSource.PAPER, CouponSource.SPECIAL]
+# All CouponSources which will be used in our bot (will be displayed in bot menu as categories)
+BotAllowedCouponSources = [CouponSource.APP, CouponSource.PAPER, CouponSource.SPECIAL, CouponSource.PAYBACK]

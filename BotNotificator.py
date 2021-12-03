@@ -248,6 +248,8 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
         if DEBUGNOTIFICATOR:
             infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!! ' + SYMBOLS.WARNING + '</b>'
+        if bkbot.crawler.missingPaperCouponsText is not None:
+            infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit in Bot/Channel fehlende Papiercoupons: ' + bkbot.crawler.missingPaperCouponsText + SYMBOLS.WARNING + '</b>'
         infoText += '\n<b>------</b>'
         infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
         infoText += "\nStören dich die Benachrichtigungen?"

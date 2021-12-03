@@ -27,6 +27,16 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 ``` max_document_id_number ``` --> Auf 1000 setzen siehe: https://docs.couchdb.org/en/latest/config/misc.html#purge
 7. `BKBot.py` einmalig mit dem Parameter `crawl` aufrufen.
 
+# CouchDB (user-DB) manuelles Backup & Wiederherstellen
+``
+git clone https://github.com/danielebailo/couchdb-dump
+-->
+Backup:
+bash couchdb-dump.sh -b -H 127.0.0.1 -d telegram_users -f telegram_users.json -u admin -p deinPasswort
+Restore:
+bash couchdb-dump.sh -r -H 127.0.0.1 -d telegram-users -f telegram-users.json -u admin -p deinPasswort
+``
+
 
 # config.json (siehe config.json.default)
 Key | Datentyp | Optional | Beschreibung | Beispiel
@@ -55,11 +65,11 @@ Gäbe es derzeit z.B. Papiercoupons mit dem Buchstaben ``B`` und Ablaufdatum  ``
 ```  
 **Achtung: Ist diese Datei nicht auf dem aktuellen Stand, werden Papiercoupons nicht unbedingt als solche erkannt bzw. mit einem dummy Ablaufdatum gekennzeichnet!**
 
-## config_special_coupons.json: Optionale Config zum manuellen Hinzufügen sogenannter "special Coupons"
-Die ``config_special_coupons.json`` ist nützlich, um manuell Coupons hinzuzufügen, die in keiner der BK Datenbanken enthalten sind z.B. [solche](https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058).
+## config_extra_coupons.json: Optionale Config zum manuellen Hinzufügen von Coupons, die in keiner der Schnittstellen zu finden sind
+Die ``config_extra_coupons.json`` ist nützlich, um manuell Coupons hinzuzufügen, die in keiner der BK Datenbanken enthalten sind z.B. [solche](https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058).
 Beispiel:  
 ```
-Siehe config_special_coupons.json
+Siehe config_extra_coupons.json
 ```  
 
 ### Mögliche Start-Parameter für `BKBot.py`:  
@@ -93,7 +103,8 @@ ID | Interne Bezeichnung | Beschreibung
 4 | PAPER_UNSAFE | Coupons aus der "Coupons2" API, die keinem anderen Coupon-Typen zugewiesen werden konnten.
 5 | ONLINE_ONLY | Coupons ohne short PLU Code, die wenn überhaupt nur online oder per QR Code (Terminal) bestellbar sind.
 6 | ONLINE_ONLY_STORE_SPECIFIC | Coupons, die nur in bestimmten Filialen einlösbar sind -> Derzeit ist das nur ein Platzhalter
-7 | SPECIAL | Spezielle Coupons, die manuell über die ``config_special_coupons.json`` eingefügt werden können.
+7 | SPECIAL | Spezielle Coupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.
+8 | PAYBACK | Payback Papiercoupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.
 
 ### Codebeispiel Crawler
 ```

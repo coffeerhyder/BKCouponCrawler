@@ -3,11 +3,13 @@ import random
 import re
 from datetime import datetime, timedelta
 from re import Pattern
+from typing import Union
 
 import pytz
 import simplejson as json
 from PIL import Image
 
+import BotUtils
 from BotUtils import BotProperty
 
 
@@ -39,7 +41,7 @@ class HISTORYDB:
     COUPONS_HISTORY_DOC = 'history'
 
 
-def loadConfig(fallback=None):
+def loadConfig(fallback: str = None):
     try:
         return loadJson(BotProperty.configPath)
     except:
@@ -47,10 +49,15 @@ def loadConfig(fallback=None):
         return fallback
 
 
-def loadJson(path):
+def loadJson(path: str):
     with open(os.path.join(os.getcwd(), path), encoding='utf-8') as infile:
         loadedJson = json.load(infile, use_decimal=True)
     return loadedJson
+
+
+def saveJson(path: str, data: Union[list, dict]):
+    with open(path, 'w') as f:
+        json.dump(data, f, indent=4, sort_keys=True)
 
 
 def couponOrOfferGetImageURL(data: dict) -> str:
@@ -221,6 +228,7 @@ class SYMBOLS:
     NEW = '🆕'
     GHOST = '👻'
     GIFT = '🎁'
+    PARK = '🅿️'
 
 
 def getFilenameFromURL(url: str) -> str:
@@ -313,3 +321,23 @@ def isValidImageFile(path: str) -> bool:
         return True
     except:
         return False
+
+
+def getActivePaperCouponInfo() -> dict:
+    return getActivePaperCouponInfo2(loadPaperCouponConfigFile())
+
+
+def getActivePaperCouponInfo2(paperCouponConfig: dict) -> dict:
+    paperCouponInfo = {}
+    """ Load file which contains some extra data which can be useful to correctly determine the "CouponSource" and expire date of paper coupons. """
+    for paperChar, paperData in paperCouponConfig.items():
+        validuntil = datetime.strptime(paperData['expire_date'] + ' 23:59:59', '%Y-%m-%d %H:%M:%S').astimezone(getTimezone()).timestamp()
+        if validuntil > datetime.now().timestamp():
+            newPaperData = paperData
+            newPaperData['expire_timestamp'] = validuntil
+            paperCouponInfo[paperChar] = newPaperData
+    return paperCouponInfo
+
+
+def loadPaperCouponConfigFile() -> dict:
+    return loadJson(BotUtils.BotProperty.paperCouponExtraDataPath)

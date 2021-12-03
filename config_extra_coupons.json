@@ -1,12 +1,12 @@
 {
-  "special_coupons": [
+  "extra_coupons": [
     {
       "uniqueID": "44149",
       "title": "KING Sundae",
       "price": 0,
       "staticReducedPercent": 100,
       "source": 7,
-      "imageURL": "https://www.picflash.org/viewer.php?img=44149_KING_Sundae7XHGGE.jpg",
+      "imageURL": "file://media\\extra_coupons_pics\\44149_KING_Sundae.jpg",
       "description": "Achtung! Wird nicht überall akzeptiert siehe: https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058\nFalls der Deal als abgelaufen markiert wurde: Diverse Filialen akzeptieren diese Coupons noch immer!",
       "expire_date": "2021-07-31",
       "enforce_is_new_override_until_date": "2021-06-08"
@@ -17,10 +17,19 @@
       "price": 0,
       "static_reduced_percent": 100,
       "source": 7,
-      "imageURL": "https://www.picflash.org/viewer.php?img=51011_CocaCola2JKO9O.jpg",
+      "imageURL": "file://media\\extra_coupons_pics\\51011_CocaCola.jpg",
       "description": "Achtung! Wird nicht überall akzeptiert siehe: https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058\nFalls der Deal als abgelaufen markiert wurde: Diverse Filialen akzeptieren diese Coupons noch immer!",
       "expire_date": "2021-07-31",
       "enforce_is_new_override_until_date": "2021-06-08"
+    },
+    {
+      "uniqueID": "99110",
+	  "plu": "C47",
+      "title": "5Fach auf jede Bestellung",
+      "source": 8,
+      "imageURL": "file://media\\extra_coupons_pics\\2022_01_07_PayBack_C47_99110.png",
+      "expire_date": "2022-01-07",
+      "enforce_is_new_override_until_date": "2021-12-03"
     }
   ]
 }
