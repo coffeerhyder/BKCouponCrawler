@@ -71,6 +71,7 @@ class BKCrawler:
         self.crawlOnlyBotCompatibleCoupons = True
         self.storeCouponAPIDataAsJson = False
         self.exportCSVs = False
+        self.missingPaperCouponsText = None
         # Create required DBs
         if DATABASES.INFO_DB not in self.couchdb:
             infoDB = self.couchdb.create(DATABASES.INFO_DB)
@@ -645,7 +646,7 @@ class BKCrawler:
             for paperPLUChar, coupons in pluCharMap.items():
                 if len(couponCharsLogtext) > 0:
                     couponCharsLogtext += ', '
-                couponCharsLogtext += paperPLUChar + "[" + str(len(coupons)) + "]"
+                couponCharsLogtext += paperPLUChar + "(" + str(len(coupons)) + ")"
             logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon char(s): " + couponCharsLogtext)
             allowAutoDetectedPaperCoupons = False  # 2021-11-15: Added this switch as their DB is f*cked at this moment so the auto-detection found wrong coupons.
             # Evaluate our findings
@@ -687,6 +688,7 @@ class BKCrawler:
         2021-09-29: Now we do filter by array size before so this handling is pretty much useless but let's keep it anyways.
         """
         logging.debug("Looking for missing paper coupons...")
+        self.missingPaperCouponsText = None
         for paperChar, paperCoupons in foundPaperCouponMap.items():
             # Now get a list of the numbers only and consider: paperCoupons may contain duplicates but we don't want those in paperCouponNumbersList!
             paperCouponNumbersList = []
@@ -717,6 +719,11 @@ class BKCrawler:
                             missingPaperPLUs.append(plu)
                 if len(missingPaperPLUs) > 0:
                     logging.info("Paper coupons NOT OK: " + paperChar + " | Found items: " + str(len(paperCoupons)) + " | Possibly missing PLUs: " + str(missingPaperPLUs))
+                    for missingPaperPLU in missingPaperPLUs:
+                        if self.missingPaperCouponsText is None:
+                            self.missingPaperCouponsText = missingPaperPLU
+                        else:
+                            self.missingPaperCouponsText += ', ' + missingPaperPLU
                 # Rare case: BK has deleted the paper coupons in their API already but we still got them in our DB because they should still be valid!
                 if len(missingPaperPLUsButPresentInDB) > 0:
                     logging.info("Paper PLUs that are present in DB but not in API: " + str(missingPaperPLUsButPresentInDB))
@@ -733,7 +740,7 @@ class BKCrawler:
         else:
             # Add all detected coupons to DB
             couponsToAddToDB = coupons2LeftToProcess
-        # Now collect all DB updates we want to do
+        # Now collect all resulting DB updates
         for uniqueCouponID, newCoupon in couponsToAddToDB.items():
             existantCoupon = Coupon.load(couponDB, uniqueCouponID)
             # Update DB
@@ -745,10 +752,11 @@ class BKCrawler:
                     dbUpdates.append(newCoupon)
                     numberofUpdatedCoupons += 1
             else:
-                # Add new coupon
+                # Add new coupon to DB
                 numberofNewCoupons += 1
                 dbUpdates.append(newCoupon)
         if len(dbUpdates) > 0:
+            logging.info('Pushing DB updates: ' + str(len(dbUpdates)))
             couponDB.update(dbUpdates)
         logging.info("Number of crawled coupons2: " + str(len(couponsToAddToDB)))
         # Update history if needed
@@ -788,6 +796,7 @@ class BKCrawler:
                 if couponDoc.source != CouponSource.APP and uniqueCouponID not in allCouponIDs:
                     deleteCouponDocs[uniqueCouponID] = couponDoc
         if len(deleteCouponDocs) > 0:
+            logging.info('Pushing DB DELETE updates: ' + str(len(deleteCouponDocs)))
             couponDB.purge(deleteCouponDocs.values())
         self.genericCouponDBCleanup(couponDB)
 
@@ -797,16 +806,6 @@ class BKCrawler:
             logging.info("Coupons2 updated IDs: " + str(numberofUpdatedCoupons))
         if len(deleteCouponDocs) > 0:
             logging.info("Coupons2 deleted coupons: " + str(len(deleteCouponDocs)) + " | " + str(list(deleteCouponDocs.keys())))
-        # 2021-03-21: Debug-Test debugtest
-        for couponID in couponDB:
-            coupon = Coupon.load(couponDB, couponID)
-            if coupon.plu is not None and (len(coupon.plu) > 0 and (coupon.plu[0] == 'S' or coupon.plu[0] == 'Z')) and coupon.source != CouponSource.APP:
-                # Debugtest
-                print(
-                    'Coupon contains app coupon char but is not available in app anymore: ' + (
-                        "N/A" if coupon.plu is None else coupon.plu) + " | " + coupon.id + " | " + coupon.title + " | " + couponDBGetPriceFormatted(
-                        coupon, "??€") + " | " + ("NO_EXPIRE_DATE_2" if coupon.dateFormattedExpire2 is None else coupon.dateFormattedExpire2) + " | " + (
-                        "NO_EXPIRE_DATE_" if coupon.dateFormattedExpire is None else coupon.dateFormattedExpire))
         logging.info("API Crawling 2 done | Total number of coupons in DB: " + str(len(couponDB)))
         logging.info("Total coupons2 crawl time: " + getFormattedPassedTime(timestampStart))
 
