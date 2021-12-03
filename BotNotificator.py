@@ -70,7 +70,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
                 usertext += "\nPer Klick kommst du zu den jeweiligen Coupons im " + bkbot.getPublicChannelHyperlinkWithCustomizedText(
                     "Channel") + " und mit /start ins Hauptmenü des Bots."
             if remainingEntities < 0:
-                usertext += "\n" + SYMBOLS.WARNING + "Wegen Telegram Limits konnten nicht alle Coupons verlinkt werden."
+                usertext += "\n" + SYMBOLS.WARNING + "Wegen Telegram Limits konnten evtl. nicht alle Coupons verlinkt werden."
                 usertext += "\nDas ist nicht weiter tragisch. Du findest alle Coupons im Bot/Channel."
             # Store text to send to user and send it later
             usersNotify[userIDStr] = usertext
@@ -249,7 +249,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         if DEBUGNOTIFICATOR:
             infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!! ' + SYMBOLS.WARNING + '</b>'
         if bkbot.crawler.missingPaperCouponsText is not None:
-            infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit in Bot/Channel fehlende Papiercoupons: ' + bkbot.crawler.missingPaperCouponsText + SYMBOLS.WARNING + '</b>'
+            infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit in Bot/Channel fehlende Papiercoupons: ' + bkbot.crawler.missingPaperCouponsText + '</b>'
         infoText += '\n<b>------</b>'
         infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
         infoText += "\nStören dich die Benachrichtigungen?"
