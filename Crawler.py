@@ -476,6 +476,7 @@ class BKCrawler:
                     usedMappingToFindPaperCoupons = True
                 if uniqueCouponID not in allCoupons:
                     allCoupons[uniqueCouponID] = coupon
+                    allCouponIDs.append(uniqueCouponID)
                     numberofNewCouponsInCurrentStore += 1
             logging.info("Found coupons2 so far: " + str(len(allCoupons)))
             if numberofNewCouponsInCurrentStore > 0:
@@ -553,8 +554,6 @@ class BKCrawler:
                     """ Invalidate whatever we've found there as we cannot trust that value! """
                     priceCompare = -1
             # Check if this coupon exists/existed in app -> Update information as other BK endpoints may serve more info than their official app endpoint!
-            if uniqueCouponID not in allCouponIDs:
-                allCouponIDs.append(uniqueCouponID)
             existantCoupon = Coupon.load(couponDB, uniqueCouponID)
             if existantCoupon is not None and couponDBIsValid(existantCoupon) and existantCoupon.source in [CouponSource.APP,
                                                                                                             CouponSource.APP_VALID_AFTER_DELETION]:
