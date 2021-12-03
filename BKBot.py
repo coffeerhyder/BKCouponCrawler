@@ -776,7 +776,7 @@ class BKBot:
             return open(imagePath, mode='rb')
         else:
             # Return fallback image file -> Should usually not be required!
-            logging.warning("Returning coupon fallback image")
+            logging.warning("Returning coupon fallback image for path: " + imagePath)
             return open("media/fallback_image_missing_coupon_image.jpeg", mode='rb')
 
     def getCouponImageQR(self, coupon):

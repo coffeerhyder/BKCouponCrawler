@@ -70,7 +70,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
                 usertext += "\nPer Klick kommst du zu den jeweiligen Coupons im " + bkbot.getPublicChannelHyperlinkWithCustomizedText(
                     "Channel") + " und mit /start ins Hauptmenü des Bots."
             if remainingEntities < 0:
-                usertext += "\n" + SYMBOLS.WARNING + "Wegen Telegram Limits konnten nicht alle Coupons verlinkt werden."
+                usertext += "\n" + SYMBOLS.WARNING + "Wegen Telegram Limits konnten evtl. nicht alle Coupons verlinkt werden."
                 usertext += "\nDas ist nicht weiter tragisch. Du findest alle Coupons im Bot/Channel."
             # Store text to send to user and send it later
             usersNotify[userIDStr] = usertext
