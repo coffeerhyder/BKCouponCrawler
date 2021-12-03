@@ -155,7 +155,7 @@ class BKCrawler:
         numberofDownloadedImages = 0
         for uniqueCouponID in couponDB:
             coupon = Coupon.load(couponDB, uniqueCouponID)
-            if downloadImageIfNonExistant(coupon.imageURL, couponDBGetImagePath(coupon)):
+            if downloadCouponImageIfNonExistant(coupon):
                 numberofDownloadedImages += 1
             generateQRImageIfNonExistant(uniqueCouponID, couponDBGetImagePathQR(coupon))
         if numberofDownloadedImages > 0:
@@ -412,7 +412,7 @@ class BKCrawler:
         # Contains the original unmodified DB data
         allProducts = {}
         allCoupons = {}
-        allCouponsNew = {}
+        allCouponIDs = []
         # Contains our own created coupon data dicts
         coupons2LeftToProcess = {}
         # List of all DB items we will later change via a single DB request
@@ -444,10 +444,11 @@ class BKCrawler:
                 # This should never happen!
                 logging.warning("Failed to obtain coupons from this store -> Skipping it")
                 continue
-            # Collect all poductIDs to separate dict for later usage
+            # Collect all productIDs to separate dict for later usage
             for productIDTmp, productTmp in products.items():
                 allProducts[productIDTmp] = productTmp
             # Collect all coupon objects -> Apply slight corrections
+            numberofNewCouponsInCurrentStore = 0
             for coupon in coupons:
                 productID = coupon['product_id']
                 uniqueCouponID = coupon['promo_code']
@@ -473,12 +474,15 @@ class BKCrawler:
                     logging.debug('Found paper coupon correction: ' + plu + ' --> ' + newplu)
                     coupon['store_promo_code'] = newplu
                     usedMappingToFindPaperCoupons = True
-                allCoupons[uniqueCouponID] = coupon
+                if uniqueCouponID not in allCoupons:
+                    allCoupons[uniqueCouponID] = coupon
+                    numberofNewCouponsInCurrentStore += 1
             logging.info("Found coupons2 so far: " + str(len(allCoupons)))
+            if numberofNewCouponsInCurrentStore > 0:
+                logging.info("Number of new coupon IDs in current store: " + str(numberofNewCouponsInCurrentStore))
             if storeIndex + 1 >= maxNumberofStoresToCrawlCouponsFrom:
                 logging.info("Stopping store coupon crawling because reached store limit of: " + str(maxNumberofStoresToCrawlCouponsFrom))
                 break
-
         for coupon in allCoupons.values():
             """ First collect all data we need """
             productID = coupon['product_id']
@@ -549,6 +553,8 @@ class BKCrawler:
                     """ Invalidate whatever we've found there as we cannot trust that value! """
                     priceCompare = -1
             # Check if this coupon exists/existed in app -> Update information as other BK endpoints may serve more info than their official app endpoint!
+            if uniqueCouponID not in allCouponIDs:
+                allCouponIDs.append(uniqueCouponID)
             existantCoupon = Coupon.load(couponDB, uniqueCouponID)
             if existantCoupon is not None and couponDBIsValid(existantCoupon) and existantCoupon.source in [CouponSource.APP,
                                                                                                             CouponSource.APP_VALID_AFTER_DELETION]:
@@ -711,7 +717,7 @@ class BKCrawler:
                         else:
                             missingPaperPLUs.append(plu)
                 if len(missingPaperPLUs) > 0:
-                    logging.info("Paper coupons NOT OK: " + paperChar + " [" + str(len(paperCoupons)) + "] | Possibly missing PLUs: " + str(missingPaperPLUs))
+                    logging.info("Paper coupons NOT OK: " + paperChar + " | Found items: " + str(len(paperCoupons)) + " | Possibly missing PLUs: " + str(missingPaperPLUs))
                 # Rare case: BK has deleted the paper coupons in their API already but we still got them in our DB because they should still be valid!
                 if len(missingPaperPLUsButPresentInDB) > 0:
                     logging.info("Paper PLUs that are present in DB but not in API: " + str(missingPaperPLUsButPresentInDB))
@@ -774,13 +780,13 @@ class BKCrawler:
                 if couponDoc.source == CouponSource.PAPER and couponDBIsValid(couponDoc):
                     # 2021-05-26: Allow 'valid' paper coupons to stay in DB as long as they're not expired. This makes sense as BK sometimes removes them from DB for some time even though they're still valid...
                     continue
-                elif couponDoc.source != CouponSource.APP and uniqueCouponID not in allCoupons.keys():
+                elif couponDoc.source != CouponSource.APP and uniqueCouponID not in allCouponIDs:
                     deleteCouponDocs[uniqueCouponID] = couponDoc
         else:
-            # Less 'intelligent' cleanup
+            # Less 'intelligent' cleanup: If we previously collected everything, delete everything that is not available via API now.
             for uniqueCouponID in couponDB:
                 couponDoc = Coupon.load(couponDB, uniqueCouponID)
-                if couponDoc.source != CouponSource.APP and uniqueCouponID not in allCoupons.keys():
+                if couponDoc.source != CouponSource.APP and uniqueCouponID not in allCouponIDs:
                     deleteCouponDocs[uniqueCouponID] = couponDoc
         if len(deleteCouponDocs) > 0:
             couponDB.purge(deleteCouponDocs.values())
@@ -843,7 +849,6 @@ class BKCrawler:
                 couponsToAdd[coupon.uniqueID] = coupon
         if len(couponsToAdd) > 0:
             # Add items to DB
-            logging.info("Adding " + str(len(couponsToAdd)) + " extra coupons...")
             couponDB = self.getCouponDB()
             dbUpdates = []
             for uniqueCouponID, coupon in couponsToAdd.items():
@@ -853,6 +858,7 @@ class BKCrawler:
                     coupon["_rev"] = existantCoupon.rev
                 dbUpdates.append(coupon)
             couponDB.update(dbUpdates)
+            logging.info("Added " + str(len(couponsToAdd)) + " extra coupons")
 
     def updateHistoryEntry(self, historyDB, primaryKey: str, newData):
         """ Adds/Updates entry inside given database. """
@@ -1342,7 +1348,13 @@ def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
     return False
 
 
+def downloadCouponImageIfNonExistant(coupon: Coupon) -> bool:
+    return downloadImageIfNonExistant(coupon.imageURL, couponDBGetImagePath(coupon))
+
+
 def downloadImageIfNonExistant(url: str, path: str) -> bool:
+    if url is None or path is None:
+        return False
     try:
         if os.path.exists(path):
             # Image already exists
@@ -1361,7 +1373,7 @@ def downloadImageIfNonExistant(url: str, path: str) -> bool:
                 return False
     except:
         traceback.print_exc()
-        logging.warning("Image download failed")
+        logging.warning("Image download failed: " + url)
         return False
 
 

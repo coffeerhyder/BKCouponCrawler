@@ -21,7 +21,7 @@ class CouponCategory:
     def __init__(self, couponSrc: Union[CouponSource, int]):
         self.couponSource = couponSrc
         self.displayDescription = False
-        self.allowsExtraSelectionForCouponsWithoutMenu = True
+        self.addMenuEntryForCouponsWithoutMenu = True
         if couponSrc == CouponSource.APP:
             self.nameSingular = "App Coupon"
             self.namePlural = "App Coupons"
@@ -52,14 +52,14 @@ class CouponCategory:
             self.namePlural = SYMBOLS.GIFT + "Special Coupons"
             self.namePluralWithoutSymbol = "Special Coupons"
             self.description = "Diese Coupons sind evtl. nicht in allen Filialen einlösbar!"
-            self.allowsExtraSelectionForCouponsWithoutMenu = False
+            self.addMenuEntryForCouponsWithoutMenu = False
         elif couponSrc == CouponSource.PAYBACK:
             self.nameSingular = "Payback Coupon"
-            self.namePlural = SYMBOLS.PARK + "Payback Coupons"
+            self.namePlural = SYMBOLS.PARK + "ayback Coupons"
             self.namePluralWithoutSymbol = "Payback Coupons"
             self.description = "Payback Papiercoupons"
-            # No extra "Coupons ohne Menü" menu selection for PayBack coupons!
-            self.allowsExtraSelectionForCouponsWithoutMenu = False
+            # No extra "Coupons ohne Menü" menu selection for Payback coupons!
+            self.addMenuEntryForCouponsWithoutMenu = False
         else:
             self.nameSingular = "Unbekannt"
             self.namePlural = "Unbekannt"
