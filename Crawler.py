@@ -405,9 +405,10 @@ class BKCrawler:
         for uniqueCouponID in couponDB:
             coupon = Coupon.load(couponDB, uniqueCouponID)
             dbAllPLUsList.add(coupon.plu)
-            regexPLUWithOneLetter = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
-            if coupon.source == CouponSource.APP and couponDBIsValid(coupon) and regexPLUWithOneLetter is not None:
-                appCouponCharList.add(regexPLUWithOneLetter.group(1).upper())
+            if coupon.plu is not None:
+                regexPLUWithOneLetter = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
+                if coupon.source == CouponSource.APP and couponDBIsValid(coupon) and regexPLUWithOneLetter is not None:
+                    appCouponCharList.add(regexPLUWithOneLetter.group(1).upper())
         numberofNewCoupons = 0
         numberofUpdatedCoupons = 0
         # Contains the original unmodified DB data

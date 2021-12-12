@@ -134,8 +134,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 * App Coupons testen, die gerade nicht in der App sind aber noch gültig sein müssten
 
 # Feature Ideen
-* PayBack Aktionen integrieren? https://www.mydealz.de/deals/20-fach-payback-punkte-coupon-bei-burger-king-1709510 --> Schwierig bis unmöglich zu automatisieren
-* Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen (sonst werden es ggf. über die Zeit immer mehr)
+* Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen sonst werden es über die Zeit immer mehr
 
 # Daten für den BotFather (Telegram Bot Konfiguration)
 
@@ -287,4 +286,3 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * Couponplatz Crawler/Bot
 * KFC Bot
 * Aral Bot/Channel ([MeinAral App](https://mein.aral.de/service-tools/meinaral-app/))
-* Payback Channel
