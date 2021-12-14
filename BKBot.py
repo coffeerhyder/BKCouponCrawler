@@ -51,7 +51,7 @@ USER_SETTINGS_ON_OFF = {
         "default": False
     },
     "displayHiddenAppCouponsWithinGenericCategories": {
-        "description": "Versteckte App Coupons in Kategorien zeigen**",
+        "description": "Versteckte App Coupons in Kategorien zeigen*¹",
         "default": False
     },
     "displayCouponCategoryPayback": {
@@ -265,7 +265,7 @@ class BKBot:
                 # Do not display this category if disabled by user
                 continue
             allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural, callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY + "&cs=" + str(couponSrc))])
-            if couponCategory.addMenuEntryForCouponsWithoutMenu:
+            if couponCategory.addMenuEntryForCouponsWithoutCokeOrFries:
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' ohne Menü',
                                                         callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY_WITHOUT_MENU + "&cs=" + str(couponSrc))])
             if couponSrc == CouponSource.APP and self.crawler.cachedHasHiddenAppCouponsAvailable:
@@ -368,17 +368,17 @@ class BKBot:
     def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavorites, str]:
         userFavorites = self.getUserFavorites(user=user, coupons=coupons, enableExceptionHandling=True)
         menuText = SYMBOLS.STAR + str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
-        numberofCouponsWithoutPrice = 0
-        totalSum = 0
+        numberofEatableCouponsWithoutPrice = 0
+        totalPrice = 0
         for coupon in userFavorites.couponsAvailable:
             if coupon.price is not None:
-                totalSum += coupon.price
-            else:
-                numberofCouponsWithoutPrice += 1
-        if totalSum > 0:
-            menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalSum)
-            if numberofCouponsWithoutPrice > 0:
-                menuText += "*\n* exklusive " + str(numberofCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
+                totalPrice += coupon.price
+            elif coupon.isEatable:
+                numberofEatableCouponsWithoutPrice += 1
+        if totalPrice > 0:
+            menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalPrice)
+            if numberofEatableCouponsWithoutPrice > 0:
+                menuText += "*\n* exklusive " + str(numberofEatableCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
         if len(userFavorites.couponsUnavailable) > 0:
             menuText += '\n' + SYMBOLS.WARNING + str(len(userFavorites.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
             menuText += '\n' + userFavorites.getUnavailableFavoritesText()
@@ -600,7 +600,7 @@ class BKBot:
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
-        menuText += "\n** Versteckte Coupons sind meist überteuerte große Menüs."
+        menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
         # Add 'reset settings' button
         if user.settings.__dict__ != dummyUser.settings.__dict__:
@@ -608,9 +608,9 @@ class BKBot:
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         userFavorites = self.getUserFavorites(user=user)
         if len(userFavorites.couponsUnavailable) > 0:
-            keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavorites.couponsUnavailable)) + ")?***",
+            keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavorites.couponsUnavailable)) + ")?*²",
                                                   callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
-            menuText += "\n***" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
+            menuText += "\n*²" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
             menuText += "\n" + userFavorites.getUnavailableFavoritesText()
         keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Meine Daten löschen",
                                               callback_data=CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND)])

@@ -857,7 +857,7 @@ class BKCrawler:
                     coupon["_rev"] = existantCoupon.rev
                 dbUpdates.append(coupon)
             couponDB.update(dbUpdates)
-            logging.info("Added " + str(len(couponsToAdd)) + " extra coupons")
+            logging.info("Found " + str(len(couponsToAdd)) + " valid extra coupons")
 
     def updateHistoryEntry(self, historyDB, primaryKey: str, newData):
         """ Adds/Updates entry inside given database. """

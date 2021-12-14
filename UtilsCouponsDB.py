@@ -31,6 +31,7 @@ class Coupon(Document):
     isNew = BooleanField(default=False)
     isHidden = BooleanField(default=False)  # Typically only available for App coupons
     isUnsafeExpiredate = BooleanField(default=False)  # Set this if timestampExpire2 is a self made up date
+    isEatable = BooleanField(default=True)  # E.g. False for Payback coupons
     description = TextField()
 
 
