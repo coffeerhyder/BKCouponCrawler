@@ -125,9 +125,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
-* Cache erweitern und mehr Infos zu allen verfügbaren Coupon Kategorien hinzufügen
 * Payback Coupons in "Alle Coupons" Ansicht ganz oben anzeigen (normale Coupons ohne Preis stehen derzeit ganz oben - aktuell nur einer)(?) -> Low Prio
-* Crawler so anpassen, dass extra Coupons beim Start auch ohne Crawlvorgang hinzugefügt werden, sodass man neue extra Coupons händisch eintragen kann ohne einen Crawlvorgang zu starten und somit ohne sich ggf. die "isNew" Property zu verschiessen
 * Neue API einbauen
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"

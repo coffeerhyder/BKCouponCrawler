@@ -258,17 +258,17 @@ class BKBot:
         allButtons.append([InlineKeyboardButton('Alle Coupons ohne Menü', callback_data="?a=dcs&m=" + CouponDisplayMode.ALL_WITHOUT_MENU + "&cs=")])
         for couponSrc in BotAllowedCouponSources:
             # Only add buttons for coupon sources for which at least one coupon is available
-            couponCategory = CouponCategory(couponSrc)
-            if couponSrc not in self.crawler.cachedAvailableCouponSources:
+            couponCategory = self.crawler.cachedAvailableCouponCategories.get(couponSrc)
+            if couponCategory is None:
                 continue
             elif couponSrc == CouponSource.PAYBACK and not user.settings.displayCouponCategoryPayback:
                 # Do not display this category if disabled by user
                 continue
             allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural, callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY + "&cs=" + str(couponSrc))])
-            if couponCategory.addMenuEntryForCouponsWithoutCokeOrFries:
+            if couponCategory.numberofCouponsWithFriesOrCoke < couponCategory.numberofCouponsTotal and couponCategory.isEatable():
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' ohne Menü',
                                                         callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY_WITHOUT_MENU + "&cs=" + str(couponSrc))])
-            if couponSrc == CouponSource.APP and self.crawler.cachedHasHiddenAppCouponsAvailable:
+            if couponSrc == CouponSource.APP and couponCategory.numberofCouponsHidden > 0:
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' versteckte',
                                                         callback_data="?a=dcs&m=" + CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY + "&cs=" + str(couponSrc))])
         keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data="?a=dcs&m=" + CouponDisplayMode.FAVORITES),

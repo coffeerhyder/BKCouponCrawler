@@ -21,8 +21,6 @@ class CouponCategory:
     def __init__(self, couponSrc: Union[CouponSource, int]):
         self.couponSource = couponSrc
         self.displayDescription = False  # Display description for this category in bot menu?
-        self.addMenuEntryForCouponsWithoutCokeOrFries = True  # Deprecated 2021-12-14 TODO: Replace this with stuff below
-        # TODO: Implement the stuff below
         self.numberofCouponsTotal = 0
         self.numberofCouponsHidden = 0
         self.numberofCouponsEatable = 0
@@ -58,14 +56,11 @@ class CouponCategory:
             self.namePlural = SYMBOLS.GIFT + "Special Coupons"
             self.namePluralWithoutSymbol = "Special Coupons"
             self.description = "Diese Coupons sind evtl. nicht in allen Filialen einlösbar!"
-            self.addMenuEntryForCouponsWithoutCokeOrFries = False
         elif couponSrc == CouponSource.PAYBACK:
             self.nameSingular = "Payback Coupon"
             self.namePlural = SYMBOLS.PARK + "ayback Coupons"
             self.namePluralWithoutSymbol = "Payback Coupons"
             self.description = "Payback Papiercoupons"
-            # No extra "Coupons ohne Menü" menu selection for Payback coupons!
-            self.addMenuEntryForCouponsWithoutCokeOrFries = False
         else:
             self.nameSingular = "Unbekannt"
             self.namePlural = "Unbekannt"
@@ -73,6 +68,27 @@ class CouponCategory:
 
     def isValidSourceForBot(self) -> bool:
         if self.couponSource in BotAllowedCouponSources:
+            return True
+        else:
+            return False
+
+    def setNumberofCouponsTotal(self, newNumber: int):
+        self.numberofCouponsTotal = newNumber
+
+    def setNumberofCouponsHidden(self, newNumber: int):
+        self.numberofCouponsHidden = newNumber
+
+    def setNumberofCouponsEatable(self, newNumber: int):
+        self.numberofCouponsEatable = newNumber
+
+    def setNumberofCouponsNew(self, newNumber: int):
+        self.numberofCouponsNew = newNumber
+
+    def setNumberofCouponsWithFriesOrCoke(self, newNumber: int):
+        self.numberofCouponsWithFriesOrCoke = newNumber
+
+    def isEatable(self) -> bool:
+        if self.numberofCouponsEatable > 0:
             return True
         else:
             return False
