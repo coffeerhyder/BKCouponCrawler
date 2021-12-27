@@ -47,8 +47,8 @@ public_channel_name | String | Ja | Name des öffentlichen Telegram Channels, in
 bot_name | String | Nein | Name des Bots | `BetterKingBot`
 **Falls nur der Crawler benötigt wird, reicht die CouchDB URL (mit Zugangsdaten)!**
 
-## config_paper_coupons.json: Optionale Config zur Erkennung von Papiercoupons
-Die `config_paper_coupons.json` wie folgt befüllen:  
+## Optional: Papiercoupons hinzufügen  
+1. Die `config_paper_coupons.json` wie folgt befüllen:  
 Gäbe es derzeit z.B. Papiercoupons mit dem Buchstaben ``B`` und Ablaufdatum  ``05.03.2021`` **und** ``C`` mit dem Ablaufdatum ``23.04.2021``, müsste die json Datei wie folgt angepasst werden:
    
 ```
@@ -63,7 +63,13 @@ Gäbe es derzeit z.B. Papiercoupons mit dem Buchstaben ``B`` und Ablaufdatum  ``
 }
 }   
 ```  
-**Achtung: Ist diese Datei nicht auf dem aktuellen Stand, werden Papiercoupons nicht unbedingt als solche erkannt bzw. mit einem dummy Ablaufdatum gekennzeichnet!**
+2. Datei `paper_coupon_helper_ids.txt` erstellen und mit allen IDs der Papiercoupons (in korrekter Reihenfolge also 1-47 bzw. 1-48) befüllen z.B.:  
+```
+21007
+23007
+22063
+```
+3. `PaperCouponHelper.py` einmalig ausführen. Dies wird die `config_paper_coupons.json` aktualisieren und die neuen Papiercoupons einbinden.
 
 ## config_extra_coupons.json: Optionale Config zum manuellen Hinzufügen von Coupons, die in keiner der Schnittstellen zu finden sind
 Die ``config_extra_coupons.json`` ist nützlich, um manuell Coupons hinzuzufügen, die in keiner der BK Datenbanken enthalten sind z.B. [solche](https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058).
@@ -125,7 +131,9 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
-* Neue API einbauen
+* Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
+* Payback Coupons in "Alle Coupons" Ansicht ganz oben anzeigen (normale Coupons ohne Preis stehen derzeit ganz oben - aktuell nur einer)(?) -> Low Prio
+* Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden)
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
 * User, die den Bot geblockt haben keine Benachrichtigungen mehr versuchen zu schicken (könnte passieren, wenn ein User Favoriten speichert. Benachrichtigungen aktiviert und dannach den Bot blockiert, TG Exception Unauthorized)
@@ -138,7 +146,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 
 # Daten für den BotFather (Telegram Bot Konfiguration)
 
-### Bot Commands Liste (in Verwendung)
+### Bot Commands Liste
 ```
 start - Hauptmenü
 tschau - 🚫 Meine Daten löschen

@@ -29,7 +29,8 @@
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2022_01_07_PayBack_C47_99110.png",
       "expire_date": "2022-01-07",
-      "enforce_is_new_override_until_date": "2021-12-03"
+      "enforce_is_new_override_until_date": "2021-12-03",
+      "isEatable": false
     },
     {
       "uniqueID": "99141",
@@ -38,7 +39,8 @@
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2021_12_26_99141_10Fach.jpg",
       "expire_date": "2021-12-26",
-      "enforce_is_new_override_until_date": "2021-12-13"
+      "enforce_is_new_override_until_date": "2021-12-13",
+      "isEatable": false
     }
   ]
 }

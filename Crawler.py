@@ -1,11 +1,11 @@
 import csv
 import logging
 import traceback
-from typing import List, Union, Dict
+from typing import List
 
 import qrcode
 import requests
-from couchdb import Document, Database
+from couchdb import Document
 from hyper import HTTP20Connection  # we're using hyper instead of requests because of its' HTTP/2.0 capability
 
 import couchdb
@@ -19,10 +19,10 @@ from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponIsValid, couponGetStartTimestamp
-from UtilsCouponsDB import couponDBIsValid, couponDBGetUniqueCouponID, couponDBGetComparableValue, \
+from UtilsCouponsDB import couponDBIsValid, couponDBGetComparableValue, \
     couponDBGetExpireDateFormatted, couponDBGetPriceFormatted, couponDBGetImagePathQR, isValidBotCoupon, getImageBasePath, \
-    couponDBGetImagePath, Coupon, User, InfoEntry, CouponSortMode, couponDBGetTitleShortened
-from CouponCategory import CouponSource, BotAllowedCouponSources
+    couponDBGetImagePath, Coupon, User, InfoEntry, CouponSortMode
+from CouponCategory import CouponSource, BotAllowedCouponSources, CouponCategory
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
@@ -51,7 +51,7 @@ class UserFavorites:
             for coupon in self.couponsUnavailable:
                 if len(unavailableFavoritesText) > 0:
                     unavailableFavoritesText += '\n'
-                unavailableFavoritesText += coupon.id + ' | ' + couponDBGetTitleShortened(coupon)
+                unavailableFavoritesText += coupon.id + ' | ' + coupon.titleShortened
                 if coupon.price is not None:
                     unavailableFavoritesText += ' | ' + couponDBGetPriceFormatted(coupon)
             return unavailableFavoritesText
@@ -65,8 +65,7 @@ class BKCrawler:
             raise Exception('Broken or missing config')
         # Init DB
         self.couchdb = couchdb.Server(self.cfg[Config.DB_URL])
-        self.cachedAvailableCouponSources = {}
-        self.cachedHasHiddenAppCouponsAvailable = False
+        self.cachedAvailableCouponCategories = {}
         self.keepHistory = False
         self.crawlOnlyBotCompatibleCoupons = True
         self.storeCouponAPIDataAsJson = False
@@ -108,6 +107,8 @@ class BKCrawler:
             os.makedirs(getPathImagesOffers())
         if not os.path.exists(getPathImagesProducts()):
             os.makedirs(getPathImagesProducts())
+        # Do this here so manually added coupons will get added without extra crawl process
+        self.addExtraCoupons()
         # Make sure that our cache gets filled on init
         self.updateCache()
 
@@ -826,7 +827,7 @@ class BKCrawler:
          This will only add VALID coupons to DB! """
         extraCouponData = loadJson(BotProperty.extraCouponConfigPath)
         extraCouponsJson = extraCouponData["extra_coupons"]
-        couponsToAdd = {}
+        extraCouponsToAdd = {}
         for extraCouponJson in extraCouponsJson:
             coupon = Coupon.wrap(extraCouponJson)
             coupon.id = coupon.uniqueID  # Set custom uniqueID otherwise couchDB will create one later -> This is not what we want to happen!!
@@ -845,19 +846,23 @@ class BKCrawler:
                     enforceIsNewOverrideUntilDate = datetime.strptime(enforceIsNewOverrideUntilDateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
                     if enforceIsNewOverrideUntilDate.timestamp() > datetime.now().timestamp():
                         coupon.isNew = True
-                couponsToAdd[coupon.uniqueID] = coupon
-        if len(couponsToAdd) > 0:
+                extraCouponsToAdd[coupon.uniqueID] = coupon
+        if len(extraCouponsToAdd) > 0:
+            logging.info("There are " + str(len(extraCouponsToAdd)) + " valid extra coupons available")
             # Add items to DB
             couponDB = self.getCouponDB()
             dbUpdates = []
-            for uniqueCouponID, coupon in couponsToAdd.items():
-                existantCoupon = Coupon.load(couponDB, uniqueCouponID)
-                if existantCoupon is not None:
+            for coupon in extraCouponsToAdd.values():
+                existantCoupon = Coupon.load(couponDB, coupon.id)
+                if existantCoupon is None:
+                    dbUpdates.append(coupon)
+                elif existantCoupon is not None and hasChanged(existantCoupon, coupon):
                     # Put rev of existing coupon into 'new' object otherwise DB update will throw Exception.
                     coupon["_rev"] = existantCoupon.rev
-                dbUpdates.append(coupon)
-            couponDB.update(dbUpdates)
-            logging.info("Added " + str(len(couponsToAdd)) + " extra coupons")
+                    dbUpdates.append(coupon)
+            if len(dbUpdates) > 0:
+                couponDB.update(dbUpdates)
+                logging.info("Did " + str(len(dbUpdates)) + " extra coupons DB updates")
 
     def updateHistoryEntry(self, historyDB, primaryKey: str, newData):
         """ Adds/Updates entry inside given database. """
@@ -1169,17 +1174,22 @@ class BKCrawler:
     def updateCache(self):
         """ Updates cache containing all existant coupon sources e.g. used be the Telegram bot to display them inside main menu without having to do any DB requests. """
         couponDB = self.getCouponDB()
-        newCachedAvailableCouponSources = {}
-        foundHiddenAppCoupons = False
+        newCachedAvailableCouponCategories = {}
         for couponID in couponDB:
             coupon = Coupon.load(couponDB, couponID)
             if couponDBIsValid(coupon):
-                newCachedAvailableCouponSources.setdefault(coupon.source, {})
-                if coupon.source == CouponSource.APP and coupon.isHidden:
-                    foundHiddenAppCoupons = True
+                category = newCachedAvailableCouponCategories.setdefault(coupon.source, CouponCategory(couponSrc=coupon.source))
+                category.setNumberofCouponsTotal(category.numberofCouponsTotal + 1)
+                if coupon.isHidden:
+                    category.setNumberofCouponsHidden(category.numberofCouponsHidden + 1)
+                if coupon.isEatable:
+                    category.setNumberofCouponsEatable(category.numberofCouponsEatable + 1)
+                if coupon.isNew:
+                    category.setNumberofCouponsNew(category.numberofCouponsNew + 1)
+                if coupon.containsFriesOrCoke:
+                    category.setNumberofCouponsWithFriesOrCoke(category.numberofCouponsWithFriesOrCoke + 1)
         # Overwrite old cache
-        self.cachedAvailableCouponSources = newCachedAvailableCouponSources
-        self.cachedHasHiddenAppCouponsAvailable = foundHiddenAppCoupons
+        self.cachedAvailableCouponCategories = newCachedAvailableCouponCategories
 
     def getCouponDB(self):
         return self.couchdb[DATABASES.COUPONS]
