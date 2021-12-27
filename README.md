@@ -69,7 +69,8 @@ Gäbe es derzeit z.B. Papiercoupons mit dem Buchstaben ``B`` und Ablaufdatum  ``
 23007
 22063
 ```
-3. `PaperCouponHelper.py` einmalig ausführen. Dies wird die `config_paper_coupons.json` aktualisieren und die neuen Papiercoupons einbinden.
+3. `PaperCouponHelper.py` einmalig ausführen. Dies wird die `config_paper_coupons.json` aktualisieren und die neuen Papiercoupons einbinden.  
+Derzeit lassen sich über diesen Weg nur Coupons eines einzigen aktiven Buchstabens hinzufügen!
 
 ## config_extra_coupons.json: Optionale Config zum manuellen Hinzufügen von Coupons, die in keiner der Schnittstellen zu finden sind
 Die ``config_extra_coupons.json`` ist nützlich, um manuell Coupons hinzuzufügen, die in keiner der BK Datenbanken enthalten sind z.B. [solche](https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058).
