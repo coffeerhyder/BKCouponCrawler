@@ -208,7 +208,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
                 channelDB[coupon.id] = {}
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
             channelCoupon.uniqueIdentifier = couponDBGetUniqueIdentifier(coupon)
-            couponText = generateCouponLongTextFormattedWithDescription(coupon)
+            couponText = generateCouponLongTextFormattedWithDescription(coupon, highlightIfNew=True)
             photoAlbum = [InputMediaPhoto(media=bkbot.getCouponImage(coupon), caption=couponText, parse_mode='HTML'),
                           InputMediaPhoto(media=bkbot.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
                           ]

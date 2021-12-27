@@ -21,8 +21,7 @@ from Helper import *
 from Crawler import BKCrawler, UserFavorites
 from Models import CouponFilter
 
-from UtilsCouponsDB import couponDBGetUniqueCouponID, \
-    couponDBGetUniqueIdentifier, couponDBGetPriceFormatted, couponDBGetImageQR, \
+from UtilsCouponsDB import couponDBGetUniqueIdentifier, couponDBGetPriceFormatted, couponDBGetImageQR, \
     couponDBGetImagePath, couponDBGetPLUOrUniqueID, Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, generateCouponLongTextFormatted, \
     generateCouponLongTextFormattedWithDescription, generateCouponShortText, generateCouponShortTextFormatted, generateCouponShortTextFormattedWithHyperlinkToChannelPost, \
     generateCouponLongTextFormattedWithHyperlinkToChannelPost, getCouponsSeparatedByType
@@ -58,10 +57,18 @@ USER_SETTINGS_ON_OFF = {
         "description": "Payback Coupons im Hauptmenü zeigen",
         "default": True
     },
-    "highlightFavoriteCouponsInContextOfNormalCouponLists": {
-        "description": "Favoriten in Listen mit " + SYMBOLS.STAR + " markieren",
+    "highlightFavoriteCouponsInButtonTexts": {
+        "description": "Favoriten in Buttons mit " + SYMBOLS.STAR + " markieren",
         "default": True
-    }
+    },
+    "highlightNewCouponsInCouponButtonTexts": {
+        "description": "Neue Coupons in Buttons mit " + SYMBOLS.NEW + " markieren",
+        "default": True
+    },
+    # "autoDeleteExpiredFavorites": {
+    #     "description": "Abgelaufene Favoriten autom. löschen",
+    #     "default": False
+    # }
 }
 if DISPLAY_BETA_SETTING:
     USER_SETTINGS_ON_OFF["enableBetaFeatures"] = {
@@ -317,7 +324,7 @@ class BKBot:
             coupons = None
             menuText = None
             user = User.load(self.couchdb[DATABASES.TELEGRAM_USERS], str(update.effective_user.id))
-            highlightFavorites = user.settings.highlightFavoriteCouponsInContextOfNormalCouponLists
+            highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
             if mode == CouponDisplayMode.ALL:
@@ -362,7 +369,7 @@ class BKBot:
         userFavorites = self.getUserFavorites(user=user, enableExceptionHandling=False)
         inactiveFavoriteCouponIDs = []
         for unavailableCoupon in userFavorites.couponsUnavailable:
-            inactiveFavoriteCouponIDs.append(couponDBGetUniqueCouponID(unavailableCoupon))
+            inactiveFavoriteCouponIDs.append(unavailableCoupon.id)
         return inactiveFavoriteCouponIDs
 
     def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavorites, str]:
@@ -417,9 +424,6 @@ class BKBot:
         query.answer()
         urlquery_callbackBack = furl(urlquery.args["cb"])
         buttons = []
-        userFavoritesDict = {}
-        if highlightFavorites:
-            userFavoritesDict = user.favoriteCoupons
         maxCouponsPerPage = 20
         paginationMax = math.ceil(len(coupons) / maxCouponsPerPage)
         desiredPage = int(urlquery.args.get("p", 1))
@@ -432,11 +436,11 @@ class BKBot:
         desiredPageContainsAtLeastOneFavoriteCoupon = False
         while len(buttons) < maxCouponsPerPage and index < len(coupons):
             coupon = coupons[index]
-            buttonText = ''
-            if coupon.id in userFavoritesDict:
-                buttonText += SYMBOLS.STAR
+            if coupon.id in user.favoriteCoupons and highlightFavorites:
+                buttonText = SYMBOLS.STAR + generateCouponShortText(coupon=coupon, highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
                 desiredPageContainsAtLeastOneFavoriteCoupon = True
-            buttonText += generateCouponShortText(coupon)
+            else:
+                buttonText = generateCouponShortText(coupon=coupon, highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
 
             buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
             index += 1
@@ -676,7 +680,7 @@ class BKBot:
         """
         favoriteKeyboard = self.getCouponFavoriteKeyboard(isFavorite, coupon.id, CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING)
         replyMarkupWithoutBackButton = InlineKeyboardMarkup([favoriteKeyboard, []])
-        couponText = generateCouponLongTextFormattedWithDescription(coupon)
+        couponText = generateCouponLongTextFormattedWithDescription(coupon, highlightIfNew=True)
         if additionalText is not None:
             couponText += '\n' + additionalText
         msgQR = None
@@ -757,17 +761,16 @@ class BKBot:
         else:
             return coupons
 
-    def getCouponImage(self, coupon):
+    def getCouponImage(self, coupon: Coupon):
         """ Returns either image URL or file or Telegram file_id of a given coupon. """
-        uniqueCouponID = couponDBGetUniqueCouponID(coupon)
-        cachedImageData = self.couponImageCache.get(uniqueCouponID)
+        cachedImageData = self.couponImageCache.get(coupon.id)
         """ Re-use Telegram file-ID if possible: https://core.telegram.org/bots/api#message
         If the PLU has changed, we cannot just re-use the old ID because the images can contain that PLU code and the PLU code in our saved image can lead to a completely different product now!
         According to the Telegram FAQ, sich file_ids can be trusted to be persistent: https://core.telegram.org/bots/faq#can-i-count-on-file-ids-to-be-persistent """
         imagePath = couponDBGetImagePath(coupon)
         if cachedImageData is not None and cachedImageData[PhotoCacheVars.UNIQUE_IDENTIFIER] == couponDBGetUniqueIdentifier(coupon):
             # Re-use cached image_id and update cache timestamp
-            self.couponImageCache[uniqueCouponID][PhotoCacheVars.TIMESTAMP_LAST_USED] = datetime.now().timestamp()
+            self.couponImageCache[coupon.id][PhotoCacheVars.TIMESTAMP_LAST_USED] = datetime.now().timestamp()
             logging.debug("Returning coupon image file_id: " + cachedImageData[PhotoCacheVars.FILE_ID])
             return cachedImageData[PhotoCacheVars.FILE_ID]
         elif isValidImageFile(imagePath):
@@ -779,14 +782,13 @@ class BKBot:
             logging.warning("Returning coupon fallback image for path: " + imagePath)
             return open("media/fallback_image_missing_coupon_image.jpeg", mode='rb')
 
-    def getCouponImageQR(self, coupon):
+    def getCouponImageQR(self, coupon: Coupon):
         """ Returns either image URL or file or Telegram file_id of a given coupon QR image. """
-        uniqueCouponID = couponDBGetUniqueCouponID(coupon)
-        cachedImageData = self.couponImageCache.get(uniqueCouponID)
+        cachedImageData = self.couponImageCache.get(coupon.id)
         # Re-use Telegram file-ID if possible: https://core.telegram.org/bots/api#message
         if cachedImageData is not None and PhotoCacheVars.FILE_ID_QR in cachedImageData:
             # Return cached image_id and update cache timestamp
-            self.couponImageCache[uniqueCouponID][PhotoCacheVars.TIMESTAMP_LAST_USED] = datetime.now().timestamp()
+            self.couponImageCache[coupon.id][PhotoCacheVars.TIMESTAMP_LAST_USED] = datetime.now().timestamp()
             logging.debug("Returning QR image file_id: " + cachedImageData[PhotoCacheVars.FILE_ID_QR])
             return cachedImageData[PhotoCacheVars.FILE_ID_QR]
         else:
@@ -867,15 +869,15 @@ class BKBot:
             if coupon.id in channelDB:
                 messageIDs = ChannelCoupon.load(channelDB, coupon.id).messageIDs
                 if len(messageIDs) > 0:
-                    couponText = generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon, self.getPublicChannelName(), messageIDs[0])
+                    couponText = generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon=coupon, highlightIfNew=False, publicChannelName=self.getPublicChannelName(), messageID=messageIDs[0])
                 else:
                     # This should never happen but we'll allow it to
                     logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
-                    couponText = generateCouponShortTextFormatted(coupon)
+                    couponText = generateCouponShortTextFormatted(coupon=coupon, highlightIfNew=False)
             else:
                 # This should never happen but we'll allow it to anyways
                 logging.warning("Can't hyperlink coupon because it is not in channelDB: " + coupon.id)
-                couponText = generateCouponShortTextFormatted(coupon)
+                couponText = generateCouponShortTextFormatted(coupon=coupon, highlightIfNew=False)
             infoText += '\n' + couponText
 
             if index == maxNewCouponsDescriptionLines - 1:
@@ -1031,21 +1033,21 @@ class BKBot:
                                 if useLongCouponTitles:
                                     couponText = generateCouponLongTextFormattedWithHyperlinkToChannelPost(coupon, self.getPublicChannelName(), channelCoupon.messageIDs[0])
                                 else:
-                                    couponText = generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon, self.getPublicChannelName(), channelCoupon.messageIDs[0])
+                                    couponText = generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon=coupon, highlightIfNew=True, publicChannelName=self.getPublicChannelName(), messageID=channelCoupon.messageIDs[0])
                             else:
                                 # This should never happen but we'll allow it to
                                 logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
                                 if useLongCouponTitles:
                                     couponText = generateCouponLongTextFormatted(coupon)
                                 else:
-                                    couponText = generateCouponShortTextFormatted(coupon)
+                                    couponText = generateCouponShortTextFormatted(coupon=coupon, highlightIfNew=True)
                         else:
                             # This should never happen but we'll allow it to
                             logging.warning("Can't hyperlink coupon because it is not in channelDB: " + coupon.id)
                             if useLongCouponTitles:
                                 couponText = generateCouponLongTextFormatted(coupon)
                             else:
-                                couponText = generateCouponShortTextFormatted(coupon)
+                                couponText = generateCouponShortTextFormatted(coupon=coupon, highlightIfNew=True)
 
                         couponOverviewText += '\n' + couponText
                         # Exit loop after last coupon info has been added

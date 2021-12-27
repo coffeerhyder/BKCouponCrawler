@@ -1,5 +1,4 @@
 import logging
-import time
 from json import loads
 
 from hyper import HTTP20Connection

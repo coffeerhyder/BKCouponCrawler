@@ -1,11 +1,11 @@
 import csv
 import logging
 import traceback
-from typing import List, Union, Dict
+from typing import List
 
 import qrcode
 import requests
-from couchdb import Document, Database
+from couchdb import Document
 from hyper import HTTP20Connection  # we're using hyper instead of requests because of its' HTTP/2.0 capability
 
 import couchdb
@@ -19,9 +19,9 @@ from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponIsValid, couponGetStartTimestamp
-from UtilsCouponsDB import couponDBIsValid, couponDBGetUniqueCouponID, couponDBGetComparableValue, \
+from UtilsCouponsDB import couponDBIsValid, couponDBGetComparableValue, \
     couponDBGetExpireDateFormatted, couponDBGetPriceFormatted, couponDBGetImagePathQR, isValidBotCoupon, getImageBasePath, \
-    couponDBGetImagePath, Coupon, User, InfoEntry, CouponSortMode, couponDBGetTitleShortened
+    couponDBGetImagePath, Coupon, User, InfoEntry, CouponSortMode
 from CouponCategory import CouponSource, BotAllowedCouponSources, CouponCategory
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -51,7 +51,7 @@ class UserFavorites:
             for coupon in self.couponsUnavailable:
                 if len(unavailableFavoritesText) > 0:
                     unavailableFavoritesText += '\n'
-                unavailableFavoritesText += coupon.id + ' | ' + couponDBGetTitleShortened(coupon)
+                unavailableFavoritesText += coupon.id + ' | ' + coupon.titleShortened
                 if coupon.price is not None:
                     unavailableFavoritesText += ' | ' + couponDBGetPriceFormatted(coupon)
             return unavailableFavoritesText

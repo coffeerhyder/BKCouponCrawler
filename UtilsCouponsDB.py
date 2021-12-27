@@ -7,7 +7,7 @@ from typing import Union, List
 from couchdb.mapping import TextField, FloatField, ListField, IntegerField, BooleanField, Document, DictField, Mapping
 
 from CouponCategory import BotAllowedCouponSources
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS
 
 
 class Coupon(Document):
@@ -36,6 +36,10 @@ class Coupon(Document):
 
 
 class User(Document):
+
+    def testMethod(self):
+        return None
+
     settings = DictField(
         Mapping.build(
             displayQR=BooleanField(default=False),
@@ -43,7 +47,9 @@ class User(Document):
             displayCouponCategoryPayback=BooleanField(default=True),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
-            highlightFavoriteCouponsInContextOfNormalCouponLists=BooleanField(default=True),
+            highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
+            highlightNewCouponsInCouponButtonTexts=BooleanField(default=True),
+            autoDeleteExpiredFavorites=BooleanField(default=False),  # TODO: Implement this
             enableBetaFeatures=BooleanField(default=False)
         )
     )
@@ -99,22 +105,6 @@ def couponDBGetExpireDateFormatted(coupon: Coupon, fallback=None) -> Union[str, 
         return coupon.dateFormattedExpire
     else:
         return fallback
-
-
-def couponDBContainsFriesOrCoke(coupon: Coupon) -> bool:
-    return coupon.containsFriesOrCoke
-
-
-def couponDBGetTitleFull(coupon: Coupon) -> str:
-    return coupon.title
-
-
-def couponDBGetTitleShortened(coupon: Coupon) -> str:
-    return coupon.titleShortened
-
-
-def couponDBGetUniqueCouponID(coupon: Coupon) -> Union[str, None]:
-    return coupon.id
 
 
 def couponDBGetImageQR(coupon: Coupon):
@@ -194,7 +184,7 @@ def getFormattedPrice(price: float) -> str:
 
 def isValidBotCoupon(coupon: Coupon) -> bool:
     """ Checks if the given coupon can be used in bot e.g. is from allowed source (App/Paper) and is valid. """
-    return couponDBIsValid(coupon) and coupon.source in BotAllowedCouponSources
+    return coupon.source in BotAllowedCouponSources and couponDBIsValid(coupon)
 
 
 def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
@@ -214,95 +204,118 @@ def getCouponsSeparatedByType(coupons: dict) -> dict:
     return couponsSeparatedByType
 
 
-def generateCouponShortText(coupon: Coupon) -> str:
+def generateCouponShortText(coupon: Coupon, highlightIfNew: bool) -> str:
     """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
-    text = couponDBGetPLUOrUniqueID(coupon) + " | " + coupon.titleShortened
+    couponText = ''
+    if coupon.isNew and highlightIfNew:
+        couponText += SYMBOLS.NEW
+    couponText += couponDBGetPLUOrUniqueID(coupon) + " | " + coupon.titleShortened
     priceFormatted = couponDBGetPriceFormatted(coupon)
     reducedPercent = couponDBGetReducedPercentageFormatted(coupon)
     if priceFormatted is not None:
-        text += " | " + priceFormatted
+        couponText += " | " + priceFormatted
     elif reducedPercent is not None:
         # Fallback for coupons without given price (rare case) -> Show reduced percent instead (if given)
-        text += " | " + reducedPercent
-    return text
+        couponText += " | " + reducedPercent
+    return couponText
 
 
-def generateCouponShortTextFormatted(coupon: Coupon) -> str:
+def generateCouponShortTextFormatted(coupon: Coupon, highlightIfNew: bool) -> str:
     """ Returns e.g. "<b>Y15</b> | 2Whopper+M🍟+0,4Cola | 8,99€" """
-    text = "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | " + coupon.titleShortened
+    couponText = ''
+    if coupon.isNew and highlightIfNew:
+        couponText += SYMBOLS.NEW
+    couponText += "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | " + coupon.titleShortened
     priceFormatted = couponDBGetPriceFormatted(coupon)
     reducedPercent = couponDBGetReducedPercentageFormatted(coupon)
     if priceFormatted is not None:
-        text += " | " + priceFormatted
+        couponText += " | " + priceFormatted
     elif reducedPercent is not None:
         # Fallback for coupons without given price (rare case) -> Show reduced percent instead (if given)
-        text += " | " + reducedPercent
-    return text
+        couponText += " | " + reducedPercent
+    return couponText
 
 
-def generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon: Coupon, publicChannelName: str, messageID: int) -> str:
+def generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon: Coupon, highlightIfNew: bool, publicChannelName: str, messageID: int) -> str:
     """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
-    text = "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
-        messageID) + "\">" + coupon.titleShortened + "</a>"
+    couponText = "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
+        messageID) + "\">"
+    if coupon.isNew and highlightIfNew:
+        couponText += SYMBOLS.NEW
+    couponText += coupon.titleShortened + "</a>"
     priceFormatted = couponDBGetPriceFormatted(coupon)
     if priceFormatted is not None:
-        text += " | " + priceFormatted
+        couponText += " | " + priceFormatted
     percentReduced = couponDBGetReducedPercentageFormatted(coupon)
     if percentReduced is not None:
-        text += " | " + percentReduced
-    return text
+        couponText += " | " + percentReduced
+    return couponText
 
 
-def generateCouponLongText(coupon: Coupon) -> str:
-    """ Returns e.g. "2 Whopper + Mittlere Pommes + 0,4L Cola
-    Y15 | 8,99€ | -25% " """
-    text = coupon.title
-    text += "\n" + couponDBGetPLUOrUniqueID(coupon)
-    priceFormatted = couponDBGetPriceFormatted(coupon)
-    if priceFormatted is not None:
-        text += " | " + priceFormatted
-    percentReduced = couponDBGetReducedPercentageFormatted(coupon)
-    if percentReduced is not None:
-        text += " | " + percentReduced
-    return text
+# def generateCouponLongText(coupon: Coupon, highlightIfNew: bool = True) -> str:
+#     """ Returns e.g. "2 Whopper + Mittlere Pommes + 0,4L Cola
+#     Y15 | 8,99€ | -25% " """
+#     couponText = ''
+#     if coupon.isNew and highlightIfNew:
+#         couponText += SYMBOLS.NEW
+#     couponText += coupon.title
+#     couponText += "\n" + couponDBGetPLUOrUniqueID(coupon)
+#     priceFormatted = couponDBGetPriceFormatted(coupon)
+#     if priceFormatted is not None:
+#         couponText += " | " + priceFormatted
+#     percentReduced = couponDBGetReducedPercentageFormatted(coupon)
+#     if percentReduced is not None:
+#         couponText += " | " + percentReduced
+#     return couponText
 
 
 def generateCouponLongTextFormatted(coupon: Coupon) -> str:
     """ Returns e.g. "2 Whopper + Mittlere Pommes + 0,4L Cola
      <b>Y15</b> | 8,99€ | -25% " """
-    text = coupon.title
-    text += "\n<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b>"
+    couponText = ''
+    if coupon.isNew:
+        couponText += SYMBOLS.NEW
+    couponText += coupon.title
+    couponText += "\n<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b>"
     priceFormatted = couponDBGetPriceFormatted(coupon)
     if priceFormatted is not None:
-        text += " | " + priceFormatted
+        couponText += " | " + priceFormatted
     reducedPercentage = couponDBGetReducedPercentageFormatted(coupon)
     if reducedPercentage is not None:
-        text += " | " + reducedPercentage
-    return text
+        couponText += " | " + reducedPercentage
+    return couponText
 
 
 def generateCouponLongTextFormattedWithHyperlinkToChannelPost(coupon: Coupon, publicChannelName: str, messageID: int) -> str:
     """ Returns e.g. "2 Whopper + Mittlere Pommes +0,4L Cola (https://t.me/betterkingpublic/1054)
      <b>Y15</b> | 8,99€ | -25% " """
-    text = "<a href=\"https://t.me/" + publicChannelName + '/' + str(
-        messageID) + "\">" + coupon.title + "</a>"
-    text += "\n<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b>"
+    couponText = "<a href=\"https://t.me/" + publicChannelName + '/' + str(
+        messageID) + "\">"
+    if coupon.isNew:
+        couponText += SYMBOLS.NEW
+    couponText += coupon.title
+    couponText += "</a>"
+    couponText += "\n<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b>"
     priceFormatted = couponDBGetPriceFormatted(coupon)
     if priceFormatted is not None:
-        text += " | " + priceFormatted
+        couponText += " | " + priceFormatted
     reducedPercentage = couponDBGetReducedPercentageFormatted(coupon)
     if reducedPercentage is not None:
-        text += " | " + reducedPercentage
-    return text
+        couponText += " | " + reducedPercentage
+    return couponText
 
 
-def generateCouponLongTextFormattedWithDescription(coupon: Coupon):
+def generateCouponLongTextFormattedWithDescription(coupon: Coupon, highlightIfNew: bool):
     """
+    :param highlightIfNew: Add emoji to text if coupon is new.
     :param coupon: Coupon
     :return: E.g. "<b>B3</b> | 1234 | 13.99€ | -50%\nGültig bis:19.06.2021\nCoupon.description"
     """
     price = couponDBGetPriceFormatted(coupon)
-    couponText = coupon.title + '\n'
+    couponText = ''
+    if coupon.isNew and highlightIfNew:
+        couponText += SYMBOLS.NEW
+    couponText += coupon.title + '\n'
     if coupon.plu is not None:
         couponText += '<b>' + coupon.plu + '</b>' + ' | ' + coupon.id
     else:
