@@ -49,7 +49,7 @@ class User(Document):
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
             highlightNewCouponsInCouponButtonTexts=BooleanField(default=True),
-            autoDeleteExpiredFavorites=BooleanField(default=False),  # TODO: Implement this
+            autoDeleteExpiredFavorites=BooleanField(default=False),
             enableBetaFeatures=BooleanField(default=False)
         )
     )

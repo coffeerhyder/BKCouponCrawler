@@ -36,7 +36,7 @@ DISPLAY_BETA_SETTING = True
 
 """ This is a helper for basic user on/off settings """
 USER_SETTINGS_ON_OFF = {
-    # TODO: Obtain these Keys and default values from "User" Mapping class!
+    # TODO: Obtain these Keys and default values from "User" Mapping class and remove this mess!
     "notifyWhenFavoritesAreBack": {
         "description": "Favoriten Benachrichtigungen",
         "default": False
@@ -65,10 +65,10 @@ USER_SETTINGS_ON_OFF = {
         "description": "Neue Coupons in Buttons mit " + SYMBOLS.NEW + " markieren",
         "default": True
     },
-    # "autoDeleteExpiredFavorites": {
-    #     "description": "Abgelaufene Favoriten autom. löschen",
-    #     "default": False
-    # }
+    "autoDeleteExpiredFavorites": {
+        "description": "Abgelaufene Favoriten autom. löschen",
+        "default": False
+    }
 }
 if DISPLAY_BETA_SETTING:
     USER_SETTINGS_ON_OFF["enableBetaFeatures"] = {
@@ -364,14 +364,6 @@ class BKBot:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_MAIN
 
-    def getUnavailableFavoriteCouponIDs(self, user: User) -> list:
-        """ Returns all couponIDs which the user has set as favorite but which are not available (expired) at this moment. """
-        userFavorites = self.getUserFavorites(user=user, enableExceptionHandling=False)
-        inactiveFavoriteCouponIDs = []
-        for unavailableCoupon in userFavorites.couponsUnavailable:
-            inactiveFavoriteCouponIDs.append(unavailableCoupon.id)
-        return inactiveFavoriteCouponIDs
-
     def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavorites, str]:
         userFavorites = self.getUserFavorites(user=user, coupons=coupons, enableExceptionHandling=True)
         menuText = SYMBOLS.STAR + str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
@@ -398,7 +390,7 @@ class BKBot:
                 # unavailableCouponsText += '\nEbenfalls kannst du abgelaufene Favoriten in den Einstellungen löschen.'
         return userFavorites, menuText
 
-    def getUserFavorites(self, user: User, coupons: Union[dict, None] = None, enableExceptionHandling: bool = False) -> UserFavorites:
+    def getUserFavorites(self, user: User, coupons: Union[dict, None], enableExceptionHandling: bool) -> UserFavorites:
         """
         Wrapper
         Returns price-sorted list of favorites of current user along with a text containing unavailable favorite coupons.
@@ -596,12 +588,17 @@ class BKBot:
             # All settings that are in 'USER_SETTINGS_ON_OFF' are simply on/off settings and will automatically be included in users' settings.
             if settingKey in USER_SETTINGS_ON_OFF:
                 description = USER_SETTINGS_ON_OFF[settingKey]["description"]
-                if user.settings.get(settingKey, dummyUser.settings[settingKey]):
-                    # Add symbol to enabled settings button text so user can see which settings are currently enabled
-                    keyboard.append(
-                        [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
-                else:
-                    keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
+                displaySetting = True
+                # Check for special cases where one setting depends of the state of another
+                if settingKey == 'notifyWhenFavoritesAreBack' and user.settings.get('autoDeleteExpiredFavorites', dummyUser.settings['autoDeleteExpiredFavorites']):
+                    displaySetting = False
+                if displaySetting:
+                    if user.settings.get(settingKey, dummyUser.settings[settingKey]):
+                        # Add symbol to enabled settings button text so user can see which settings are currently enabled
+                        keyboard.append(
+                            [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
+                    else:
+                        keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
@@ -610,7 +607,7 @@ class BKBot:
         if user.settings.__dict__ != dummyUser.settings.__dict__:
             keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + "bleiben)" + SYMBOLS.WARNING,
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
-        userFavorites = self.getUserFavorites(user=user)
+        userFavorites = self.getUserFavorites(user=user, coupons=None, enableExceptionHandling=False)
         if len(userFavorites.couponsUnavailable) > 0:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavorites.couponsUnavailable)) + ")?*²",
                                                   callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
@@ -840,12 +837,11 @@ class BKBot:
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
         userDB = self.crawler.getUsersDB()
         user = User.load(userDB, str(update.effective_user.id))
-        userUnavailableFavoriteCouponIDs = self.getUnavailableFavoriteCouponIDs(user)
-        if len(userUnavailableFavoriteCouponIDs) > 0:
-            for unavailableFavoriteCouponID in userUnavailableFavoriteCouponIDs:
-                # Double-check - we can't know whether or not has changed in between!
-                if unavailableFavoriteCouponID in user.favoriteCoupons:
-                    del user.favoriteCoupons[unavailableFavoriteCouponID]
+        coupons = self.crawler.getBotCoupons()
+        userUnavailableFavoriteCouponInfo = self.crawler.getUserFavorites(user=user, coupons=coupons)
+        if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0 and user.settings.autoDeleteExpiredFavorites:
+            for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
+                del user.favoriteCoupons[unavailableCoupon.id]
             # Update DB
             user.store(userDB)
         else:
@@ -853,6 +849,22 @@ class BKBot:
             logging.info("No expired favorites there to delete")
         # Reload settings menu
         return self.displaySettings(update, context, user)
+
+    def batchprocessAutoDeleteUsersUnavailableFavorites(self):
+        """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
+        userDB = self.crawler.getUsersDB()
+        coupons = self.crawler.getBotCoupons()
+        dbUpdates = []
+        for userID in userDB:
+            user = User.load(userDB, userID)
+            userUnavailableFavoriteCouponInfo = self.crawler.getUserFavorites(user=user, coupons=coupons)
+            if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0 and user.settings.autoDeleteExpiredFavorites:
+                for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
+                    del user.favoriteCoupons[unavailableCoupon.id]
+                dbUpdates.append(user)
+        if len(dbUpdates) > 0:
+            logging.info('Deleting expired favorites of ' + str(len(dbUpdates)) + ' users')
+            userDB.update(dbUpdates)
 
     def getNewCouponsTextWithChannelHyperlinks(self, couponsDict: dict, maxNewCouponsDescriptionLines: int) -> str:
         infoText = ''
@@ -895,10 +907,10 @@ class BKBot:
         return infoText
 
     def batchProcess(self):
-        """ Runs all processes which should only run once per day:
-         1. Crawler, 2. Channel renew/update, 3. User notify favorites/new coupons, 4. Cleanup channel """
+        """ Runs all processes which should only run once per day. """
         self.crawl()
         self.renewPublicChannel()
+        self.batchprocessAutoDeleteUsersUnavailableFavorites()
         self.notifyUsers()
         self.cleanupPublicChannel()
 

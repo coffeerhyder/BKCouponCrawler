@@ -1313,7 +1313,7 @@ class BKCrawler:
                 offers.append(offer)
         return offers
 
-    def getUserFavorites(self, user: User, coupons: Union[dict, None] = None) -> UserFavorites:
+    def getUserFavorites(self, user: User, coupons: Union[dict, None]) -> UserFavorites:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
         """
@@ -1322,7 +1322,7 @@ class BKCrawler:
             return UserFavorites()
         # Get coupons if they're not given already
         if coupons is None:
-            coupons = self.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
+            coupons = self.getBotCoupons()
         availableFavoriteCoupons = []
         unavailableFavoriteCoupons = []
         for uniqueCouponID, coupon in user.favoriteCoupons.items():
@@ -1333,8 +1333,14 @@ class BKCrawler:
                 # User chosen favorite coupon has expired or is not in DB
                 coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
                 unavailableFavoriteCoupons.append(coupon)
+        # Sort all coupon arrays by price
         availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
+        unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
         return UserFavorites(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
+
+    def getBotCoupons(self):
+        """ Returns all coupons suitable for bot-usage (do not trust the sorting here!). """
+        return self.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
 
 
 def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:

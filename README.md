@@ -7,7 +7,7 @@ Burger King Coupon Telegram Bot
 # Features
 * Alle Burger King Coupons ohne App & Accountzwang
 * Crawler und Bot getrennt: Crawler kann einfach für andere Projekte verwendet werden
-* Coupons sortiert, aufgeräumt und teils mit zusätzlichen Informationen (Originalpreis, Rabatt, Typ)
+* Coupons sortiert, aufgeräumt und teils mit zusätzlichen Informationen
 
 **Video:**  
 https://www.bitchute.com/video/eoMYCfag5oiM/
