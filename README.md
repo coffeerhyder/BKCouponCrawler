@@ -7,7 +7,7 @@ Burger King Coupon Telegram Bot
 # Features
 * Alle Burger King Coupons ohne App & Accountzwang
 * Crawler und Bot getrennt: Crawler kann einfach für andere Projekte verwendet werden
-* Coupons sortiert, aufgeräumt und teils mit zusätzlichen Informationen (Originalpreis, Rabatt, Typ)
+* Coupons sortiert, aufgeräumt und teils mit zusätzlichen Informationen
 
 **Video:**  
 https://www.bitchute.com/video/eoMYCfag5oiM/
@@ -27,15 +27,15 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 ``` max_document_id_number ``` --> Auf 1000 setzen siehe: https://docs.couchdb.org/en/latest/config/misc.html#purge
 7. `BKBot.py` einmalig mit dem Parameter `crawl` aufrufen.
 
-# CouchDB (user-DB) manuelles Backup & Wiederherstellen
-``
+# CouchDB (user-DB) Backup & Wiederherstellen
+```
 git clone https://github.com/danielebailo/couchdb-dump
 -->
 Backup:
 bash couchdb-dump.sh -b -H 127.0.0.1 -d telegram_users -f telegram_users.json -u admin -p deinPasswort
 Restore:
 bash couchdb-dump.sh -r -H 127.0.0.1 -d telegram-users -f telegram-users.json -u admin -p deinPasswort
-``
+```
 
 
 # config.json (siehe config.json.default)
@@ -69,14 +69,13 @@ Gäbe es derzeit z.B. Papiercoupons mit dem Buchstaben ``B`` und Ablaufdatum  ``
 23007
 22063
 ```
-3. `PaperCouponHelper.py` einmalig ausführen. Dies wird die `config_paper_coupons.json` aktualisieren und die neuen Papiercoupons einbinden.
+3. `PaperCouponHelper.py` einmalig ausführen **oder** Bot/Crawler neustarten.  Dies wird die `config_paper_coupons.json` aktualisieren und die neuen Papiercoupons einbinden.
+Derzeit lassen sich über diesen Weg nur Coupons eines einzigen aktiven Buchstabens hinzufügen!
 
 ## config_extra_coupons.json: Optionale Config zum manuellen Hinzufügen von Coupons, die in keiner der Schnittstellen zu finden sind
 Die ``config_extra_coupons.json`` ist nützlich, um manuell Coupons hinzuzufügen, die in keiner der BK Datenbanken enthalten sind z.B. [solche](https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058).
 Beispiel:  
-```
-Siehe config_extra_coupons.json
-```  
+Siehe `config_extra_coupons.json`
 
 ### Mögliche Start-Parameter für `BKBot.py`:  
 Die meisten Parameter sind nur einzeln verwendbar.  

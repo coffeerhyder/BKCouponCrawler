@@ -286,6 +286,7 @@ def cleanupChannel(bkbot):
 
 
 def deleteLeftoverCouponMessageIDsToDelete(bkbot, infoDB, infoDoc):
+    """ Deletes all channel messages which were previously flagged for deletion. """
     if len(infoDoc.messageIDsToDelete) > 0:
         initialNumberofMsgsToDelete = len(infoDoc.messageIDsToDelete)
         logging.info("Deleting " + str(initialNumberofMsgsToDelete) + " old messages...")

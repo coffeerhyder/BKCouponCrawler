@@ -11,9 +11,10 @@ from hyper import HTTP20Connection  # we're using hyper instead of requests beca
 import couchdb
 from json import loads
 
+import PaperCouponHelper
 from BotUtils import Config
 from Helper import *
-from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, getActivePaperCouponInfo
+from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, isCouponShortPLUWithAtLeastOneLetter, isValidImageFile
 from Models import CouponFilter
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
@@ -111,9 +112,6 @@ class BKCrawler:
         self.addExtraCoupons()
         # Make sure that our cache gets filled on init
         self.updateCache()
-
-    def getServer(self):
-        return self.couchdb
 
     def setKeepHistory(self, keepHistory: bool):
         """ Enable this if you want the crawler to maintain a history of past coupons/offers and update it on every crawl process. """
@@ -392,7 +390,7 @@ class BKCrawler:
         logging.info("Found " + str(len(storeIDs)) + " stores to crawl coupons from")
         logging.info("Crawling coupons2...")
         """ Load file which contains some extra data which can be useful to correctly determine find paper coupons. """
-        paperCouponConfig = getActivePaperCouponInfo()
+        paperCouponConfig = PaperCouponHelper.getActivePaperCouponInfo2()
         paperCouponMappings = {}
         # Put all mappings into one dict
         for pluChar, charInfo in paperCouponConfig.items():
@@ -825,6 +823,8 @@ class BKCrawler:
         """ Adds extra coupons which have been manually put in config_extra_coupons.json.
          Make sure to execute this AFTER DB cleanup so this can set IS_NEW flags without them being removed immediately afterwards!
          This will only add VALID coupons to DB! """
+        # First prepare extra coupons config because manual steps are involved to make this work
+        PaperCouponHelper.main()
         extraCouponData = loadJson(BotProperty.extraCouponConfigPath)
         extraCouponsJson = extraCouponData["extra_coupons"]
         extraCouponsToAdd = {}
@@ -1313,7 +1313,7 @@ class BKCrawler:
                 offers.append(offer)
         return offers
 
-    def getUserFavorites(self, user: User, coupons: Union[dict, None] = None) -> UserFavorites:
+    def getUserFavorites(self, user: User, coupons: Union[dict, None]) -> UserFavorites:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
         """
@@ -1322,7 +1322,7 @@ class BKCrawler:
             return UserFavorites()
         # Get coupons if they're not given already
         if coupons is None:
-            coupons = self.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
+            coupons = self.getBotCoupons()
         availableFavoriteCoupons = []
         unavailableFavoriteCoupons = []
         for uniqueCouponID, coupon in user.favoriteCoupons.items():
@@ -1333,8 +1333,14 @@ class BKCrawler:
                 # User chosen favorite coupon has expired or is not in DB
                 coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
                 unavailableFavoriteCoupons.append(coupon)
+        # Sort all coupon arrays by price
         availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
+        unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
         return UserFavorites(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
+
+    def getBotCoupons(self):
+        """ Returns all coupons suitable for bot-usage (do not trust the sorting here!). """
+        return self.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
 
 
 def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:

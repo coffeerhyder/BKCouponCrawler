@@ -88,7 +88,7 @@ class CouponCategory:
         self.numberofCouponsWithFriesOrCoke = newNumber
 
     def isEatable(self) -> bool:
-        """ Typically all coupon categories except payback coupons will return True here. """
+        """ Typically all coupon categories except Payback coupons will return True here as they do contain at least one item that is considered 'eatable'. """
         if self.numberofCouponsEatable > 0:
             return True
         else:
