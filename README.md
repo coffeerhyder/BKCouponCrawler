@@ -18,7 +18,7 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 # [Zur Matrix Bridge](https://app.element.io/#/room/#BetterKingDE:matrix.org)
 
 # Installation
-1. ``git clone https://github.com/BetterKingBot/bkcouponcrawler/bkcouponcrawler.git``
+1. ``git clone https://github.com/BetterKingBot/BKCouponCrawler.git``
 2. ``apt install python3-pip``
 3. ``pip3 install -r requirements.txt``
 4. [CouchDB](https://linuxize.com/post/how-to-install-couchdb-on-ubuntu-20-04/) installieren und einrichten.  
@@ -28,13 +28,18 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 7. `BKBot.py` einmalig mit dem Parameter `crawl` aufrufen.
 
 # CouchDB (user-DB) Backup & Wiederherstellen
+Backup:
 ```
 git clone https://github.com/danielebailo/couchdb-dump
 -->
-Backup:
-bash couchdb-dump.sh -b -H 127.0.0.1 -d telegram_users -f telegram_users.json -u admin -p deinPasswort
-Restore:
-bash couchdb-dump.sh -r -H 127.0.0.1 -d telegram-users -f telegram-users.json -u admin -p deinPasswort
+bash couchdb-dump.sh -b -H 127.0.0.1 -d telegram_users -f telegram_users.json -u username -p password
+```
+Wiederherstellen:
+```
+Alte DB löschen, da bestehende Einträge nicht überschrieben werden:
+curl -X DELETE http://username:password@127.0.0.1:5984/telegram_users
+Wiederherstellen des Backups:
+bash couchdb-dump.sh -r -c -H 127.0.0.1 -d telegram_users -f telegram_users.json -u username -p password
 ```
 
 
