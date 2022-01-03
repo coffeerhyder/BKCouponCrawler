@@ -2,7 +2,7 @@ import math
 import sys
 import time
 import traceback
-from typing import Union, List, Tuple
+from typing import List, Tuple
 
 import schedule
 from couchdb import Database
@@ -109,6 +109,16 @@ def generateCallbackRegEx(settings: dict):
     return settingsCallbackRegEx
 
 
+def cleanupCache(cacheDict: dict):
+    cacheDictCopy = cacheDict.copy()
+    maxCacheAgeSeconds = 7 * 24 * 60 * 60
+    for cacheID, cache in cacheDictCopy.items():
+        cacheItemAge = datetime.now().timestamp() - cache[PhotoCacheVars.TIMESTAMP_LAST_USED]
+        if cacheItemAge > maxCacheAgeSeconds:
+            logging.info("Deleting cache item " + str(cacheID) + " as it was last used before: " + str(cacheItemAge) + " seconds")
+            del cacheDict[cacheID]
+
+
 class BKBot:
 
     def __init__(self):
@@ -121,7 +131,7 @@ class BKBot:
         self.crawler.setExportCSVs(False)
         self.publicChannelName = self.cfg.get(Config.PUBLIC_CHANNEL_NAME)
         self.botName = self.cfg[Config.BOT_NAME]
-        self.couchdb = self.crawler.getServer()
+        self.couchdb = self.crawler.couchdb
         self.updater = Updater(self.cfg[Config.BOT_TOKEN], request_kwargs={"read_timeout": 30})
         dispatcher = self.updater.dispatcher
 
@@ -968,17 +978,8 @@ class BKBot:
         self.updater.stop()
 
     def cleanupCaches(self):
-        self.cleanupCache(self.couponImageCache)
-        self.cleanupCache(self.offerImageCache)
-
-    def cleanupCache(self, cacheDict: dict):
-        cacheDictCopy = cacheDict.copy()
-        maxCacheAgeSeconds = 7 * 24 * 60 * 60
-        for cacheID, cache in cacheDictCopy.items():
-            cacheItemAge = datetime.now().timestamp() - cache[PhotoCacheVars.TIMESTAMP_LAST_USED]
-            if cacheItemAge > maxCacheAgeSeconds:
-                logging.info("Deleting cache item " + str(cacheID) + " as it was last used before: " + str(cacheItemAge) + " seconds")
-                del cacheDict[cacheID]
+        cleanupCache(self.couponImageCache)
+        cleanupCache(self.offerImageCache)
 
     def sendCouponOverviewWithChannelLinks(self, chat_id: Union[int, str], coupons: dict, useLongCouponTitles: bool, channelDB: Database, infoDB: Union[None, Database],
                                            infoDBDoc: Union[None, InfoEntry], allowMessageEdit: bool):
