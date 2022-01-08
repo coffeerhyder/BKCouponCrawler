@@ -11,6 +11,24 @@ from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS
 
 
 class Coupon(Document):
+
+    def isValid(self):
+        expireDatetime = couponDBGetExpireDatetime(self)
+        if expireDatetime is None:
+            # Coupon without expire-date = invalid --> Should never happen
+            return False
+        elif expireDatetime > getCurrentDate():
+            return True
+        else:
+            return False
+
+    def isValidForBot(self) -> bool:
+        """ Checks if the given coupon can be used in bot e.g. is from allowed source (App/Paper) and is valid. """
+        if self.source in BotAllowedCouponSources and self.isValid():
+            return True
+        else:
+            return False
+
     plu = TextField()
     uniqueID = TextField()
     price = FloatField()
@@ -36,9 +54,6 @@ class Coupon(Document):
 
 
 class User(Document):
-
-    def testMethod(self):
-        return None
 
     settings = DictField(
         Mapping.build(
@@ -87,17 +102,6 @@ def couponDBGetExpireDatetime(coupon: Coupon) -> Union[datetime, None]:
         # This should never happen
         logging.warning("Found coupon without expiredate: " + coupon.id)
         return None
-
-
-def couponDBIsValid(coupon: Coupon) -> bool:
-    expireDatetime = couponDBGetExpireDatetime(coupon)
-    if expireDatetime is None:
-        # Coupon without expire-date = invalid --> Should never happen
-        return False
-    elif expireDatetime > getCurrentDate():
-        return True
-    else:
-        return False
 
 
 def couponDBGetExpireDateFormatted(coupon: Coupon, fallback=None) -> Union[str, None]:
@@ -182,11 +186,6 @@ def couponDBGetReducedPercentageFormatted(coupon: Coupon, fallback=None) -> Unio
 
 def getFormattedPrice(price: float) -> str:
     return f'{(price / 100):2.2f}'.replace('.', ',') + '€'
-
-
-def isValidBotCoupon(coupon: Coupon) -> bool:
-    """ Checks if the given coupon can be used in bot e.g. is from allowed source (App/Paper) and is valid. """
-    return coupon.source in BotAllowedCouponSources and couponDBIsValid(coupon)
 
 
 def getCouponsTotalPrice(coupons: List[Coupon]) -> float:

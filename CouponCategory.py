@@ -6,7 +6,7 @@ from Helper import SYMBOLS
 class CouponSource:
     UNKNOWN = -1
     APP = 0
-    APP_VALID_AFTER_DELETION = 1
+    APP_VALID_AFTER_DELETION = 1  # Deprecated!
     APP_SAME_CHAR_AS_CURRENT_APP_COUPONS = 2
     PAPER = 3
     PAPER_UNSAFE = 4

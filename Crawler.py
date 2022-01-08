@@ -20,8 +20,8 @@ from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponIsValid, couponGetStartTimestamp
-from UtilsCouponsDB import couponDBIsValid, couponDBGetComparableValue, \
-    couponDBGetExpireDateFormatted, couponDBGetPriceFormatted, couponDBGetImagePathQR, isValidBotCoupon, getImageBasePath, \
+from UtilsCouponsDB import couponDBGetComparableValue, \
+    couponDBGetExpireDateFormatted, couponDBGetPriceFormatted, couponDBGetImagePathQR, getImageBasePath, \
     couponDBGetImagePath, Coupon, User, InfoEntry, CouponSortMode
 from CouponCategory import CouponSource, BotAllowedCouponSources, CouponCategory
 
@@ -210,12 +210,12 @@ class BKCrawler:
                 newCouponIDs.append(couponID)
                 coupon.isNew = True
                 dbUpdates.append(coupon)
-            elif not self.crawlOnlyBotCompatibleCoupons and couponDBIsValid(coupon) and (couponID not in lastCoupons or not couponDBIsValid(lastCoupons[couponID])):
+            elif not self.crawlOnlyBotCompatibleCoupons and coupon.isValid() and (couponID not in lastCoupons or not lastCoupons[couponID].isValid()):
                 newCouponIDs.append(couponID)
                 coupon.isNew = True
                 dbUpdates.append(coupon)
             else:
-                # Coupon is not new isNew default == False
+                # Coupon is not new --> isNew default == False
                 pass
         # Update DB if needed
         if len(dbUpdates) > 0:
@@ -309,18 +309,6 @@ class BKCrawler:
         if len(couponDBUpdates) > 0:
             # Handle all DB updates with one call
             couponDB.update(couponDBUpdates)
-        if not self.crawlOnlyBotCompatibleCoupons or CouponSource.APP_VALID_AFTER_DELETION in BotAllowedCouponSources:
-            # Experimental functionality: Tag expired app coupons as separate category (CouponSource)
-            couponDBUpdates = []
-            for uniqueCouponID in couponDB:
-                coupon = Coupon.load(couponDB, uniqueCouponID)
-                if uniqueCouponID not in appCouponsIDs and coupon.source == CouponSource.APP:
-                    logging.info("Initial app coupon is not an app coupon anymore: " + uniqueCouponID)
-                    coupon.source = CouponSource.APP_VALID_AFTER_DELETION
-                    coupon.store(couponDB)
-                    couponDBUpdates.append(coupon)
-            if len(couponDBUpdates) > 0:
-                couponDB.update(couponDBUpdates)
 
         devPrintAppCouponsThatMightBeStillValidButAreNotInAppAPIAnymore = False
         if devPrintAppCouponsThatMightBeStillValidButAreNotInAppAPIAnymore and self.keepHistory:
@@ -406,7 +394,7 @@ class BKCrawler:
             dbAllPLUsList.add(coupon.plu)
             if coupon.plu is not None:
                 regexPLUWithOneLetter = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
-                if coupon.source == CouponSource.APP and couponDBIsValid(coupon) and regexPLUWithOneLetter is not None:
+                if coupon.source == CouponSource.APP and coupon.isValid() and regexPLUWithOneLetter is not None:
                     appCouponCharList.add(regexPLUWithOneLetter.group(1).upper())
         numberofNewCoupons = 0
         numberofUpdatedCoupons = 0
@@ -556,8 +544,7 @@ class BKCrawler:
                     priceCompare = -1
             # Check if this coupon exists/existed in app -> Update information as other BK endpoints may serve more info than their official app endpoint!
             existantCoupon = Coupon.load(couponDB, uniqueCouponID)
-            if existantCoupon is not None and couponDBIsValid(existantCoupon) and existantCoupon.source in [CouponSource.APP,
-                                                                                                            CouponSource.APP_VALID_AFTER_DELETION]:
+            if existantCoupon is not None and existantCoupon.isValid() and existantCoupon.source == CouponSource.APP:
                 # Update existing app coupon with new information.
                 if existantCoupon.price is None:
                     # 201-07-06: Only update current price if we failed to find it before as entrys of this APIs can sometimes be wrong (e.g. for 32749: 4,99€ according to this API but 9,89€ according to API)
@@ -773,28 +760,14 @@ class BKCrawler:
             logging.info("Time it took to update coupons2 history DBs: " + getFormattedPassedTime(timestampHistoryDBUpdateStart))
         # Cleanup DB: Remove all non-App coupons that do not exist in API anymore
         deleteCouponDocs = {}
-        if self.crawlOnlyBotCompatibleCoupons:
-            # Allow to clean paper coupons if we found new/current ones in this run
-            if len(foundPaperCouponMap) > 0:
-                cleanupPapercoupons = True
-            else:
-                cleanupPapercoupons = False
-            for uniqueCouponID in couponDB:
-                couponDoc = Coupon.load(couponDB, uniqueCouponID)
-                if cleanupPapercoupons and couponDoc.source == CouponSource.PAPER and uniqueCouponID not in couponsToAddToDB:
-                    # Remove paper coupon regardless of validity because we found new paper coupons this run
-                    deleteCouponDocs[uniqueCouponID] = couponDoc
-                if couponDoc.source == CouponSource.PAPER and couponDBIsValid(couponDoc):
-                    # 2021-05-26: Allow 'valid' paper coupons to stay in DB as long as they're not expired. This makes sense as BK sometimes removes them from DB for some time even though they're still valid...
-                    continue
-                elif couponDoc.source != CouponSource.APP and uniqueCouponID not in allCouponIDs:
-                    deleteCouponDocs[uniqueCouponID] = couponDoc
-        else:
-            # Less 'intelligent' cleanup: If we previously collected everything, delete everything that is not available via API now.
-            for uniqueCouponID in couponDB:
-                couponDoc = Coupon.load(couponDB, uniqueCouponID)
-                if couponDoc.source != CouponSource.APP and uniqueCouponID not in allCouponIDs:
-                    deleteCouponDocs[uniqueCouponID] = couponDoc
+        for uniqueCouponID in couponDB:
+            couponDoc = Coupon.load(couponDB, uniqueCouponID)
+            if couponDoc.source == CouponSource.APP:
+                continue
+            elif uniqueCouponID not in allCouponIDs:
+                deleteCouponDocs[uniqueCouponID] = couponDoc
+            elif self.crawlOnlyBotCompatibleCoupons and not couponDoc.isValidForBot():
+                deleteCouponDocs[uniqueCouponID] = couponDoc
         if len(deleteCouponDocs) > 0:
             logging.info('Pushing DB DELETE updates: ' + str(len(deleteCouponDocs)))
             couponDB.purge(deleteCouponDocs.values())
@@ -813,7 +786,7 @@ class BKCrawler:
         deleteCouponDocs = {}
         for uniqueCouponID in couponDB:
             couponDoc = Coupon.load(couponDB, uniqueCouponID)
-            if self.crawlOnlyBotCompatibleCoupons and not isValidBotCoupon(couponDoc):
+            if self.crawlOnlyBotCompatibleCoupons and not couponDoc.isValidForBot():
                 deleteCouponDocs[uniqueCouponID] = couponDoc
         if len(deleteCouponDocs) > 0:
             logging.info("Deleting non-allowed coupons from DB: " + str(len(deleteCouponDocs)))
@@ -923,7 +896,7 @@ class BKCrawler:
         for couponIDStr in couponDB:
             coupon = Coupon.load(couponDB, couponIDStr)
             # 2021-04-20: Skip invalid/expired coupons as they're not relevant for the user (we don't access them anyways at this moment).
-            if not couponDBIsValid(coupon) or coupon.source not in BotAllowedCouponSources:
+            if coupon.source not in BotAllowedCouponSources or not coupon.isValid():
                 continue
             imagePathCoupon = couponDBGetImagePath(coupon)
             if not isValidImageFile(imagePathCoupon):
@@ -1154,7 +1127,7 @@ class BKCrawler:
                     """ This should not happen if we treat our DB like it's designed to be treated! """
                     logging.debug("ID " + userCouponFavoriteID + " is not in our couponDB -> This should never happen")
                     continue
-                elif not couponDBIsValid(coupon):
+                elif not coupon.isValid():
                     """ Coupon currently invalid/expire -> Set notification flag """
                     userCouponFavorite["notify"] = True
                     userExpectsNotification = True
@@ -1177,7 +1150,7 @@ class BKCrawler:
         newCachedAvailableCouponCategories = {}
         for couponID in couponDB:
             coupon = Coupon.load(couponDB, couponID)
-            if couponDBIsValid(coupon):
+            if coupon.isValid():
                 category = newCachedAvailableCouponCategories.setdefault(coupon.source, CouponCategory(couponSrc=coupon.source))
                 category.setNumberofCouponsTotal(category.numberofCouponsTotal + 1)
                 if coupon.isHidden:
@@ -1221,7 +1194,7 @@ class BKCrawler:
         namesDupeMap = {}
         for uniqueCouponID in couponDB:
             coupon = Coupon.load(couponDB, uniqueCouponID)
-            if filters.activeOnly and not couponDBIsValid(coupon):
+            if filters.activeOnly and not coupon.isValid():
                 # Skip expired coupons if needed
                 continue
             elif filters.allowedCouponSources is not None and coupon.source not in filters.allowedCouponSources:
@@ -1327,7 +1300,7 @@ class BKCrawler:
         unavailableFavoriteCoupons = []
         for uniqueCouponID, coupon in user.favoriteCoupons.items():
             couponFromProductiveDB = coupons.get(uniqueCouponID)
-            if couponFromProductiveDB is not None and isValidBotCoupon(couponFromProductiveDB):
+            if couponFromProductiveDB is not None and couponFromProductiveDB.isValid():
                 availableFavoriteCoupons.append(couponFromProductiveDB)
             else:
                 # User chosen favorite coupon has expired or is not in DB
