@@ -94,8 +94,10 @@ def couponDBIsValid(coupon: Coupon) -> bool:
     if expireDatetime is None:
         # Coupon without expire-date = invalid --> Should never happen
         return False
+    elif expireDatetime > getCurrentDate():
+        return True
     else:
-        return expireDatetime > getCurrentDate()
+        return False
 
 
 def couponDBGetExpireDateFormatted(coupon: Coupon, fallback=None) -> Union[str, None]:
