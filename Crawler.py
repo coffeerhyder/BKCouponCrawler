@@ -641,7 +641,7 @@ class BKCrawler:
         if len(pluCharMap) == 0:
             logging.info("Failed to find any paper coupon candidates")
         else:
-            # More logging
+            # Logging
             couponCharsLogtext = ''
             for paperPLUChar, coupons in pluCharMap.items():
                 if len(couponCharsLogtext) > 0:
