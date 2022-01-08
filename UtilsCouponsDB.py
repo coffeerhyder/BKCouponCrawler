@@ -13,7 +13,7 @@ from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS
 class Coupon(Document):
 
     def isValid(self):
-        expireDatetime = couponDBGetExpireDatetime(self)
+        expireDatetime = self.getExpireDatetime()
         if expireDatetime is None:
             # Coupon without expire-date = invalid --> Should never happen
             return False
@@ -28,6 +28,54 @@ class Coupon(Document):
             return True
         else:
             return False
+
+    def getExpireDatetime(self) -> Union[datetime, None]:
+        # First check for artificial expire-date which is usually shorter than the other date - prefer that!
+        if self.timestampExpire2 is not None:
+            return datetime.fromtimestamp(self.timestampExpire2, getTimezone())
+        elif self.timestampExpire is not None:
+            return datetime.fromtimestamp(self.timestampExpire, getTimezone())
+        else:
+            # This should never happen
+            logging.warning("Found coupon without expiredate: " + self.id)
+            return None
+
+    def getExpireDateFormatted(self, fallback=None) -> Union[str, None]:
+        if self.dateFormattedExpire2 is not None:
+            return self.dateFormattedExpire2
+        elif self.dateFormattedExpire is not None:
+            return self.dateFormattedExpire
+        else:
+            return fallback
+
+    def getUniqueIdentifier(self) -> str:
+        """ Returns an unique identifier String which can be used to compare coupon objects. """
+        expiredateStr = self.getExpireDateFormatted(fallback='undefined')
+        return self.id + '_' + ("undefined" if self.plu is None else self.plu) + '_' + expiredateStr + '_' + self.imageURL
+
+    def getComparableValue(self) -> str:
+        """ Returns value which can be used to compare given coupon object to another one.
+         This might be useful in the future to e.g. find coupons that contain exactly the same products and cost the same price as others.
+          Do NOT use this to compare multiple Coupon objects! Use couponDBGetUniqueIdentifier instead!
+          """
+        return self.title.lower() + str(self.price)
+
+    def getImagePath(self) -> str:
+        if self.imageURL.startswith('file://'):
+            # Image should be present in local storage: Use pre-given path
+            return self.imageURL.replace('file://', '')
+        else:
+            return getImageBasePath() + "/" + self.id + "_" + getFilenameFromURL(self.imageURL)
+
+    def getImagePathQR(self) -> str:
+        return getImageBasePath() + "/" + self.id + "_QR.png"
+
+    def getImageQR(self):
+        path = self.getImagePathQR()
+        if os.path.exists(path):
+            return open(path, mode='rb')
+        else:
+            return None
 
     plu = TextField()
     uniqueID = TextField()
@@ -92,18 +140,7 @@ class CouponSortMode(Enum):
     SOURCE_MENU_PRICE = 2
 
 
-def couponDBGetExpireDatetime(coupon: Coupon) -> Union[datetime, None]:
-    """ First check for artificial expire-date which is usually shorter than the other date - prefer that! """
-    if coupon.timestampExpire2 is not None:
-        return datetime.fromtimestamp(coupon.timestampExpire2, getTimezone())
-    elif coupon.timestampExpire is not None:
-        return datetime.fromtimestamp(coupon.timestampExpire, getTimezone())
-    else:
-        # This should never happen
-        logging.warning("Found coupon without expiredate: " + coupon.id)
-        return None
-
-
+# Deprecated
 def couponDBGetExpireDateFormatted(coupon: Coupon, fallback=None) -> Union[str, None]:
     if coupon.dateFormattedExpire2 is not None:
         return coupon.dateFormattedExpire2
@@ -113,34 +150,8 @@ def couponDBGetExpireDateFormatted(coupon: Coupon, fallback=None) -> Union[str, 
         return fallback
 
 
-def couponDBGetImageQR(coupon: Coupon):
-    path = couponDBGetImagePathQR(coupon)
-    if os.path.exists(path):
-        return open(path, mode='rb')
-    else:
-        return None
-
-
 def getImageBasePath() -> str:
     return "crawler/images/couponsproductive"
-
-
-def couponDBGetImagePathQR(coupon: Coupon) -> str:
-    return getImageBasePath() + "/" + coupon.id + "_QR.png"
-
-
-def couponDBGetImagePath(coupon: Coupon) -> str:
-    if coupon.imageURL.startswith('file://'):
-        # Image should be present in local storage: Use pre-given path
-        return coupon.imageURL.replace('file://', '')
-    else:
-        return getImageBasePath() + "/" + coupon.id + "_" + getFilenameFromURL(coupon.imageURL)
-
-
-def couponDBGetUniqueIdentifier(coupon: Coupon) -> str:
-    """ Returns an unique identifier String which can be used to compare coupon objects. """
-    expiredateStr = couponDBGetExpireDateFormatted(coupon, 'undefined')
-    return coupon.id + '_' + ("undefined" if coupon.plu is None else coupon.plu) + '_' + expiredateStr + '_' + coupon.imageURL
 
 
 def couponDBGetPLUOrUniqueID(coupon: Coupon) -> str:
@@ -149,14 +160,6 @@ def couponDBGetPLUOrUniqueID(coupon: Coupon) -> str:
         return coupon.plu
     else:
         return coupon.id
-
-
-def couponDBGetComparableValue(coupon: Coupon) -> str:
-    """ Returns value which can be used to compare given coupon object to another one.
-     This might be useful in the future to e.g. find coupons that contain exactly the same products as others.
-      Do NOT use this to compare multiple coupon datasets! Use couponDBGetUniqueIdentifier instead!
-      """
-    return coupon.title.lower() + str(coupon.price)
 
 
 def couponDBGetPriceFormatted(coupon: Coupon, fallback=None) -> Union[str, None]:

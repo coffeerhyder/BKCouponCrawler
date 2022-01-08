@@ -67,7 +67,7 @@ def main():
                     number = 48
                 mapping[couponIDStr] = paperIdentifier + str(number)
                 number += 1
-        print('Mapping result = ' + str(mapping))
+        # print('Mapping result = ' + str(mapping))
 
         # Finally update our config
         paperCouponConfig.setdefault(paperIdentifier, {})['mapping'] = mapping

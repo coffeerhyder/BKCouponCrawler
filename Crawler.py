@@ -20,9 +20,8 @@ from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponIsValid, couponGetStartTimestamp
-from UtilsCouponsDB import couponDBGetComparableValue, \
-    couponDBGetExpireDateFormatted, couponDBGetPriceFormatted, couponDBGetImagePathQR, getImageBasePath, \
-    couponDBGetImagePath, Coupon, User, InfoEntry, CouponSortMode
+from UtilsCouponsDB import couponDBGetPriceFormatted, getImageBasePath, \
+    Coupon, User, InfoEntry, CouponSortMode
 from CouponCategory import CouponSource, BotAllowedCouponSources, CouponCategory
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -157,7 +156,7 @@ class BKCrawler:
             coupon = Coupon.load(couponDB, uniqueCouponID)
             if downloadCouponImageIfNonExistant(coupon):
                 numberofDownloadedImages += 1
-            generateQRImageIfNonExistant(uniqueCouponID, couponDBGetImagePathQR(coupon))
+            generateQRImageIfNonExistant(uniqueCouponID, coupon.getImagePathQR())
         if numberofDownloadedImages > 0:
             logging.info("Number of coupon images downloaded: " + str(numberofDownloadedImages))
             logging.info("Download image files duration: " + getFormattedPassedTime(timestampStart))
@@ -368,7 +367,7 @@ class BKCrawler:
                 if 'mobileOrdering' in properties or 'paperCoupons' in properties:
                     storeIDs.append(store['id'])
         if len(storeIDs) == 0 or len(storeIDs) > 100:
-            # 2021-07-22: TODO: Workaround! Either the "mobileOrdering" property is not present anymore at night or we need to find a new way to detect stores with available additional online coupon DB...
+            # 2021-07-22: Workaround
             logging.warning("Using store-crawler workaround/fallback!")
             storeIDs = [682, 4108, 514]
         if len(storeIDs) == 0:
@@ -381,11 +380,13 @@ class BKCrawler:
         paperCouponConfig = PaperCouponHelper.getActivePaperCouponInfo2()
         paperCouponMappings = {}
         # Put all mappings into one dict
-        for pluChar, charInfo in paperCouponConfig.items():
-            mappingTmp = charInfo.get('mapping')
+        for pluIdentifier, paperData in paperCouponConfig.items():
+            mappingTmp = paperData.get('mapping')
             if mappingTmp is not None:
-                for uniqueID, plu in mappingTmp.items():
-                    paperCouponMappings[uniqueID] = plu
+                expireTimestamp = datetime.strptime(paperData['expire_date'] + ' 23:59:59', '%Y-%m-%d %H:%M:%S').astimezone(getTimezone()).timestamp()
+                for uniquePaperCouponID, plu in mappingTmp.items():
+                    paperCouponMappings[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, source=CouponSource.PAPER, plu=plu, timestampExpire2=expireTimestamp,
+                                                                      dateFormattedExpire2=formatDateGerman(datetime.fromtimestamp(expireTimestamp)))
         # Collect all app coupon chars e.g. "Z13" -> "Z"
         dbAllPLUsList = set()
         appCouponCharList = set()
@@ -400,15 +401,14 @@ class BKCrawler:
         numberofUpdatedCoupons = 0
         # Contains the original unmodified DB data
         allProducts = {}
-        allCoupons = {}
         allCouponIDs = []
         # Contains our own created coupon data dicts
         coupons2LeftToProcess = {}
-        # List of all DB items we will later change via a single DB request
-        dbUpdates = []
+        usedMappingToFindPaperCoupons = False
+        # List of all app coupons for which we found additional information that we push to DB later via single request
+        dbUpdatesAppCoupons = []
         # The more stores we crawl coupons from the longer it takes -> Limit that (set this to -1 to crawl all stores that are providing coupons). This can take a lot of time so without threading we won't be able to crawl all coupons from all stores for our bot (TG channel)!
         maxNumberofStoresToCrawlCouponsFrom = 2
-        usedMappingToFindPaperCoupons = False
         for storeIndex in range(len(storeIDs)):
             storeID = storeIDs[storeIndex]
             # This is for logging purposes only so that our log output is easier to read and we know roughly when this loop will be finished.
@@ -453,280 +453,271 @@ class BKCrawler:
                     logging.debug("Found swapped plu/uniqueID: " + plu + " / " + uniqueCouponID)
                     newplu = uniqueCouponID
                     uniqueCouponID = plu
-                    coupon['store_promo_code'] = newplu
+                    plu = newplu
                 elif not uniqueCouponID.isdecimal():
                     # This should never ever happen!
                     logging.warning("WTF uniqueCouponID has unexpected format")
                     continue
-                elif uniqueCouponID.isdecimal() and plu.isdecimal() and uniqueCouponID == plu and uniqueCouponID in paperCouponMappings:
-                    newplu = paperCouponMappings[uniqueCouponID]
-                    logging.debug('Found paper coupon correction: ' + plu + ' --> ' + newplu)
-                    coupon['store_promo_code'] = newplu
+                paperCouponOverride = paperCouponMappings.get(uniqueCouponID)
+                if uniqueCouponID.isdecimal() and uniqueCouponID == plu and paperCouponOverride is not None:
+                    logging.debug('Found paper coupon correction: ' + plu + ' --> ' + paperCouponOverride.plu)
+                    plu = paperCouponOverride.plu
                     usedMappingToFindPaperCoupons = True
-                if uniqueCouponID not in allCoupons:
-                    allCoupons[uniqueCouponID] = coupon
-                    allCouponIDs.append(uniqueCouponID)
-                    numberofNewCouponsInCurrentStore += 1
-            logging.info("Found coupons2 so far: " + str(len(allCoupons)))
+                title = product['name']
+                price = product['price']
+                image_url = product['image_url']
+                startDate = coupon2GetDatetimeFromString(coupon['start_date'])
+                expirationDate = coupon2GetDatetimeFromString(coupon['expiration_date'])
+                # Fix- and sanitize title: Again BK has a very 'dirty' DB!
+                title = coupon2FixProductTitle(title)
+                # Try to find a meaningful compare price (the hard way...)
+                priceCompare = -1
+                if 'combo_groups' in product:
+                    combo_groups = product['combo_groups']
+                    containsUnsupportedGroup = False
+                    """ "50%" coupons will contain dummy products that have a price of 0 -> We cannot easily find a compare price! """
+                    containsUnidentifiedDummyProducts = False
+                    containsUnidentifiedZeroPriceProducts = False
+                    for combo_group in combo_groups:
+                        comboGroupType = combo_group['type']
+                        if comboGroupType != 'entrees':
+                            containsUnsupportedGroup = True
+                            continue
+                        product_ids = combo_group['product_ids']
+                        containedProductsDebug = []
+                        namesToPricesTmp = {}
+                        unidentifiedDummyProductNamesWithoutPrices = {}
+                        for product_idTmp in product_ids:
+                            productTmp = allProducts.get(str(product_idTmp))
+                            pruductNameTmp = coupon2FixProductTitle(productTmp['name'])
+                            containedProductsDebug.append(str(productTmp['id']) + " -> " + pruductNameTmp)
+                            """ Find products ending with "STEPX" - usually "STEP2" and in some rare cases "STEP3" """
+                            dummyProductNameRegex = re.compile('(?i)(.*?)\\s*step\\s?[23]\\s*').search(pruductNameTmp)
+                            if dummyProductNameRegex and productTmp['price'] == 0:
+                                """ Dummy product """
+                                unidentifiedDummyProductNamesWithoutPrices[dummyProductNameRegex.group(1).lower()] = {
+                                    "id": productTmp['id'],
+                                    "fullname": pruductNameTmp
+                                }
+                            elif productTmp['price'] == 0:
+                                """ Zero price product """
+                                # print("WTF zero price product in: " + uniqueCouponID)
+                                containsUnidentifiedZeroPriceProducts = True
+                            else:
+                                """ "Real" product with real price """
+                                priceCompare += productTmp['price']
+                            namesToPricesTmp[pruductNameTmp.lower()] = productTmp['price']
+                        # Now try to find all missing prices
+                        identifiedAllDummyProductsPrices = True
+                        for unidentifiedDummyProductName in unidentifiedDummyProductNamesWithoutPrices:
+                            realPriceOfDummyProduct = namesToPricesTmp.get(unidentifiedDummyProductName)
+                            if realPriceOfDummyProduct is None:
+                                identifiedAllDummyProductsPrices = False
+                            else:
+                                priceCompare += realPriceOfDummyProduct
+                        if not identifiedAllDummyProductsPrices:
+                            # print("Coupon contains unidentified step2 products: " + uniqueCouponID + " --> ProductID: " + str(productID) + " --> " + str(unidentifiedDummyProductNamesWithoutPrices))
+                            # print('Contained products: ' + str(containedProductsDebug))
+                            pass
+                    if not containsUnsupportedGroup and not containsUnidentifiedDummyProducts and not containsUnidentifiedZeroPriceProducts and priceCompare > price:
+                        # print("Found compare price: " + plu + '\t' + uniqueCouponID + '\t' + title + '\t' + str(price / 100) + '\t' + str(priceCompare / 100))
+                        pass
+                    else:
+                        """ Invalidate whatever we've found there as we cannot trust that value! """
+                        priceCompare = -1
+                # Check if this coupon exists/existed in app -> Update information as other BK endpoints may serve more info than their official app endpoint!
+                existantCoupon = Coupon.load(couponDB, uniqueCouponID)
+                if existantCoupon is not None and existantCoupon.isValid() and existantCoupon.source == CouponSource.APP:
+                    # Update existing app coupon with new information.
+                    if existantCoupon.price is None:
+                        # 201-07-06: Only update current price if we failed to find it before as entrys of this APIs can sometimes be wrong (e.g. for 32749: 4,99€ according to this API but 9,89€ according to API)
+                        existantCoupon.price = price
+                    elif price != existantCoupon.price:
+                        # Rare case
+                        logging.warning("Detected API price difference for coupon " + existantCoupon.id + " | App: " + str(existantCoupon.price) + " | API2: " + str(price))
+                    if priceCompare > 0:
+                        existantCoupon.priceCompare = priceCompare
+                    # Add additional expire date data
+                    existantCoupon.timestampExpire = expirationDate.timestamp()
+                    existantCoupon.dateFormattedExpire = formatDateGerman(expirationDate)
+                    dbUpdatesAppCoupons.append(existantCoupon)
+                else:
+                    # Add/Update non-App coupons
+                    # logging.info("Possible paper coupon: " + plu + '\t' + uniqueCouponID + '\t' + title + '\t' + str(price / 100))
+                    newCoupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=plu, title=title, titleShortened=shortenProductNames(title),
+                                       timestampStart=expirationDate.timestamp(), timestampExpire=expirationDate.timestamp(),
+                                       dateFormattedStart=formatDateGerman(startDate), dateFormattedExpire=formatDateGerman(expirationDate),
+                                       price=price, containsFriesOrCoke=couponTitleContainsFriesOrCoke(title))
+                    if priceCompare > 0:
+                        newCoupon.priceCompare = priceCompare
+                    # Now determine coupon type
+                    if len(plu) == 0:
+                        # "Secret" coupon -> Only online orderable 'type 1'
+                        newCoupon.source = CouponSource.ONLINE_ONLY
+                    elif paperCouponOverride is not None:
+                        newCoupon.source = CouponSource.PAPER
+                        newCoupon.timestampExpire2 = paperCouponOverride.timestampExpire2
+                        newCoupon.dateFormattedExpire2 = paperCouponOverride.dateFormattedExpire2
+                    elif plu.isdecimal():
+                        # "Secret" coupon -> Only online orderable 'type 2'
+                        newCoupon.source = CouponSource.ONLINE_ONLY
+                    elif plu[0] in appCouponCharList:
+                        newCoupon.source = CouponSource.APP_SAME_CHAR_AS_CURRENT_APP_COUPONS
+                    else:
+                        # Assumed "unsafe paper coupon" --> This may be changed later on!
+                        newCoupon.source = CouponSource.PAPER_UNSAFE
+                    newCoupon.imageURL = image_url
+                    if uniqueCouponID not in coupons2LeftToProcess:
+                        coupons2LeftToProcess[uniqueCouponID] = newCoupon
+                        allCouponIDs.append(uniqueCouponID)
+                        numberofNewCouponsInCurrentStore += 1
+            logging.info("Found coupons2 so far: " + str(len(coupons2LeftToProcess)))
             if numberofNewCouponsInCurrentStore > 0:
                 logging.info("Number of new coupon IDs in current store: " + str(numberofNewCouponsInCurrentStore))
             if storeIndex + 1 >= maxNumberofStoresToCrawlCouponsFrom:
                 logging.info("Stopping store coupon crawling because reached store limit of: " + str(maxNumberofStoresToCrawlCouponsFrom))
                 break
-        for coupon in allCoupons.values():
-            """ First collect all data we need """
-            productID = coupon['product_id']
-            uniqueCouponID = coupon['promo_code']
-            plu = coupon['store_promo_code']
-            """ Find the product which belongs to this coupon (basically a dataset containing more details). """
-            product = allProducts.get(str(productID))
-            title = product['name']
-            price = product['price']
-            image_url = product['image_url']
-            startDate = coupon2GetDatetimeFromString(coupon['start_date'])
-            expirationDate = coupon2GetDatetimeFromString(coupon['expiration_date'])
-            # Fix- and sanitize title: Again BK has a very 'dirty' DB!
-            title = coupon2FixProductTitle(title)
-            # Try to find a meaningful compare price (the hard way...)
-            priceCompare = -1
-            if 'combo_groups' in product:
-                combo_groups = product['combo_groups']
-                containsUnsupportedGroup = False
-                """ "50%" coupons will contain dummy products that have a price of 0 -> We cannot easily find a compare price! """
-                containsUnidentifiedDummyProducts = False
-                containsUnidentifiedZeroPriceProducts = False
-                for combo_group in combo_groups:
-                    comboGroupType = combo_group['type']
-                    if comboGroupType != 'entrees':
-                        containsUnsupportedGroup = True
-                        continue
-                    product_ids = combo_group['product_ids']
-                    containedProductsDebug = []
-                    namesToPricesTmp = {}
-                    unidentifiedDummyProductNamesWithoutPrices = {}
-                    for product_idTmp in product_ids:
-                        productTmp = allProducts.get(str(product_idTmp))
-                        pruductNameTmp = coupon2FixProductTitle(productTmp['name'])
-                        containedProductsDebug.append(str(productTmp['id']) + " -> " + pruductNameTmp)
-                        """ Find products ending with "STEPX" - usually "STEP2" and in some rare cases "STEP3" """
-                        dummyProductNameRegex = re.compile('(?i)(.*?)\\s*step\\s?[23]\\s*').search(pruductNameTmp)
-                        if dummyProductNameRegex and productTmp['price'] == 0:
-                            """ Dummy product """
-                            unidentifiedDummyProductNamesWithoutPrices[dummyProductNameRegex.group(1).lower()] = {
-                                "id": productTmp['id'],
-                                "fullname": pruductNameTmp
-                            }
-                        elif productTmp['price'] == 0:
-                            """ Zero price product """
-                            # print("WTF zero price product in: " + uniqueCouponID)
-                            containsUnidentifiedZeroPriceProducts = True
-                        else:
-                            """ "Real" product with real price """
-                            priceCompare += productTmp['price']
-                        namesToPricesTmp[pruductNameTmp.lower()] = productTmp['price']
-                    # Now try to find all missing prices
-                    identifiedAllDummyProductsPrices = True
-                    for unidentifiedDummyProductName in unidentifiedDummyProductNamesWithoutPrices:
-                        realPriceOfDummyProduct = namesToPricesTmp.get(unidentifiedDummyProductName)
-                        if realPriceOfDummyProduct is None:
-                            identifiedAllDummyProductsPrices = False
-                        else:
-                            priceCompare += realPriceOfDummyProduct
-                    if not identifiedAllDummyProductsPrices:
-                        # print("Coupon contains unidentified step2 products: " + uniqueCouponID + " --> ProductID: " + str(productID) + " --> " + str(unidentifiedDummyProductNamesWithoutPrices))
-                        # print('Contained products: ' + str(containedProductsDebug))
-                        pass
-                if not containsUnsupportedGroup and not containsUnidentifiedDummyProducts and not containsUnidentifiedZeroPriceProducts and priceCompare > price:
-                    # print("Found compare price: " + plu + '\t' + uniqueCouponID + '\t' + title + '\t' + str(price / 100) + '\t' + str(priceCompare / 100))
-                    pass
-                else:
-                    """ Invalidate whatever we've found there as we cannot trust that value! """
-                    priceCompare = -1
-            # Check if this coupon exists/existed in app -> Update information as other BK endpoints may serve more info than their official app endpoint!
-            existantCoupon = Coupon.load(couponDB, uniqueCouponID)
-            if existantCoupon is not None and existantCoupon.isValid() and existantCoupon.source == CouponSource.APP:
-                # Update existing app coupon with new information.
-                if existantCoupon.price is None:
-                    # 201-07-06: Only update current price if we failed to find it before as entrys of this APIs can sometimes be wrong (e.g. for 32749: 4,99€ according to this API but 9,89€ according to API)
-                    existantCoupon.price = price
-                elif price != existantCoupon.price:
-                    # Rare case
-                    logging.warning("Detected API price difference for coupon " + existantCoupon.id + " | App: " + str(existantCoupon.price) + " | API2: " + str(price))
-                if priceCompare > 0:
-                    existantCoupon.priceCompare = priceCompare
-                # Add additional expire date data
-                existantCoupon.timestampExpire = expirationDate.timestamp()
-                existantCoupon.dateFormattedExpire = formatDateGerman(expirationDate)
-                dbUpdates.append(existantCoupon)
-            else:
-                # Add/Update non-App coupons
-                # logging.info("Possible paper coupon: " + plu + '\t' + uniqueCouponID + '\t' + title + '\t' + str(price / 100))
-                newCoupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=plu, title=title, titleShortened=shortenProductNames(title),
-                                   timestampStart=expirationDate.timestamp(), timestampExpire=expirationDate.timestamp(),
-                                   dateFormattedStart=formatDateGerman(startDate), dateFormattedExpire=formatDateGerman(expirationDate),
-                                   price=price, containsFriesOrCoke=couponTitleContainsFriesOrCoke(title))
-                if priceCompare > 0:
-                    newCoupon.priceCompare = priceCompare
-                # Now determine coupon type
-                if len(plu) == 0:
-                    # "Secret" coupon -> Only online orderable 'type 1'
-                    newCoupon.source = CouponSource.ONLINE_ONLY
-                elif plu.isdecimal():
-                    # "Secret" coupon -> Only online orderable 'type 2'
-                    newCoupon.source = CouponSource.ONLINE_ONLY
-                elif plu[0] in appCouponCharList:
-                    newCoupon.source = CouponSource.APP_SAME_CHAR_AS_CURRENT_APP_COUPONS
-                else:
-                    # Assumed "unsafe paper coupon" --> This may be changed later on!
-                    newCoupon.source = CouponSource.PAPER_UNSAFE
-                newCoupon.imageURL = image_url
-                coupons2LeftToProcess[uniqueCouponID] = newCoupon
 
-        # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
-        pluCharMap = {}
-        for uniqueCouponID, coupon in coupons2LeftToProcess.items():
-            # Make sure that we got a valid "paper PLU"
-            pluRegEx = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
-            if not pluRegEx:
-                # Skip invalid items
-                continue
-            else:
-                pluCharMap.setdefault(pluRegEx.group(1).upper(), []).append(coupon)
-        # Remove all results that cannot be paper coupoons by length
-        for pluChar, coupons in pluCharMap.copy().items():
-            if pluChar in appCouponCharList:
-                # App coupons cannot be paper coupons
-                del pluCharMap[pluChar]
-            elif len(coupons) != 46 and len(coupons) != 47:
-                loggertext = "Found paper char candidate with bad length:" + pluChar + " [" + str(len(coupons)) + "]"
-                if usedMappingToFindPaperCoupons:
-                    logging.info(loggertext + " --> ALLOW")
-                else:
-                    logging.info(loggertext + " --> REMOVE")
-                    del pluCharMap[pluChar]
-        logging.info('DB update queue so far contains ' + str(len(dbUpdates)) + ' app coupon updates based on crawl2 results')
-        """ Now do some workarounds/corrections of our results.
-         This was necessary because as of 09-2021 e.g., current paper coupons' PLUs started with letter "A" but were listed with letter "F" in the BK DB.
-         """
-        # corrections = {"F": "A"}
-        corrections = {}  # 2021-11-28: No corrections required
-        for oldChar, newChar in corrections.items():
-            if oldChar in pluCharMap and newChar in paperCouponConfig.keys():
-                logging.info("Correcting paper coupons starting with " + oldChar + " --> " + newChar)
-                if newChar in pluCharMap:
-                    # Edge case: This is very very unlikely going to happen!
-                    logging.warning("Correction failed due to possible collision: " + newChar + " already exists in our results!")
-                    continue
-                else:
-                    coupons = pluCharMap[oldChar]
-                    for coupon in coupons:
-                        coupon.plu = newChar + coupon.plu[1:]
-                    del pluCharMap[oldChar]
-                    pluCharMap[newChar] = coupons
-        # Store possible paper coupon short-PLU numbers without chars e.g. {"B": [1, 2, 3], "C": [1, 2, 3] }
-        foundPaperCouponMap = {}
-        if len(pluCharMap) == 0:
-            logging.info("Failed to find any paper coupon candidates")
-        else:
-            # Logging
-            couponCharsLogtext = ''
-            for paperPLUChar, coupons in pluCharMap.items():
-                if len(couponCharsLogtext) > 0:
-                    couponCharsLogtext += ', '
-                couponCharsLogtext += paperPLUChar + "(" + str(len(coupons)) + ")"
-            logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon char(s): " + couponCharsLogtext)
-            allowAutoDetectedPaperCoupons = False  # 2021-11-15: Added this switch as their DB is f*cked at this moment so the auto-detection found wrong coupons.
-            # Evaluate our findings
-            for paperPLUChar, paperCoupons in pluCharMap.items():
-                if paperPLUChar in paperCouponConfig.keys():
-                    # We safely detected this set of paper coupons meaning we know that all current paper coupons start with this char
-                    logging.info("Safely detected paper coupon char is: " + paperPLUChar)
-                    # Update data of these coupons and add them to DB later
-                    expireTimestamp = paperCouponConfig[paperPLUChar]['expire_timestamp']
-                    for paperCoupon in paperCoupons:
-                        paperCoupon.source = CouponSource.PAPER
-                        paperCoupon.timestampExpire2 = expireTimestamp
-                        paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(expireTimestamp))
-                else:
-                    # We assume that these coupons are paper coupons
-                    logging.info("Auto detected paper coupon char is: " + paperPLUChar)
-                    if not allowAutoDetectedPaperCoupons:
-                        logging.info("WARNING: Skipping auto detected paper coupon char: " + paperPLUChar)
-                        continue
-                    # Update data of these coupons and add them to DB later
-                    # https://www.quora.com/In-Python-what-is-the-cleanest-way-to-get-a-datetime-for-the-start-of-today
-                    today = datetime.today()  # or datetime.now to use local timezone
-                    todayDayEnd = datetime(year=today.year, month=today.month,
-                                           day=today.day, hour=23, minute=59, second=59)
-                    # Add them with fake validity of 2 days
-                    artificialExpireTimestamp = todayDayEnd.timestamp() + 2 * 24 * 60
-                    for paperCoupon in paperCoupons:
-                        paperCoupon.source = CouponSource.PAPER
-                        paperCoupon.timestampExpire2 = artificialExpireTimestamp
-                        paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
-                        paperCoupon.isUnsafeExpiredate = True
-                        paperCoupon.description = SYMBOLS.INFORMATION + "Das hier eingetragene Ablaufdatum ist vorläufig und wird zeitnah korrigiert!"
-                foundPaperCouponMap[paperPLUChar] = paperCoupons
-        if len(paperCouponConfig) > 0 and len(foundPaperCouponMap) == 0:
-            # This should never happen
-            logging.warning("Failed to find any paper coupons alhough we expect some to be there!")
+        logging.info('Pushing ' + str(len(dbUpdatesAppCoupons)) + ' app coupon updates based on crawl2 results')
+        couponDB.update(dbUpdatesAppCoupons)
 
-        """ Check for missing paper coupons based on the ones we found.
-        2021-09-29: Now we do filter by array size before so this handling is pretty much useless but let's keep it anyways.
-        """
-        logging.debug("Looking for missing paper coupons...")
-        self.missingPaperCouponsText = None
-        for paperChar, paperCoupons in foundPaperCouponMap.items():
-            # Now get a list of the numbers only and consider: paperCoupons may contain duplicates but we don't want those in paperCouponNumbersList!
-            paperCouponNumbersList = []
-            for coupon in paperCoupons:
-                couponNumber = int(coupon.plu[1:])
-                if couponNumber not in paperCouponNumbersList:
-                    paperCouponNumbersList.append(couponNumber)
-            # Sort list to easily find highest number
-            paperCouponNumbersList.sort()
-            highestPaperPLUNumber = paperCouponNumbersList[len(paperCouponNumbersList) - 1]
-            # Now collect possibly missing paper coupons
-            # Even if all "real" paper coupons are found, it may happen that the last one, usually number 47 is not found as thart is a dedicated Payback coupon
-            if highestPaperPLUNumber != len(paperCouponNumbersList):
-                missingPaperPLUs = []
-                missingPaperPLUsButPresentInDB = []
-                paybackDummyPLUNumber = 47
-                # paybackDummyPLU = paperChar + str(paybackDummyPLUNumber) --> C47
-                for numberToCheck in range(1, highestPaperPLUNumber + 1):
-                    if numberToCheck == paybackDummyPLUNumber:
-                        # Skip this
-                        continue
-                    plu = paperChar + str(numberToCheck)
-                    if numberToCheck not in paperCouponNumbersList:
-                        if plu in dbAllPLUsList:
-                            # 2021-06-10: This may happen right before paper coupons expire as BK will already remove them from their apps earlier than their real expire date...
-                            missingPaperPLUsButPresentInDB.append(plu)
-                        else:
-                            missingPaperPLUs.append(plu)
-                if len(missingPaperPLUs) > 0:
-                    logging.info("Paper coupons NOT OK: " + paperChar + " | Found items: " + str(len(paperCoupons)) + " | Possibly missing PLUs: " + str(missingPaperPLUs))
-                    for missingPaperPLU in missingPaperPLUs:
-                        if self.missingPaperCouponsText is None:
-                            self.missingPaperCouponsText = missingPaperPLU
-                        else:
-                            self.missingPaperCouponsText += ', ' + missingPaperPLU
-                # Rare case: BK has deleted the paper coupons in their API already but we still got them in our DB because they should still be valid!
-                if len(missingPaperPLUsButPresentInDB) > 0:
-                    logging.info("Paper PLUs that are present in DB but not in API: " + str(missingPaperPLUsButPresentInDB))
-            else:
-                # Looks like we found all paper coupons :)
-                logging.info("Paper coupons OK: " + paperChar + " [" + str(len(paperCoupons)) + "]")
         couponsToAddToDB = {}
+        foundPaperCoupons = []
+        self.missingPaperCouponsText = None
+        if usedMappingToFindPaperCoupons:
+            # New/current handling
+            for newCoupon in coupons2LeftToProcess.values():
+                if newCoupon.source == CouponSource.PAPER:
+                    foundPaperCoupons.append(newCoupon)
+            for mappingCoupon in paperCouponMappings.values():
+                if mappingCoupon.id not in allCouponIDs:
+                    if self.missingPaperCouponsText is None:
+                        self.missingPaperCouponsText = mappingCoupon.plu
+                    else:
+                        self.missingPaperCouponsText += ', ' + mappingCoupon.plu
+            if self.missingPaperCouponsText is not None:
+                logging.info("Missing paper coupons: " + self.missingPaperCouponsText)
+        else:
+            # Old/fallback handling
+            # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
+            pluCharMap = {}
+            for uniqueCouponID, coupon in coupons2LeftToProcess.items():
+                # Make sure that we got a valid "paper PLU"
+                pluRegEx = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
+                if pluRegEx:
+                    pluCharMap.setdefault(pluRegEx.group(1).upper(), []).append(coupon)
+            # Remove all results that cannot be paper coupoons by length
+            for pluIdentifier, coupons in pluCharMap.copy().items():
+                if pluIdentifier in appCouponCharList:
+                    # App coupons cannot be paper coupons
+                    del pluCharMap[pluIdentifier]
+                elif len(coupons) != 46 and len(coupons) != 47:
+                    loggertext = "Found paper char candidate with bad length:" + pluIdentifier + " [" + str(len(coupons)) + "] --> IGNORE"
+                    del pluCharMap[pluIdentifier]
+            """ Now do some workarounds/corrections of our results.
+             This was necessary because as of 09-2021 e.g. current paper coupons' PLUs started with letter "A" but were listed with letter "F" in the BK DB.
+             """
+            # corrections = {"F": "A"}
+            corrections = {}  # 2021-11-28: No corrections required
+            for oldChar, newChar in corrections.items():
+                if oldChar in pluCharMap and newChar in paperCouponConfig.keys():
+                    logging.info("Correcting paper coupons starting with " + oldChar + " --> " + newChar)
+                    if newChar in pluCharMap:
+                        # Edge case: This is very very unlikely going to happen!
+                        logging.warning("Correction failed due to possible collision: " + newChar + " already exists in our results!")
+                        continue
+                    else:
+                        coupons = pluCharMap[oldChar]
+                        for coupon in coupons:
+                            coupon.plu = newChar + coupon.plu[1:]
+                        del pluCharMap[oldChar]
+                        pluCharMap[newChar] = coupons
+            # Store possible paper coupon short-PLU numbers without chars e.g. {"B": [1, 2, 3], "C": [1, 2, 3] }
+            foundPaperCouponMap = {}
+            if len(pluCharMap) == 0:
+                logging.info("Failed to find any paper coupon candidates")
+            else:
+                # Logging
+                couponCharsLogtext = ''
+                for paperPLUChar, coupons in pluCharMap.items():
+                    if len(couponCharsLogtext) > 0:
+                        couponCharsLogtext += ', '
+                    couponCharsLogtext += paperPLUChar + "(" + str(len(coupons)) + " items)"
+                logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon char(s): " + couponCharsLogtext)
+                allowAutoDetectedPaperCoupons = False  # 2021-11-15: Added this switch as their DB is f*cked at this moment so the auto-detection found wrong coupons.
+                # Evaluate our findings
+                if allowAutoDetectedPaperCoupons:
+                    for paperPLUChar, paperCoupons in pluCharMap.items():
+                        # We assume that these coupons are paper coupons
+                        logging.info("Auto detected paper coupon char is: " + paperPLUChar)
+                        # Update data of these coupons and add them to DB later
+                        # https://www.quora.com/In-Python-what-is-the-cleanest-way-to-get-a-datetime-for-the-start-of-today
+                        today = datetime.today()  # or datetime.now to use local timezone
+                        todayDayEnd = datetime(year=today.year, month=today.month,
+                                               day=today.day, hour=23, minute=59, second=59)
+                        # Add them with fake validity of 2 days
+                        artificialExpireTimestamp = todayDayEnd.timestamp() + 2 * 24 * 60
+                        for paperCoupon in paperCoupons:
+                            paperCoupon.source = CouponSource.PAPER
+                            paperCoupon.timestampExpire2 = artificialExpireTimestamp
+                            paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
+                            paperCoupon.isUnsafeExpiredate = True
+                            paperCoupon.description = SYMBOLS.INFORMATION + "Das hier eingetragene Ablaufdatum ist vorläufig und wird zeitnah korrigiert!"
+                        foundPaperCouponMap[paperPLUChar] = paperCoupons
+            if len(paperCouponConfig) > 0 and len(foundPaperCouponMap) == 0:
+                # This should never happen
+                logging.warning("Failed to find any paper coupons alhough we expect some to be there!")
+
+            """ Check for missing paper coupons based on the ones we found.
+            2021-09-29: Now we do filter by array size before so this handling is pretty much useless but let's keep it anyways.
+            """
+            logging.debug("Looking for missing paper coupons...")
+            for paperChar, paperCoupons in foundPaperCouponMap.items():
+                # Now get a list of the numbers only and consider: paperCoupons may contain duplicates but we don't want those in paperCouponNumbersList!
+                paperCouponNumbersList = []
+                for coupon in paperCoupons:
+                    couponNumber = int(coupon.plu[1:])
+                    if couponNumber not in paperCouponNumbersList:
+                        paperCouponNumbersList.append(couponNumber)
+                # Sort list to easily find highest number
+                paperCouponNumbersList.sort()
+                highestPaperPLUNumber = paperCouponNumbersList[len(paperCouponNumbersList) - 1]
+                # Now collect possibly missing paper coupons
+                # Even if all "real" paper coupons are found, it may happen that the last one, usually number 47 is not found as thart is a dedicated Payback coupon
+                if highestPaperPLUNumber != len(paperCouponNumbersList):
+                    missingPaperPLUs = []
+                    paybackDummyPLUNumber = 47
+                    # paybackDummyPLU = paperChar + str(paybackDummyPLUNumber) --> C47
+                    for numberToCheck in range(1, highestPaperPLUNumber + 1):
+                        if numberToCheck == paybackDummyPLUNumber:
+                            # Skip this
+                            continue
+                        plu = paperChar + str(numberToCheck)
+                        if numberToCheck not in paperCouponNumbersList:
+                            missingPaperPLUs.append(plu)
+                    if len(missingPaperPLUs) > 0:
+                        logging.info("Paper coupons NOT OK: " + paperChar + " | Found items: " + str(len(paperCoupons)) + " | Possibly missing PLUs: " + str(missingPaperPLUs))
+                        for missingPaperPLU in missingPaperPLUs:
+                            if self.missingPaperCouponsText is None:
+                                self.missingPaperCouponsText = missingPaperPLU
+                            else:
+                                self.missingPaperCouponsText += ', ' + missingPaperPLU
+                else:
+                    # Looks like we found all paper coupons :)
+                    logging.info("Paper coupons OK: " + paperChar + " [" + str(len(paperCoupons)) + "]")
+            for paperCoupons in foundPaperCouponMap.values():
+                for paperCoupon in paperCoupons:
+                    foundPaperCoupons.append(paperCoupon)
+        logging.info('Detected ' + str(len(foundPaperCoupons)) + ' paper coupons')
         # Collect items we want to add to DB
         if self.crawlOnlyBotCompatibleCoupons:
             # Only add paper coupons to DB
-            for paperCoupons in foundPaperCouponMap.values():
-                for paperCoupon in paperCoupons:
-                    couponsToAddToDB[paperCoupon.id] = paperCoupon
+            for paperCoupon in foundPaperCoupons:
+                couponsToAddToDB[paperCoupon.id] = paperCoupon
         else:
-            # Add all detected coupons to DB
+            # Add all found coupons to DB
             couponsToAddToDB = coupons2LeftToProcess
+        dbUpdates = []
         # Now collect all resulting DB updates
         for uniqueCouponID, newCoupon in couponsToAddToDB.items():
             existantCoupon = Coupon.load(couponDB, uniqueCouponID)
@@ -734,7 +725,7 @@ class BKCrawler:
             if existantCoupon is not None:
                 # Update existing coupon
                 if hasChanged(existantCoupon, newCoupon):
-                    # Important: We need the "_rev" value to be able to couponsCompareIgnoreKeys existing documents!
+                    # Important: We need the "_rev" value to be able to update/overwrite existing documents!
                     newCoupon["_rev"] = existantCoupon.rev
                     dbUpdates.append(newCoupon)
                     numberofUpdatedCoupons += 1
@@ -742,9 +733,8 @@ class BKCrawler:
                 # Add new coupon to DB
                 numberofNewCoupons += 1
                 dbUpdates.append(newCoupon)
-        if len(dbUpdates) > 0:
-            logging.info('Pushing DB updates: ' + str(len(dbUpdates)))
-            couponDB.update(dbUpdates)
+        logging.info('Pushing ' + str(len(dbUpdates)) + ' crawl2 DB updates')
+        couponDB.update(dbUpdates)
         logging.info("Number of crawled coupons2: " + str(len(couponsToAddToDB)))
         # Update history if needed
         if self.keepHistory:
@@ -755,7 +745,7 @@ class BKCrawler:
                 self.updateHistoryEntry(dbHistoryProducts2, itemID, product)
             logging.info("Updating history DBs... 2/2: coupons2")
             dbHistoryCoupons2 = self.couchdb[DATABASES.COUPONS2_HISTORY]
-            for itemID, coupon in allCoupons.items():
+            for itemID, coupon in couponsToAddToDB.items():
                 self.updateHistoryEntry(dbHistoryCoupons2, itemID, coupon)
             logging.info("Time it took to update coupons2 history DBs: " + getFormattedPassedTime(timestampHistoryDBUpdateStart))
         # Cleanup DB: Remove all non-App coupons that do not exist in API anymore
@@ -898,11 +888,11 @@ class BKCrawler:
             # 2021-04-20: Skip invalid/expired coupons as they're not relevant for the user (we don't access them anyways at this moment).
             if coupon.source not in BotAllowedCouponSources or not coupon.isValid():
                 continue
-            imagePathCoupon = couponDBGetImagePath(coupon)
+            imagePathCoupon = coupon.getImagePath()
             if not isValidImageFile(imagePathCoupon):
                 logging.warning(couponIDStr + ": Coupon image does not exist: " + imagePathCoupon)
                 numberOfMissingImages += 1
-            imagePathQR = couponDBGetImagePathQR(coupon)
+            imagePathQR = coupon.getImagePathQR()
             if not isValidImageFile(imagePathQR):
                 logging.warning(couponIDStr + ": QR image does not exist: " + imagePathQR)
                 numberOfMissingImages += 1
@@ -1087,7 +1077,7 @@ class BKCrawler:
                                  'START': (coupon.dateFormattedStart if coupon.dateFormattedStart is not None else "N/A"),
                                  'EXP': (coupon.dateFormattedExpire if coupon.dateFormattedExpire is not None else "N/A"),
                                  'EXP2': (coupon.dateFormattedExpire2 if coupon.dateFormattedExpire2 is not None else "N/A"),
-                                 'EXP_PRODUCTIVE': couponDBGetExpireDateFormatted(coupon)
+                                 'EXP_PRODUCTIVE': coupon.getExpireDateFormatted()
                                  })
 
     def couponCsvExport2(self):
@@ -1104,7 +1094,7 @@ class BKCrawler:
                 writer.writerow({'Produkt': coupon.title, 'Menü': coupon.containsFriesOrCoke,
                                  'PLU': coupon.plu, 'PLU2': coupon.id,
                                  'Preis': coupon.price, 'OPreis': coupon.get(Coupon.priceCompare.name, -1),
-                                 'Ablaufdatum': couponDBGetExpireDateFormatted(coupon)
+                                 'Ablaufdatum': coupon.getExpireDateFormatted()
                                  })
 
     def updateUserDBNotificationFlags_DEPRECATED(self):
@@ -1203,7 +1193,7 @@ class BKCrawler:
             elif filters.containsFriesAndCoke is not None and coupon.containsFriesOrCoke != filters.containsFriesAndCoke:
                 # Skip items if they do not have the expected "containsFriesOrCoke" state
                 continue
-            elif filters.excludeCouponsByDuplicatedProductTitles and couponDBGetComparableValue(coupon) in namesDupeMap:
+            elif filters.excludeCouponsByDuplicatedProductTitles and coupon.getComparableValue() in namesDupeMap:
                 # Skip duplicates if needed
                 continue
             elif filters.isNew is not None and coupon.isNew != filters.isNew:
@@ -1213,7 +1203,7 @@ class BKCrawler:
                 continue
             else:
                 desiredCoupons[uniqueCouponID] = coupon
-                namesDupeMap[couponDBGetComparableValue(coupon)] = coupon.id
+                namesDupeMap[coupon.getComparableValue()] = coupon.id
         if filters.sortMode is None:
             return desiredCoupons
         else:
@@ -1337,7 +1327,7 @@ def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
 
 
 def downloadCouponImageIfNonExistant(coupon: Coupon) -> bool:
-    return downloadImageIfNonExistant(coupon.imageURL, couponDBGetImagePath(coupon))
+    return downloadImageIfNonExistant(coupon.imageURL, coupon.getImagePath())
 
 
 def downloadImageIfNonExistant(url: str, path: str) -> bool:

@@ -11,7 +11,7 @@ from BotUtils import getBotImpressum
 from Helper import INFO_DB, DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
 from Models import CouponFilter
 
-from UtilsCouponsDB import couponDBGetUniqueIdentifier, User, ChannelCoupon, InfoEntry, CouponSortMode, \
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, \
     generateCouponLongTextFormattedWithDescription
 from CouponCategory import BotAllowedCouponSources
 
@@ -138,7 +138,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             if coupon.isNew:
                 newCoupons[coupon.id] = coupon
             numberOfCouponsNewToThisChannel += 1
-        elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != couponDBGetUniqueIdentifier(coupon):
+        elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != coupon.getUniqueIdentifier():
             # Current/new coupon data differs from coupon we've posted in channel (same unique ID but coupon data has changed)
             updatedCoupons[coupon.id] = coupon
     # TODO: messageIDsToDelete can contain duplicates. This is not a fatal issue but we should avoid this anyways!
@@ -207,7 +207,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             if coupon.id not in channelDB:
                 channelDB[coupon.id] = {}
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
-            channelCoupon.uniqueIdentifier = couponDBGetUniqueIdentifier(coupon)
+            channelCoupon.uniqueIdentifier = coupon.getUniqueIdentifier()
             couponText = generateCouponLongTextFormattedWithDescription(coupon, highlightIfNew=True)
             photoAlbum = [InputMediaPhoto(media=bkbot.getCouponImage(coupon), caption=couponText, parse_mode='HTML'),
                           InputMediaPhoto(media=bkbot.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')

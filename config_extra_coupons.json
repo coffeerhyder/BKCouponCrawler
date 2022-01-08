@@ -24,12 +24,12 @@
     },
     {
       "uniqueID": "99110",
-	  "plu": "C47",
+	  "plu": "965",
       "title": "5Fach auf jede Bestellung",
       "source": 8,
-      "imageURL": "file://media/extra_coupons_pics/2022_01_07_PayBack_C47_99110.png",
-      "expire_date": "2022-01-07",
-      "enforce_is_new_override_until_date": "2021-12-03",
+      "imageURL": "file://media/extra_coupons_pics/2022_03_04_PayBack_965_99110.png",
+      "expire_date": "2022-03-04",
+      "enforce_is_new_override_until_date": "2022-01-10",
       "isEatable": false
     },
     {

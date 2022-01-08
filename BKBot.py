@@ -21,8 +21,8 @@ from Helper import *
 from Crawler import BKCrawler, UserFavorites
 from Models import CouponFilter
 
-from UtilsCouponsDB import couponDBGetUniqueIdentifier, couponDBGetPriceFormatted, couponDBGetImageQR, \
-    couponDBGetImagePath, couponDBGetPLUOrUniqueID, Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, generateCouponLongTextFormatted, \
+from UtilsCouponsDB import couponDBGetPriceFormatted, \
+    couponDBGetPLUOrUniqueID, Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, generateCouponLongTextFormatted, \
     generateCouponLongTextFormattedWithDescription, generateCouponShortText, generateCouponShortTextFormatted, generateCouponShortTextFormattedWithHyperlinkToChannelPost, \
     generateCouponLongTextFormattedWithHyperlinkToChannelPost, getCouponsSeparatedByType
 from CouponCategory import CouponCategory, BotAllowedCouponSources, CouponSource
@@ -299,6 +299,8 @@ class BKBot:
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = 'Hallo ' + update.effective_user.first_name + ', <b>Bock auf Fastfood?</b>'
         menuText += '\n' + getBotImpressum()
+        if self.crawler.missingPaperCouponsText is not None:
+            menuText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit in Bot/Channel fehlende Papiercoupons: ' + bkbot.crawler.missingPaperCouponsText + '</b>'
         if query is not None:
             query.edit_message_text(text=menuText, reply_markup=reply_markup, parse_mode='HTML')
         else:
@@ -704,12 +706,12 @@ class BKBot:
                                        reply_markup=replyMarkupWithoutBackButton)
         # Update coupon image cache
         if coupon.id not in self.couponImageCache:
-            self.couponImageCache[coupon.id] = {PhotoCacheVars.UNIQUE_IDENTIFIER: couponDBGetUniqueIdentifier(coupon), PhotoCacheVars.FILE_ID: msgCoupon.photo[0].file_id,
+            self.couponImageCache[coupon.id] = {PhotoCacheVars.UNIQUE_IDENTIFIER: coupon.getUniqueIdentifier(), PhotoCacheVars.FILE_ID: msgCoupon.photo[0].file_id,
                                                 PhotoCacheVars.TIMESTAMP_CREATED: datetime.now().timestamp(),
                                                 PhotoCacheVars.TIMESTAMP_LAST_USED: datetime.now().timestamp()}
-        elif self.couponImageCache[coupon.id][PhotoCacheVars.UNIQUE_IDENTIFIER] != couponDBGetUniqueIdentifier(coupon):
+        elif self.couponImageCache[coupon.id][PhotoCacheVars.UNIQUE_IDENTIFIER] != coupon.getUniqueIdentifier():
             logging.info("Refreshing coupon cache of: " + coupon.id)
-            self.couponImageCache[coupon.id] = {PhotoCacheVars.UNIQUE_IDENTIFIER: couponDBGetUniqueIdentifier(coupon), PhotoCacheVars.FILE_ID: msgCoupon.photo[0].file_id,
+            self.couponImageCache[coupon.id] = {PhotoCacheVars.UNIQUE_IDENTIFIER: coupon.getUniqueIdentifier(), PhotoCacheVars.FILE_ID: msgCoupon.photo[0].file_id,
                                                 PhotoCacheVars.TIMESTAMP_LAST_USED: datetime.now().timestamp()}
         if sendQRCode:
             self.couponImageCache[coupon.id][PhotoCacheVars.FILE_ID_QR] = msgQR.photo[0].file_id
@@ -774,8 +776,8 @@ class BKBot:
         """ Re-use Telegram file-ID if possible: https://core.telegram.org/bots/api#message
         If the PLU has changed, we cannot just re-use the old ID because the images can contain that PLU code and the PLU code in our saved image can lead to a completely different product now!
         According to the Telegram FAQ, sich file_ids can be trusted to be persistent: https://core.telegram.org/bots/faq#can-i-count-on-file-ids-to-be-persistent """
-        imagePath = couponDBGetImagePath(coupon)
-        if cachedImageData is not None and cachedImageData[PhotoCacheVars.UNIQUE_IDENTIFIER] == couponDBGetUniqueIdentifier(coupon):
+        imagePath = coupon.getImagePath()
+        if cachedImageData is not None and cachedImageData[PhotoCacheVars.UNIQUE_IDENTIFIER] == coupon.getUniqueIdentifier():
             # Re-use cached image_id and update cache timestamp
             self.couponImageCache[coupon.id][PhotoCacheVars.TIMESTAMP_LAST_USED] = datetime.now().timestamp()
             logging.debug("Returning coupon image file_id: " + cachedImageData[PhotoCacheVars.FILE_ID])
@@ -801,7 +803,7 @@ class BKBot:
         else:
             # Return image
             logging.debug("Returning QR image file")
-            return couponDBGetImageQR(coupon)
+            return coupon.getImageQR()
 
     def getOfferImage(self, offer):
         """ Returns either image URL or file or Telegram file_id of a given offer. """
