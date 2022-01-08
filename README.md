@@ -107,7 +107,7 @@ Die Wartezeit wird benötigt, damit CouchDB auf jeden Fall vor dem Start des Bot
 ID | Interne Bezeichnung | Beschreibung
 --- | --- | --- | 
 0 | APP | App Coupons
-1 | APP_VALID_AFTER_DELETION | App Coupons, die laut Ablaufdatum noch gültig sein müssten aber bereits nicht mehr per App-API zurückgegeben werden.
+1 | APP_VALID_AFTER_DELETION | App Coupons, die laut Ablaufdatum noch gültig sein müssten aber bereits nicht mehr per App-API zurückgegeben werden. **DEPRECATED!**
 2 | APP_SAME_CHAR_AS_CURRENT_APP_COUPONS | Coupons mit denselben Abfangsbuchstaben wie aktuelle App Coupons, die jedoch nicht in der App API sind -> Potentielle "Special App Coupons"
 3 | PAPER | Papiercoupons
 4 | PAPER_UNSAFE | Coupons aus der "Coupons2" API, die keinem anderen Coupon-Typen zugewiesen werden konnten.

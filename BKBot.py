@@ -21,10 +21,7 @@ from Helper import *
 from Crawler import BKCrawler, UserFavorites
 from Models import CouponFilter
 
-from UtilsCouponsDB import couponDBGetPriceFormatted, \
-    couponDBGetPLUOrUniqueID, Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, generateCouponLongTextFormatted, \
-    generateCouponLongTextFormattedWithDescription, generateCouponShortText, generateCouponShortTextFormatted, generateCouponShortTextFormattedWithHyperlinkToChannelPost, \
-    generateCouponLongTextFormattedWithHyperlinkToChannelPost, getCouponsSeparatedByType
+from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType
 from CouponCategory import CouponCategory, BotAllowedCouponSources, CouponSource
 from UtilsOffers import offerGetImagePath
 
@@ -299,8 +296,8 @@ class BKBot:
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = 'Hallo ' + update.effective_user.first_name + ', <b>Bock auf Fastfood?</b>'
         menuText += '\n' + getBotImpressum()
-        if self.crawler.missingPaperCouponsText is not None:
-            menuText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit in Bot/Channel fehlende Papiercoupons: ' + bkbot.crawler.missingPaperCouponsText + '</b>'
+        if self.crawler.cachedMissingPaperCouponsText is not None:
+            menuText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Bot fehlende Papiercoupons: ' + bkbot.crawler.cachedMissingPaperCouponsText + '</b>'
         if query is not None:
             query.edit_message_text(text=menuText, reply_markup=reply_markup, parse_mode='HTML')
         else:
@@ -441,10 +438,10 @@ class BKBot:
         while len(buttons) < maxCouponsPerPage and index < len(coupons):
             coupon = coupons[index]
             if coupon.id in user.favoriteCoupons and highlightFavorites:
-                buttonText = SYMBOLS.STAR + generateCouponShortText(coupon=coupon, highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
+                buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
                 desiredPageContainsAtLeastOneFavoriteCoupon = True
             else:
-                buttonText = generateCouponShortText(coupon=coupon, highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
+                buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
 
             buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
             index += 1
@@ -689,7 +686,7 @@ class BKBot:
         """
         favoriteKeyboard = self.getCouponFavoriteKeyboard(isFavorite, coupon.id, CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING)
         replyMarkupWithoutBackButton = InlineKeyboardMarkup([favoriteKeyboard, []])
-        couponText = generateCouponLongTextFormattedWithDescription(coupon, highlightIfNew=True)
+        couponText = coupon.generateCouponLongTextFormattedWithDescription(highlightIfNew=True)
         if additionalText is not None:
             couponText += '\n' + additionalText
         msgQR = None
@@ -753,9 +750,9 @@ class BKBot:
 
     def generateCouponShortTextWithHyperlinkToChannelPost(self, coupon: Coupon, messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
-        text = "<b>" + couponDBGetPLUOrUniqueID(coupon) + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
+        text = "<b>" + coupon.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
             messageID) + "\">" + coupon.titleShortened + "</a>"
-        priceFormatted = couponDBGetPriceFormatted(coupon)
+        priceFormatted = coupon.getPriceFormatted()
         if priceFormatted is not None:
             text += " | " + priceFormatted
         return text
@@ -893,15 +890,15 @@ class BKBot:
             if coupon.id in channelDB:
                 messageIDs = ChannelCoupon.load(channelDB, coupon.id).messageIDs
                 if len(messageIDs) > 0:
-                    couponText = generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon=coupon, highlightIfNew=False, publicChannelName=self.getPublicChannelName(), messageID=messageIDs[0])
+                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=False, publicChannelName=self.getPublicChannelName(), messageID=messageIDs[0])
                 else:
                     # This should never happen but we'll allow it to
                     logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
-                    couponText = generateCouponShortTextFormatted(coupon=coupon, highlightIfNew=False)
+                    couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=False)
             else:
                 # This should never happen but we'll allow it to anyways
                 logging.warning("Can't hyperlink coupon because it is not in channelDB: " + coupon.id)
-                couponText = generateCouponShortTextFormatted(coupon=coupon, highlightIfNew=False)
+                couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=False)
             infoText += '\n' + couponText
 
             if index == maxNewCouponsDescriptionLines - 1:
@@ -1046,23 +1043,23 @@ class BKBot:
                             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
                             if len(channelCoupon.messageIDs) > 0:
                                 if useLongCouponTitles:
-                                    couponText = generateCouponLongTextFormattedWithHyperlinkToChannelPost(coupon, self.getPublicChannelName(), channelCoupon.messageIDs[0])
+                                    couponText = coupon.generateCouponLongTextFormattedWithHyperlinkToChannelPost(self.getPublicChannelName(), channelCoupon.messageIDs[0])
                                 else:
-                                    couponText = generateCouponShortTextFormattedWithHyperlinkToChannelPost(coupon=coupon, highlightIfNew=True, publicChannelName=self.getPublicChannelName(), messageID=channelCoupon.messageIDs[0])
+                                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=True, publicChannelName=self.getPublicChannelName(), messageID=channelCoupon.messageIDs[0])
                             else:
                                 # This should never happen but we'll allow it to
                                 logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
                                 if useLongCouponTitles:
-                                    couponText = generateCouponLongTextFormatted(coupon)
+                                    couponText = coupon.generateCouponLongTextFormatted()
                                 else:
-                                    couponText = generateCouponShortTextFormatted(coupon=coupon, highlightIfNew=True)
+                                    couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=True)
                         else:
                             # This should never happen but we'll allow it to
                             logging.warning("Can't hyperlink coupon because it is not in channelDB: " + coupon.id)
                             if useLongCouponTitles:
-                                couponText = generateCouponLongTextFormatted(coupon)
+                                couponText = coupon.generateCouponLongTextFormatted()
                             else:
-                                couponText = generateCouponShortTextFormatted(coupon=coupon, highlightIfNew=True)
+                                couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=True)
 
                         couponOverviewText += '\n' + couponText
                         # Exit loop after last coupon info has been added

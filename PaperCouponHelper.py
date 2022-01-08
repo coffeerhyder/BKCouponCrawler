@@ -3,7 +3,9 @@ import os
 from datetime import datetime
 
 import BotUtils
-from Helper import saveJson, loadPaperCouponConfigFile, getTimezone
+from CouponCategory import CouponSource
+from Helper import saveJson, loadPaperCouponConfigFile, getTimezone, formatDateGerman
+from UtilsCouponsDB import Coupon
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
@@ -12,7 +14,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 
 def main():
-    activePaperCouponInfo = getActivePaperCouponInfo2()
+    activePaperCouponInfo = getActivePaperCouponInfo()
     if len(activePaperCouponInfo) == 0:
         logging.info("Failed to find any paper coupon candidates --> Cannot add additional information")
         return
@@ -82,7 +84,7 @@ if __name__ == "__main__":
     main()
 
 
-def getActivePaperCouponInfo2() -> dict:
+def getActivePaperCouponInfo() -> dict:
     paperCouponInfo = {}
     """ Load file which contains some extra data which can be useful to correctly determine the "CouponSource" and expire date of paper coupons. """
     for paperIdentifier, paperData in loadPaperCouponConfigFile().items():
@@ -93,3 +95,15 @@ def getActivePaperCouponInfo2() -> dict:
             paperCouponInfo[paperIdentifier] = newPaperData
     return paperCouponInfo
 
+
+def getCouponMappingForCrawler() -> dict:
+    paperCouponConfig = getActivePaperCouponInfo()
+    paperCouponMapping = {}
+    for pluIdentifier, paperData in paperCouponConfig.items():
+        mappingTmp = paperData.get('mapping')
+        if mappingTmp is not None:
+            expireTimestamp = paperData['expire_timestamp']
+            for uniquePaperCouponID, plu in mappingTmp.items():
+                paperCouponMapping[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, source=CouponSource.PAPER, plu=plu, timestampExpire2=expireTimestamp,
+                                                                 dateFormattedExpire2=formatDateGerman(datetime.fromtimestamp(expireTimestamp)))
+    return paperCouponMapping

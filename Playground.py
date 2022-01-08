@@ -15,10 +15,8 @@
 from furl import furl, urllib
 from urllib.parse import urlparse, parse_qs
 
-from CouponCategory import BotAllowedCouponSources, CouponSource
 from Crawler import BKCrawler
-from Models import CouponFilter
-from UtilsCouponsDB import Coupon, ChannelCoupon, InfoEntry, CouponSortMode
+from UtilsCouponsDB import Coupon, ChannelCoupon, InfoEntry
 
 url = "?action=displaycoupons&which=favorites&page=3"
 o = urlparse(url)
