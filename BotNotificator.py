@@ -11,8 +11,7 @@ from BotUtils import getBotImpressum
 from Helper import INFO_DB, DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
 from Models import CouponFilter
 
-from UtilsCouponsDB import couponDBGetUniqueIdentifier, User, ChannelCoupon, InfoEntry, CouponSortMode, \
-    generateCouponLongTextFormattedWithDescription
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode
 from CouponCategory import BotAllowedCouponSources
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
@@ -138,7 +137,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             if coupon.isNew:
                 newCoupons[coupon.id] = coupon
             numberOfCouponsNewToThisChannel += 1
-        elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != couponDBGetUniqueIdentifier(coupon):
+        elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != coupon.getUniqueIdentifier():
             # Current/new coupon data differs from coupon we've posted in channel (same unique ID but coupon data has changed)
             updatedCoupons[coupon.id] = coupon
     # TODO: messageIDsToDelete can contain duplicates. This is not a fatal issue but we should avoid this anyways!
@@ -207,8 +206,8 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             if coupon.id not in channelDB:
                 channelDB[coupon.id] = {}
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
-            channelCoupon.uniqueIdentifier = couponDBGetUniqueIdentifier(coupon)
-            couponText = generateCouponLongTextFormattedWithDescription(coupon, highlightIfNew=True)
+            channelCoupon.uniqueIdentifier = coupon.getUniqueIdentifier()
+            couponText = coupon.generateCouponLongTextFormattedWithDescription(highlightIfNew=True)
             photoAlbum = [InputMediaPhoto(media=bkbot.getCouponImage(coupon), caption=couponText, parse_mode='HTML'),
                           InputMediaPhoto(media=bkbot.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
                           ]
@@ -248,8 +247,8 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
         if DEBUGNOTIFICATOR:
             infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!! ' + SYMBOLS.WARNING + '</b>'
-        if bkbot.crawler.missingPaperCouponsText is not None:
-            infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit in Bot/Channel fehlende Papiercoupons: ' + bkbot.crawler.missingPaperCouponsText + '</b>'
+        if bkbot.crawler.cachedMissingPaperCouponsText is not None:
+            infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + bkbot.crawler.cachedMissingPaperCouponsText + '</b>'
         infoText += '\n<b>------</b>'
         infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
         infoText += "\nStören dich die Benachrichtigungen?"

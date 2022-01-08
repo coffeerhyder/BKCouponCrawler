@@ -68,17 +68,16 @@ Gäbe es derzeit z.B. Papiercoupons mit dem Buchstaben ``B`` und Ablaufdatum  ``
 }
 }   
 ```  
-2. Datei `paper_coupon_helper_ids.txt` erstellen und mit allen IDs der Papiercoupons (in korrekter Reihenfolge also 1-47 bzw. 1-48) befüllen z.B.:  
+2. Datei `paper_coupon_data/paper_coupon_helper_ids_NOCHAR.txt` erstellen und mit allen IDs der Papiercoupons befüllen z.B.:  
 ```
-21007
-23007
-22063
+31734:906
+23236:909
+11394:910
 ```
-3. `PaperCouponHelper.py` einmalig ausführen **oder** Bot/Crawler neustarten.  Dies wird die `config_paper_coupons.json` aktualisieren und die neuen Papiercoupons einbinden.
-Derzeit lassen sich über diesen Weg nur Coupons eines einzigen aktiven Buchstabens hinzufügen!
+3. Bot einmalig mit dem `crawl` Parameter starten.
 
 ## config_extra_coupons.json: Optionale Config zum manuellen Hinzufügen von Coupons, die in keiner der Schnittstellen zu finden sind
-Die ``config_extra_coupons.json`` ist nützlich, um manuell Coupons hinzuzufügen, die in keiner der BK Datenbanken enthalten sind z.B. [solche](https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058).
+Die `config_extra_coupons.json` ist nützlich, um manuell Coupons hinzuzufügen, die in keiner der BK Datenbanken enthalten sind z.B. [solche](https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058).
 Beispiel:  
 Siehe `config_extra_coupons.json`
 
@@ -107,7 +106,7 @@ Die Wartezeit wird benötigt, damit CouchDB auf jeden Fall vor dem Start des Bot
 ID | Interne Bezeichnung | Beschreibung
 --- | --- | --- | 
 0 | APP | App Coupons
-1 | APP_VALID_AFTER_DELETION | App Coupons, die laut Ablaufdatum noch gültig sein müssten aber bereits nicht mehr per App-API zurückgegeben werden.
+1 | APP_VALID_AFTER_DELETION | App Coupons, die laut Ablaufdatum noch gültig sein müssten aber bereits nicht mehr per App-API zurückgegeben werden. **DEPRECATED!**
 2 | APP_SAME_CHAR_AS_CURRENT_APP_COUPONS | Coupons mit denselben Abfangsbuchstaben wie aktuelle App Coupons, die jedoch nicht in der App API sind -> Potentielle "Special App Coupons"
 3 | PAPER | Papiercoupons
 4 | PAPER_UNSAFE | Coupons aus der "Coupons2" API, die keinem anderen Coupon-Typen zugewiesen werden konnten.
