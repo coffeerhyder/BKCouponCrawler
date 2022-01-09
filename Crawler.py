@@ -15,13 +15,12 @@ import PaperCouponHelper
 from BotUtils import Config
 from Helper import *
 from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, isCouponShortPLUWithAtLeastOneLetter, isValidImageFile
-from Models import CouponFilter
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponIsValid, couponGetStartTimestamp
 from UtilsCouponsDB import getImageBasePath, \
-    Coupon, User, InfoEntry, CouponSortMode
+    Coupon, User, InfoEntry, CouponSortMode, sortCouponsByPrice, CouponFilter
 from CouponCategory import CouponSource, BotAllowedCouponSources, CouponCategory
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -29,32 +28,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 HEADERS = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
 """ Enable this to crawl from localhost instead of API. Useful if there is a lot of testing to do! """
 DEBUGCRAWLER = False
-
-
-class UserFavorites:
-    """ Small helper class """
-
-    def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None, favoritesUnavailable: Union[List[Coupon], None] = None):
-        # Do not allow null values when arrays are expected. This makes it easier to work with this.
-        if favoritesAvailable is None:
-            favoritesAvailable = []
-        if favoritesUnavailable is None:
-            favoritesUnavailable = []
-        self.couponsAvailable = favoritesAvailable
-        self.couponsUnavailable = favoritesUnavailable
-
-    def getUnavailableFavoritesText(self) -> Union[str, None]:
-        if len(self.couponsUnavailable) == 0:
-            return None
-        else:
-            unavailableFavoritesText = ''
-            for coupon in self.couponsUnavailable:
-                if len(unavailableFavoritesText) > 0:
-                    unavailableFavoritesText += '\n'
-                unavailableFavoritesText += coupon.id + ' | ' + coupon.titleShortened
-                if coupon.price is not None:
-                    unavailableFavoritesText += ' | ' + coupon.getPriceFormatted()
-            return unavailableFavoritesText
 
 
 class BKCrawler:
@@ -378,7 +351,7 @@ class BKCrawler:
         logging.info("Found " + str(len(storeIDs)) + " stores to crawl coupons from")
         logging.info("Crawling coupons2...")
         usedMappingToFindPaperCoupons = False
-        paperCouponMapping = PaperCouponHelper.getCouponMappingForCrawler()
+        paperCouponMapping = getCouponMappingForCrawler()
         # Collect all app coupon chars e.g. "Z13" -> "Z"
         dbAllPLUsList = set()
         appCouponCharList = set()
@@ -773,16 +746,10 @@ class BKCrawler:
             coupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(coupon.title)
             expiredateStr = extraCouponJson["expire_date"] + " 23:59:59"
             expiredate = datetime.strptime(expiredateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
-            # Only add active coupons if it is valid
-            if expiredate.timestamp() > datetime.now().timestamp():
-                coupon.timestampExpire2 = expiredate.timestamp()
-                coupon.dateFormattedExpire2 = formatDateGerman(expiredate)
-                enforceIsNewOverrideUntilDateStr = extraCouponJson.get('enforce_is_new_override_until_date')
-                if enforceIsNewOverrideUntilDateStr is not None:
-                    enforceIsNewOverrideUntilDateStr += " 23:59:59"
-                    enforceIsNewOverrideUntilDate = datetime.strptime(enforceIsNewOverrideUntilDateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
-                    if enforceIsNewOverrideUntilDate.timestamp() > datetime.now().timestamp():
-                        coupon.isNew = True
+            coupon.timestampExpire2 = expiredate.timestamp()
+            coupon.dateFormattedExpire2 = formatDateGerman(expiredate)
+            # Only add coupon if it is valid
+            if coupon.isValid():
                 extraCouponsToAdd[coupon.uniqueID] = coupon
         if len(extraCouponsToAdd) > 0:
             logging.info("There are " + str(len(extraCouponsToAdd)) + " valid extra coupons available")
@@ -1118,9 +1085,9 @@ class BKCrawler:
                 category.setNumberofCouponsTotal(category.numberofCouponsTotal + 1)
                 if coupon.isHidden:
                     category.setNumberofCouponsHidden(category.numberofCouponsHidden + 1)
-                if coupon.isEatable:
+                if coupon.isEatable():
                     category.setNumberofCouponsEatable(category.numberofCouponsEatable + 1)
-                if coupon.isNew:
+                if coupon.getIsNew():
                     category.setNumberofCouponsNew(category.numberofCouponsNew + 1)
                 if coupon.containsFriesOrCoke:
                     category.setNumberofCouponsWithFriesOrCoke(category.numberofCouponsWithFriesOrCoke + 1)
@@ -1128,7 +1095,7 @@ class BKCrawler:
         self.cachedAvailableCouponCategories = newCachedAvailableCouponCategories
 
     def updateCachedMissingPaperCouponsText(self, couponDB: Database):
-        paperCouponMapping = PaperCouponHelper.getCouponMappingForCrawler()
+        paperCouponMapping = getCouponMappingForCrawler()
         self.cachedMissingPaperCouponsText = None
         missingPLUs = []
         for mappingCoupon in paperCouponMapping.values():
@@ -1185,7 +1152,7 @@ class BKCrawler:
             elif filters.excludeCouponsByDuplicatedProductTitles and coupon.getComparableValue() in namesDupeMap:
                 # Skip duplicates if needed
                 continue
-            elif filters.isNew is not None and coupon.isNew != filters.isNew:
+            elif filters.isNew is not None and coupon.getIsNew() != filters.isNew:
                 # Skip item if it does not have the expected "is_new" state
                 continue
             elif filters.isHidden is not None and coupon.isHidden != filters.isHidden:
@@ -1265,39 +1232,9 @@ class BKCrawler:
                 offers.append(offer)
         return offers
 
-    def getUserFavorites(self, user: User, coupons: Union[dict, None]) -> UserFavorites:
-        """
-        Gathers information about the given users' favorite available/unavailable coupons.
-        """
-        if len(user.favoriteCoupons) == 0:
-            # User does not have any favorites set --> There is no point to look for the additional information
-            return UserFavorites()
-        # Get coupons if they're not given already
-        if coupons is None:
-            coupons = self.getBotCoupons()
-        availableFavoriteCoupons = []
-        unavailableFavoriteCoupons = []
-        for uniqueCouponID, coupon in user.favoriteCoupons.items():
-            couponFromProductiveDB = coupons.get(uniqueCouponID)
-            if couponFromProductiveDB is not None and couponFromProductiveDB.isValid():
-                availableFavoriteCoupons.append(couponFromProductiveDB)
-            else:
-                # User chosen favorite coupon has expired or is not in DB
-                coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
-                unavailableFavoriteCoupons.append(coupon)
-        # Sort all coupon arrays by price
-        availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
-        unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
-        return UserFavorites(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
-
     def getBotCoupons(self):
-        """ Returns all coupons suitable for bot-usage (do not trust the sorting here!). """
+        """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
         return self.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
-
-
-def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:
-    # Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list.
-    return sorted(couponList, key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
 
 
 def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
@@ -1358,6 +1295,20 @@ def generateQRImageIfNonExistant(qrCodeData: str, path: str) -> bool:
         img = qr.make_image(fill_color="#4A1E0D", back_color="white")
         img.save(path)
         return True
+
+
+def getCouponMappingForCrawler() -> dict:
+    paperCouponConfig = PaperCouponHelper.getActivePaperCouponInfo()
+    paperCouponMapping = {}
+    for pluIdentifier, paperData in paperCouponConfig.items():
+        mappingTmp = paperData.get('mapping')
+        if mappingTmp is not None:
+            expireTimestamp = paperData['expire_timestamp']
+            for uniquePaperCouponID, plu in mappingTmp.items():
+                paperCouponMapping[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, source=CouponSource.PAPER, plu=plu, timestampExpire2=expireTimestamp,
+                                                                 dateFormattedExpire2=formatDateGerman(datetime.fromtimestamp(expireTimestamp)))
+    return paperCouponMapping
+
 
 
 if __name__ == '__main__':

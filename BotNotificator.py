@@ -9,9 +9,8 @@ from telegram.error import BadRequest, Unauthorized
 
 from BotUtils import getBotImpressum
 from Helper import INFO_DB, DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
-from Models import CouponFilter
 
-from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter
 from CouponCategory import BotAllowedCouponSources
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
@@ -94,7 +93,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
 class ChannelUpdateMode(Enum):
     """ Different modes that can be used to perform a channel update """
     # Dummy entry: This mode would only work if TG bots were able to delete messages older than 48 hours!
-    UPDATE = 1  # Deprecated
+    # UPDATE = 1  # Deprecated
     # Delete- and re-send all coupons into our channel
     RESEND_ALL = 2
     # This will only re-send all items older than X hours - can be used to resume channel update if it was e.g. interrupted due to a connection loss
@@ -134,7 +133,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         if coupon.id not in channelDB:
             # New coupon - save information into both dicts
             couponsToSendOut[coupon.id] = coupon
-            if coupon.isNew:
+            if coupon.getIsNew():
                 newCoupons[coupon.id] = coupon
             numberOfCouponsNewToThisChannel += 1
         elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != coupon.getUniqueIdentifier():

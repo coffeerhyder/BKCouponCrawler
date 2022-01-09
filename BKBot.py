@@ -18,10 +18,9 @@ from BotUtils import *
 import logging
 
 from Helper import *
-from Crawler import BKCrawler, UserFavorites
-from Models import CouponFilter
+from Crawler import BKCrawler
 
-from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType
+from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavorites
 from CouponCategory import CouponCategory, BotAllowedCouponSources, CouponSource
 from UtilsOffers import offerGetImagePath
 
@@ -241,6 +240,7 @@ class BKBot:
             return fallback
 
     def getPublicChannelChatID(self) -> Union[str, None]:
+        """ Returns public channel chatID like "@ChannelName". """
         if self.getPublicChannelName() is None:
             return None
         else:
@@ -257,7 +257,7 @@ class BKBot:
             query.answer()
         userDB = self.crawler.getUsersDB()
         user = User.load(userDB, str(update.effective_user.id))
-        """ New user --> Add userID to DB. """
+        """ New user? --> Add userID to DB. """
         if user is None:
             # Add user to DB for the first time
             user = User(
@@ -320,6 +320,10 @@ class BKBot:
         self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode="HTML", reply_markup=reply_markup, disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
+    def getBotCoupons(self):
+        """ Wrapper """
+        return self.crawler.getBotCoupons()
+
     def botDisplayCoupons(self, update: Update, context: CallbackContext):
         """ Displays all coupons in a pre selected mode """
         callbackVar = update.callback_query.data
@@ -328,7 +332,6 @@ class BKBot:
         urlQuery = furl(callbackVar)
         urlinfo = urlQuery.args
         mode = urlinfo["m"]
-        # page = int(urlinfo.get('page', 0))
         try:
             coupons = None
             menuText = None
@@ -374,47 +377,39 @@ class BKBot:
             return CallbackVars.MENU_MAIN
 
     def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavorites, str]:
-        userFavorites = self.getUserFavorites(user=user, coupons=coupons, enableExceptionHandling=True)
-        menuText = SYMBOLS.STAR + str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
-        numberofEatableCouponsWithoutPrice = 0
-        totalPrice = 0
-        for coupon in userFavorites.couponsAvailable:
-            if coupon.price is not None:
-                totalPrice += coupon.price
-            elif coupon.isEatable:
-                numberofEatableCouponsWithoutPrice += 1
-        if totalPrice > 0:
-            menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalPrice)
-            if numberofEatableCouponsWithoutPrice > 0:
-                menuText += "*\n* exklusive " + str(numberofEatableCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
-        if len(userFavorites.couponsUnavailable) > 0:
-            menuText += '\n' + SYMBOLS.WARNING + str(len(userFavorites.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
-            menuText += '\n' + userFavorites.getUnavailableFavoritesText()
-            if user.settings.notifyWhenFavoritesAreBack:
-                # 2021-08-27: Removed this text to purify the favorites overview -> It contains a lot of text already!
-                # unavailableCouponsText += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
-                pass
-            else:
-                menuText += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
-                # unavailableCouponsText += '\nEbenfalls kannst du abgelaufene Favoriten in den Einstellungen löschen.'
-        return userFavorites, menuText
+        if len(user.favoriteCoupons) == 0:
+            raise BetterBotException('<b>Du hast noch keine Favoriten!</b>', InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
+        else:
+            if coupons is None:
+                # Perform DB request if not already done before
+                coupons = self.getBotCoupons()
+            userFavorites = user.getUserFavorites(coupons)
+            if len(userFavorites.couponsAvailable) == 0:
+                # Edge case
+                errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' favorisierten Coupons verfügbar:</b>'
+                errorMessage += '\n' + userFavorites.getUnavailableFavoritesText()
+                if user.settings.notifyWhenFavoritesAreBack:
+                    errorMessage += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
+                raise BetterBotException(errorMessage, InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
 
-    def getUserFavorites(self, user: User, coupons: Union[dict, None], enableExceptionHandling: bool) -> UserFavorites:
-        """
-        Wrapper
-        Returns price-sorted list of favorites of current user along with a text containing unavailable favorite coupons.
-        """
-        if len(user.favoriteCoupons) == 0 and enableExceptionHandling:
-            menuText = '<b>Du hast noch keine Favoriten!</b>'
-            raise BetterBotException(menuText, InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
-        userFavorites = self.crawler.getUserFavorites(user=user, coupons=coupons)
-        if len(userFavorites.couponsAvailable) == 0 and enableExceptionHandling:
-            # Edge case
-            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
-            menuText = '\n<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' favorisierten Coupons verfügbar:</b>'
-            menuText += '\n' + userFavorites.getUnavailableFavoritesText()
-            raise BetterBotException(menuText, reply_markup)
-        return userFavorites
+            menuText = SYMBOLS.STAR + str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
+            numberofEatableCouponsWithoutPrice = 0
+            totalPrice = 0
+            for coupon in userFavorites.couponsAvailable:
+                if coupon.price is not None:
+                    totalPrice += coupon.price
+                elif coupon.isEatable():
+                    numberofEatableCouponsWithoutPrice += 1
+            if totalPrice > 0:
+                menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalPrice)
+                if numberofEatableCouponsWithoutPrice > 0:
+                    menuText += "*\n* exklusive " + str(numberofEatableCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
+            if len(userFavorites.couponsUnavailable) > 0:
+                menuText += '\n' + SYMBOLS.WARNING + str(len(userFavorites.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
+                menuText += '\n' + userFavorites.getUnavailableFavoritesText()
+                if not user.settings.notifyWhenFavoritesAreBack:
+                    menuText += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
+            return userFavorites, menuText
 
     def displayCouponsAsButtons(self, update: Update, user: Union[User, None], coupons: list, menuText: str, urlquery, highlightFavorites: bool):
         if len(coupons) == 0:
@@ -495,7 +490,7 @@ class BKBot:
         query.answer()
         self.displayCouponsWithImagesAndBackButton(update, context, userFavorites.couponsAvailable, topMsgText='<b>Alle Favoriten mit Bildern:</b>',
                                                    bottomMsgText=favoritesInfoText)
-        # Delete last message containing menu
+        # Delete last message containing bot menu
         context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
         return CallbackVars.MENU_DISPLAY_COUPON
 
@@ -510,12 +505,11 @@ class BKBot:
         user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
         showCouponIndexText = False
         for coupon in coupons:
-            isUserFavorite = coupon.id in user.favoriteCoupons
             if showCouponIndexText:
                 additionalText = 'Coupon ' + str(index + 1) + ' / ' + str(len(coupons))
             else:
                 additionalText = None
-            self.displayCouponWithImage(update, context, coupon, isUserFavorite, user.settings.displayQR, additionalText)
+            self.displayCouponWithImage(update, context, coupon, user, additionalText)
             index += 1
 
     def botDisplayOffers(self, update: Update, context: CallbackContext):
@@ -523,23 +517,16 @@ class BKBot:
         Posts all current offers (= photos with captions) into current chat.
         """
         query = update.callback_query
+        query.answer()
         activeOffers = self.crawler.getOffersActive()
         if len(activeOffers) == 0:
             # BK should always have offers but let's check for this case anyways.
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
             menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote!</b>'
-            if query is not None:
-                query.edit_message_text(text=menuText, reply_markup=reply_markup, parse_mode='HTML')
-            else:
-                update.effective_message.reply_text(menuText, reply_markup=reply_markup, parse_mode='HTML')
+            query.edit_message_text(text=menuText, reply_markup=reply_markup, parse_mode='HTML')
             return CallbackVars.MENU_MAIN
         prePhotosText = '<b>Es sind derzeit ' + str(len(activeOffers)) + ' Angebote verfügbar:</b>'
-        # Try to "recycle" latest message
-        if query is not None:
-            query.answer()
-            query.edit_message_text(text=prePhotosText, parse_mode='HTML')
-        else:
-            update.effective_message.reply_text(prePhotosText, parse_mode='HTML')
+        query.edit_message_text(text=prePhotosText, parse_mode='HTML')
         for offer in activeOffers:
             offerID = offer['id']
             offerText = offer['title']
@@ -616,12 +603,14 @@ class BKBot:
         if user.settings.__dict__ != dummyUser.settings.__dict__:
             keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + "bleiben)" + SYMBOLS.WARNING,
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
-        userFavorites = self.getUserFavorites(user=user, coupons=None, enableExceptionHandling=False)
-        if len(userFavorites.couponsUnavailable) > 0:
-            keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavorites.couponsUnavailable)) + ")?*²",
-                                                  callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
-            menuText += "\n*²" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
-            menuText += "\n" + userFavorites.getUnavailableFavoritesText()
+        if len(user.favoriteCoupons) > 0:
+            # Additional DB request required so let's only jump into this handling if the user has at least one favorite set.
+            userFavorites = user.getUserFavorites(self.getBotCoupons())
+            if len(userFavorites.couponsUnavailable) > 0:
+                keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavorites.couponsUnavailable)) + ")?*²",
+                                                      callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
+                menuText += "\n*²" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
+                menuText += "\n" + userFavorites.getUnavailableFavoritesText()
         keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Meine Daten löschen",
                                               callback_data=CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND)])
         # Back button
@@ -637,8 +626,9 @@ class BKBot:
         callbackBack = callbackArgs['cb']
         coupon = Coupon.load(self.crawler.getCouponDB(), uniqueCouponID)
         user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
-        couponIsUserFavorite = uniqueCouponID in user.favoriteCoupons
-        self.displayCouponWithImage(update, context, coupon, couponIsUserFavorite, user.settings.displayQR)
+        # Send coupon image in chat
+        self.displayCouponWithImage(update, context, coupon, user)
+        # Post user-menu into chat
         menuText = 'Coupon Details'
         if not user.settings.displayQR:
             menuText += '\n' + SYMBOLS.INFORMATION + 'Möchtest du QR-Codes angezeigt bekommen?\nSiehe Hauptmenü -> Einstellungen'
@@ -656,12 +646,12 @@ class BKBot:
         return CallbackVars.MENU_SETTINGS_USER_DELETE_DATA
 
     def botUserDelete(self, update: Update, context: CallbackContext):
+        """ Deletes users' account from DB. """
         userInput = update.message.text
         if userInput is not None and userInput == str(update.effective_user.id):
             userDB = self.crawler.getUsersDB()
-            """ Only delete userID if it exists -> It being nonexistant really is an edge case that doesn't happen during normal usage! """
-            if str(update.effective_user.id) in userDB:
-                del userDB[str(update.effective_user.id)]
+            # Delete user from DB
+            del userDB[str(update.effective_user.id)]
             menuText = SYMBOLS.CONFIRM + ' Deine Daten wurden vernichtet!'
             menuText += '\nDu kannst diesen Chat nun löschen.'
             menuText += '\n<b>Viel Erfolg beim Abnehmen!</b>'
@@ -680,17 +670,18 @@ class BKBot:
         update.effective_message.reply_text(text=menuText, parse_mode='HTML')
         return ConversationHandler.END
 
-    def displayCouponWithImage(self, update: Update, context: CallbackContext, coupon: Coupon, isFavorite: bool, sendQRCode: bool, additionalText: Union[str, None] = None):
+    def displayCouponWithImage(self, update: Update, context: CallbackContext, coupon: Coupon, user: User, additionalText: Union[str, None] = None):
         """
         Sends new message with coupon information & photo (& optionally coupon QR code) + "Save/Delete favorite" button in chat.
         """
-        favoriteKeyboard = self.getCouponFavoriteKeyboard(isFavorite, coupon.id, CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING)
+        favoriteKeyboard = self.getCouponFavoriteKeyboard(user.isFavoriteCoupon(coupon), coupon.id, CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING)
         replyMarkupWithoutBackButton = InlineKeyboardMarkup([favoriteKeyboard, []])
         couponText = coupon.generateCouponLongTextFormattedWithDescription(highlightIfNew=True)
         if additionalText is not None:
             couponText += '\n' + additionalText
         msgQR = None
-        if sendQRCode:
+        if user.settings.displayQR:
+            # We need to send two images -> Send as album
             photoCoupon = InputMediaPhoto(media=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML')
             photoQR = InputMediaPhoto(media=self.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
             chatMessages = self.sendMediaGroup(chat_id=update.effective_message.chat_id, media=[photoCoupon, photoQR])
@@ -710,7 +701,7 @@ class BKBot:
             logging.info("Refreshing coupon cache of: " + coupon.id)
             self.couponImageCache[coupon.id] = {PhotoCacheVars.UNIQUE_IDENTIFIER: coupon.getUniqueIdentifier(), PhotoCacheVars.FILE_ID: msgCoupon.photo[0].file_id,
                                                 PhotoCacheVars.TIMESTAMP_LAST_USED: datetime.now().timestamp()}
-        if sendQRCode:
+        if msgQR is not None:
             self.couponImageCache[coupon.id][PhotoCacheVars.FILE_ID_QR] = msgQR.photo[0].file_id
         return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
 
@@ -758,7 +749,7 @@ class BKBot:
         return text
 
     def getFilteredCoupons(self, couponFilter: CouponFilter):
-        """  Wrapper for crawler.filterCouponsList """
+        """  Wrapper for crawler.filterCouponsList with errorhandling when zero results are available. """
         coupons = self.crawler.filterCouponsList(couponFilter)
         if len(coupons) == 0:
             menuText = SYMBOLS.DENY + ' <b>Es gibt derzeit keine Coupons in den von dir ausgewählten Kategorien und/oder in Kombination mit den eingestellten Filtern!</b>'
@@ -838,6 +829,7 @@ class BKBot:
         user = User.load(userDB, str(update.effective_user.id))
         dummyUser = User()
         user.settings = dummyUser.settings
+        # Update DB
         user.store(userDB)
         # Reload settings menu
         return self.displaySettings(update, context, user)
@@ -846,8 +838,8 @@ class BKBot:
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
         userDB = self.crawler.getUsersDB()
         user = User.load(userDB, str(update.effective_user.id))
-        coupons = self.crawler.getBotCoupons()
-        userUnavailableFavoriteCouponInfo = self.crawler.getUserFavorites(user=user, coupons=coupons)
+        coupons = self.getBotCoupons()
+        userUnavailableFavoriteCouponInfo = user.getUserFavorites(coupons)
         if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0 and user.settings.autoDeleteExpiredFavorites:
             for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
                 del user.favoriteCoupons[unavailableCoupon.id]
@@ -862,11 +854,11 @@ class BKBot:
     def batchprocessAutoDeleteUsersUnavailableFavorites(self):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
         userDB = self.crawler.getUsersDB()
-        coupons = self.crawler.getBotCoupons()
+        coupons = self.getBotCoupons()
         dbUpdates = []
         for userID in userDB:
             user = User.load(userDB, userID)
-            userUnavailableFavoriteCouponInfo = self.crawler.getUserFavorites(user=user, coupons=coupons)
+            userUnavailableFavoriteCouponInfo = user.getUserFavorites(coupons)
             if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0 and user.settings.autoDeleteExpiredFavorites:
                 for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
                     del user.favoriteCoupons[unavailableCoupon.id]
@@ -1089,7 +1081,7 @@ class BKBot:
                 # Rare case
                 logging.info("Nothing to do: No coupons of this type available and no old ones to delete :)")
 
-        pass
+        return
 
     def deleteMessages(self, chat_id: Union[int, str], messageIDs: Union[List[int], None]):
         """ Deletes array of messageIDs. """
