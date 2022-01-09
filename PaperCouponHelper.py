@@ -72,7 +72,6 @@ def main():
         # Finally update our config
         paperCouponConfig.setdefault(paperIdentifier, {})['mapping'] = mapping
 
-
     # paperCouponConfig[paperChar]['mapping'] = mapping
     # Update our config file accordingly
     saveJson(BotUtils.BotProperty.paperCouponExtraDataPath, paperCouponConfig)
@@ -92,4 +91,3 @@ def getActivePaperCouponInfo() -> dict:
             newPaperData['expire_timestamp'] = validuntil
             paperCouponInfo[paperIdentifier] = newPaperData
     return paperCouponInfo
-

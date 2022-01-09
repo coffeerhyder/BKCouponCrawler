@@ -245,7 +245,7 @@ def getFilenameFromURL(url: str) -> str:
 
 
 def couponTitleContainsFriesOrCoke(titleLower: str) -> bool:
-    # title to lowercase for more thoughtless string comparison
+    # Convert title to lowercase for more thoughtless string comparison
     titleLower = titleLower.lower()
     if re.compile(r'.*king\s*jr\s*\.?\s*meal.*').search(titleLower):
         return True
@@ -259,10 +259,6 @@ def couponTitleContainsFriesOrCoke(titleLower: str) -> bool:
 REGEX_PLU_WITH_AT_LEAST_ONE_LETTER = re.compile(r'(?i)^([A-Z]+)\d+[A-Z]?$')
 # Paper coupons usually only contain one char followed by a 1-2 digit number.
 REGEX_PLU_ONLY_ONE_LETTER = re.compile(r'(?i)^([A-Z])\d+$')
-
-
-# def isCouponShortPLUWithOneLetter(plu: str) -> bool:
-#     return plu is not None and REGEX_PLU_ONLY_ONE_LETTER.search(plu) is not None
 
 
 def isCouponShortPLUWithAtLeastOneLetter(plu: str) -> bool:
