@@ -3,9 +3,7 @@ import os
 from datetime import datetime
 
 import BotUtils
-from CouponCategory import CouponSource
-from Helper import saveJson, loadPaperCouponConfigFile, getTimezone, formatDateGerman
-from UtilsCouponsDB import Coupon
+from Helper import saveJson, loadPaperCouponConfigFile, getTimezone
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
@@ -95,15 +93,3 @@ def getActivePaperCouponInfo() -> dict:
             paperCouponInfo[paperIdentifier] = newPaperData
     return paperCouponInfo
 
-
-def getCouponMappingForCrawler() -> dict:
-    paperCouponConfig = getActivePaperCouponInfo()
-    paperCouponMapping = {}
-    for pluIdentifier, paperData in paperCouponConfig.items():
-        mappingTmp = paperData.get('mapping')
-        if mappingTmp is not None:
-            expireTimestamp = paperData['expire_timestamp']
-            for uniquePaperCouponID, plu in mappingTmp.items():
-                paperCouponMapping[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, source=CouponSource.PAPER, plu=plu, timestampExpire2=expireTimestamp,
-                                                                 dateFormattedExpire2=formatDateGerman(datetime.fromtimestamp(expireTimestamp)))
-    return paperCouponMapping

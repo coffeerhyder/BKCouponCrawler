@@ -9,9 +9,8 @@ from telegram.error import BadRequest, Unauthorized
 
 from BotUtils import getBotImpressum
 from Helper import INFO_DB, DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
-from Models import CouponFilter
 
-from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter
 from CouponCategory import BotAllowedCouponSources
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
@@ -134,7 +133,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         if coupon.id not in channelDB:
             # New coupon - save information into both dicts
             couponsToSendOut[coupon.id] = coupon
-            if coupon.isNew:
+            if coupon.getIsNew():
                 newCoupons[coupon.id] = coupon
             numberOfCouponsNewToThisChannel += 1
         elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != coupon.getUniqueIdentifier():

@@ -9,28 +9,18 @@
       "imageURL": "file://media/extra_coupons_pics/44149_KING_Sundae.jpg",
       "description": "Achtung! Wird nicht überall akzeptiert siehe: https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058\nFalls der Deal als abgelaufen markiert wurde: Diverse Filialen akzeptieren diese Coupons noch immer!",
       "expire_date": "2021-07-31",
-      "enforce_is_new_override_until_date": "2021-06-08"
+      "isNewUntilDate": "2021-06-08"
     },
     {
       "uniqueID": "51011",
       "title": "Coca-Cola",
       "price": 0,
-      "static_reduced_percent": 100,
+      "staticReducedPercent": 100,
       "source": 7,
       "imageURL": "file://media/extra_coupons_pics/51011_CocaCola.jpg",
       "description": "Achtung! Wird nicht überall akzeptiert siehe: https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058\nFalls der Deal als abgelaufen markiert wurde: Diverse Filialen akzeptieren diese Coupons noch immer!",
       "expire_date": "2021-07-31",
-      "enforce_is_new_override_until_date": "2021-06-08"
-    },
-    {
-      "uniqueID": "99110",
-	  "plu": "965",
-      "title": "5Fach auf jede Bestellung",
-      "source": 8,
-      "imageURL": "file://media/extra_coupons_pics/2022_03_04_PayBack_965_99110.png",
-      "expire_date": "2022-03-04",
-      "enforce_is_new_override_until_date": "2022-01-10",
-      "isEatable": false
+      "isNewUntilDate": "2021-06-08"
     },
     {
       "uniqueID": "99141",
@@ -39,8 +29,16 @@
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2021_12_26_99141_10Fach.jpg",
       "expire_date": "2021-12-26",
-      "enforce_is_new_override_until_date": "2021-12-13",
-      "isEatable": false
+      "isNewUntilDate": "2021-12-13"
+    },
+    {
+      "uniqueID": "99110",
+	  "plu": "965",
+      "title": "5Fach auf jede Bestellung",
+      "source": 8,
+      "imageURL": "file://media/extra_coupons_pics/2022_03_04_PayBack_965_99110.png",
+      "expire_date": "2022-03-04",
+      "isNewUntilDate": "2022-01-08"
     }
   ]
 }
