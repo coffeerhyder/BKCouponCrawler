@@ -519,7 +519,7 @@ class BKBot:
         query = update.callback_query
         query.answer()
         activeOffers = self.crawler.getOffersActive()
-        if len(activeOffers) == 0 or True:
+        if len(activeOffers) == 0:
             # BK should always have offers but let's check for this case anyways.
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
             menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote!</b>'
