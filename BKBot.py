@@ -332,7 +332,6 @@ class BKBot:
         urlQuery = furl(callbackVar)
         urlinfo = urlQuery.args
         mode = urlinfo["m"]
-        # page = int(urlinfo.get('page', 0))
         try:
             coupons = None
             menuText = None
@@ -491,7 +490,7 @@ class BKBot:
         query.answer()
         self.displayCouponsWithImagesAndBackButton(update, context, userFavorites.couponsAvailable, topMsgText='<b>Alle Favoriten mit Bildern:</b>',
                                                    bottomMsgText=favoritesInfoText)
-        # Delete last message containing menu
+        # Delete last message containing bot menu
         context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
         return CallbackVars.MENU_DISPLAY_COUPON
 
@@ -506,12 +505,11 @@ class BKBot:
         user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
         showCouponIndexText = False
         for coupon in coupons:
-            isUserFavorite = coupon.id in user.favoriteCoupons
             if showCouponIndexText:
                 additionalText = 'Coupon ' + str(index + 1) + ' / ' + str(len(coupons))
             else:
                 additionalText = None
-            self.displayCouponWithImage(update, context, coupon, isUserFavorite, user.settings.displayQR, additionalText)
+            self.displayCouponWithImage(update, context, coupon, user, additionalText)
             index += 1
 
     def botDisplayOffers(self, update: Update, context: CallbackContext):
@@ -519,23 +517,16 @@ class BKBot:
         Posts all current offers (= photos with captions) into current chat.
         """
         query = update.callback_query
+        query.answer()
         activeOffers = self.crawler.getOffersActive()
-        if len(activeOffers) == 0:
+        if len(activeOffers) == 0 or True:
             # BK should always have offers but let's check for this case anyways.
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
             menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote!</b>'
-            if query is not None:
-                query.edit_message_text(text=menuText, reply_markup=reply_markup, parse_mode='HTML')
-            else:
-                update.effective_message.reply_text(menuText, reply_markup=reply_markup, parse_mode='HTML')
+            query.edit_message_text(text=menuText, reply_markup=reply_markup, parse_mode='HTML')
             return CallbackVars.MENU_MAIN
         prePhotosText = '<b>Es sind derzeit ' + str(len(activeOffers)) + ' Angebote verfügbar:</b>'
-        # Try to "recycle" latest message
-        if query is not None:
-            query.answer()
-            query.edit_message_text(text=prePhotosText, parse_mode='HTML')
-        else:
-            update.effective_message.reply_text(prePhotosText, parse_mode='HTML')
+        query.edit_message_text(text=prePhotosText, parse_mode='HTML')
         for offer in activeOffers:
             offerID = offer['id']
             offerText = offer['title']
@@ -635,8 +626,9 @@ class BKBot:
         callbackBack = callbackArgs['cb']
         coupon = Coupon.load(self.crawler.getCouponDB(), uniqueCouponID)
         user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
-        couponIsUserFavorite = uniqueCouponID in user.favoriteCoupons
-        self.displayCouponWithImage(update, context, coupon, couponIsUserFavorite, user.settings.displayQR)
+        # Send coupon image in chat
+        self.displayCouponWithImage(update, context, coupon, user)
+        # Post user-menu into chat
         menuText = 'Coupon Details'
         if not user.settings.displayQR:
             menuText += '\n' + SYMBOLS.INFORMATION + 'Möchtest du QR-Codes angezeigt bekommen?\nSiehe Hauptmenü -> Einstellungen'
@@ -654,12 +646,12 @@ class BKBot:
         return CallbackVars.MENU_SETTINGS_USER_DELETE_DATA
 
     def botUserDelete(self, update: Update, context: CallbackContext):
+        """ Deletes users' account from DB. """
         userInput = update.message.text
         if userInput is not None and userInput == str(update.effective_user.id):
             userDB = self.crawler.getUsersDB()
-            """ Only delete userID if it exists -> It being nonexistant really is an edge case that doesn't happen during normal usage! """
-            if str(update.effective_user.id) in userDB:
-                del userDB[str(update.effective_user.id)]
+            # Delete user from DB
+            del userDB[str(update.effective_user.id)]
             menuText = SYMBOLS.CONFIRM + ' Deine Daten wurden vernichtet!'
             menuText += '\nDu kannst diesen Chat nun löschen.'
             menuText += '\n<b>Viel Erfolg beim Abnehmen!</b>'
@@ -678,17 +670,18 @@ class BKBot:
         update.effective_message.reply_text(text=menuText, parse_mode='HTML')
         return ConversationHandler.END
 
-    def displayCouponWithImage(self, update: Update, context: CallbackContext, coupon: Coupon, isFavorite: bool, sendQRCode: bool, additionalText: Union[str, None] = None):
+    def displayCouponWithImage(self, update: Update, context: CallbackContext, coupon: Coupon, user: User, additionalText: Union[str, None] = None):
         """
         Sends new message with coupon information & photo (& optionally coupon QR code) + "Save/Delete favorite" button in chat.
         """
-        favoriteKeyboard = self.getCouponFavoriteKeyboard(isFavorite, coupon.id, CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING)
+        favoriteKeyboard = self.getCouponFavoriteKeyboard(user.isFavoriteCoupon(coupon), coupon.id, CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING)
         replyMarkupWithoutBackButton = InlineKeyboardMarkup([favoriteKeyboard, []])
         couponText = coupon.generateCouponLongTextFormattedWithDescription(highlightIfNew=True)
         if additionalText is not None:
             couponText += '\n' + additionalText
         msgQR = None
-        if sendQRCode:
+        if user.settings.displayQR:
+            # We need to send two images -> Send as album
             photoCoupon = InputMediaPhoto(media=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML')
             photoQR = InputMediaPhoto(media=self.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
             chatMessages = self.sendMediaGroup(chat_id=update.effective_message.chat_id, media=[photoCoupon, photoQR])
@@ -708,7 +701,7 @@ class BKBot:
             logging.info("Refreshing coupon cache of: " + coupon.id)
             self.couponImageCache[coupon.id] = {PhotoCacheVars.UNIQUE_IDENTIFIER: coupon.getUniqueIdentifier(), PhotoCacheVars.FILE_ID: msgCoupon.photo[0].file_id,
                                                 PhotoCacheVars.TIMESTAMP_LAST_USED: datetime.now().timestamp()}
-        if sendQRCode:
+        if msgQR is not None:
             self.couponImageCache[coupon.id][PhotoCacheVars.FILE_ID_QR] = msgQR.photo[0].file_id
         return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
 
@@ -756,7 +749,7 @@ class BKBot:
         return text
 
     def getFilteredCoupons(self, couponFilter: CouponFilter):
-        """  Wrapper for crawler.filterCouponsList """
+        """  Wrapper for crawler.filterCouponsList with errorhandling when zero results are available. """
         coupons = self.crawler.filterCouponsList(couponFilter)
         if len(coupons) == 0:
             menuText = SYMBOLS.DENY + ' <b>Es gibt derzeit keine Coupons in den von dir ausgewählten Kategorien und/oder in Kombination mit den eingestellten Filtern!</b>'
@@ -836,6 +829,7 @@ class BKBot:
         user = User.load(userDB, str(update.effective_user.id))
         dummyUser = User()
         user.settings = dummyUser.settings
+        # Update DB
         user.store(userDB)
         # Reload settings menu
         return self.displaySettings(update, context, user)
@@ -1087,7 +1081,7 @@ class BKBot:
                 # Rare case
                 logging.info("Nothing to do: No coupons of this type available and no old ones to delete :)")
 
-        pass
+        return
 
     def deleteMessages(self, chat_id: Union[int, str], messageIDs: Union[List[int], None]):
         """ Deletes array of messageIDs. """

@@ -295,9 +295,17 @@ class User(Document):
     )
     favoriteCoupons = DictField()
 
+    def isFavoriteCoupon(self, coupon: Coupon):
+        """ Checks if given coupon is users' favorite """
+        if coupon.id in self.favoriteCoupons:
+            return True
+        else:
+            return False
+
     def getUserFavorites(self, couponsFromDB: Union[dict, Document]) -> UserFavorites:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
+        Coupons from DB are required to get current dataset of available favorites.
         """
         if len(self.favoriteCoupons) == 0:
             # User does not have any favorites set --> There is no point to look for the additional information

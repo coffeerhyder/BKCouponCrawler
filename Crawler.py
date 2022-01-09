@@ -1233,7 +1233,7 @@ class BKCrawler:
         return offers
 
     def getBotCoupons(self):
-        """ Returns all coupons suitable for bot-usage (do not trust the sorting here!). """
+        """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
         return self.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
 
 
