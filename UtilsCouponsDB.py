@@ -293,6 +293,7 @@ class User(Document):
             enableBetaFeatures=BooleanField(default=False)
         )
     )
+    botBlockedCounter = IntegerField(default=0)
     favoriteCoupons = DictField()
 
     def isFavoriteCoupon(self, coupon: Coupon):

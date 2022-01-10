@@ -93,16 +93,27 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         return
     logging.info("Notifying " + str(len(usersNotify)) + " users about favorites / new coupons")
     index = -1
+    dbUpdates = []
     for userIDStr, postText in usersNotify.items():
         index += 1
-        logging.info("Sending user notification " + str(index + 1) + " / " + str(len(usersNotify)) + " to user " + userIDStr)
+        # isLastItem = index == len(usersNotify) - 1
+        logging.info("Sending user notification " + str(index + 1) + " / " + str(len(usersNotify)) + " to user: " + userIDStr)
+        user = User.load(userDB, userIDStr)
         try:
             bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
+            if user.botBlockedCounter > 0:
+                """ User had blocked but at some point of time but unblocked it --> Reset this counter so upper handling will not delete user at some point of time. """
+                user.botBlockedCounter = 0
+                dbUpdates.append(user)
         except Unauthorized as botBlocked:
-            # TODO: Maybe auto-delete users who blocked the bot in DB.
             # Almost certainly it will be "Forbidden: bot was blocked by the user"
             logging.warning(botBlocked.message + " --> chat_id: " + userIDStr)
-            continue
+            # TODO: Maybe auto-delete users who blocked the bot in DB.
+            user.botBlockedCounter += 1
+            dbUpdates.append(user)
+    if len(dbUpdates) > 0:
+        logging.info("Pushing DB updates for users who have blocked/unblocked bot: " + str(len(dbUpdates)))
+        userDB.update(dbUpdates)
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 
