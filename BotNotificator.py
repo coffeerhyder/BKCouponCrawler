@@ -25,11 +25,10 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info("Checking for pending new coupons notifications")
     timestampStart = datetime.now().timestamp()
     userDB = bkbot.crawler.getUsersDB()
-    newCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
-    if len(newCoupons) == 0:
+    allNewCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
+    if len(allNewCoupons) == 0:
         logging.info("No new coupons available to notify about")
         return
-    postTextNewCoupons = "<b>" + SYMBOLS.NEW + str(len(newCoupons)) + " neue Coupons verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(newCoupons, 49)
     usersNotify = {}
     numberofFavoriteNotifications = 0
     numberofNewCouponsNotifications = 0
@@ -38,39 +37,56 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         usertext = ""
         # Obey Telegram entity limits...
         remainingEntities = 50
+        # Collect users favorite coupons that are currently new --> Those ones are 'Favorites that are back'
+        # TODO: Also find favorites that are back by matching unified coupon titles against coupon titles of users' saved coupons to make this more reliable
+        # TODO: Make use of user.getUserFavorites method
+        userNewFavoriteCoupons = {}
+        for couponID in user.favoriteCoupons:
+            newCoupon = allNewCoupons.get(couponID)
+            if newCoupon is not None:
+                userNewFavoriteCoupons[couponID] = newCoupon
+        # Check if user wants to be notified about favorites that are back
         if user.settings.notifyWhenFavoritesAreBack:
-            # Check if user has favorites that are new (back/valid again)
-            userNewCoupons = {}
-            for couponID in user.favoriteCoupons:
-                newCoupon = newCoupons.get(couponID)
-                if newCoupon is not None:
-                    userNewCoupons[couponID] = newCoupon
-            if len(userNewCoupons) > 0:
+            if len(userNewFavoriteCoupons) > 0:
                 usertext += "<b>" + SYMBOLS.STAR + str(
-                    len(userNewCoupons)) + " deiner favorisierten Coupons sind wieder verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(userNewCoupons, 49)
+                    len(userNewFavoriteCoupons)) + " deiner favorisierten Coupons sind wieder verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(userNewFavoriteCoupons, 49)
                 numberofFavoriteNotifications += 1
+                # The '<b>' entity is also one entity so let's substract this so we know how many are remaining
                 remainingEntities -= 1
-                remainingEntities -= len(userNewCoupons)
+                remainingEntities -= len(userNewFavoriteCoupons)
         # Check if user has enabled notifications for new coupons
         if user.settings.notifyWhenNewCouponsAreAvailable:
-            if len(usertext) == 0:
-                remainingEntities -= 1
+            newCouponsListForThisUsersNotification = {}
+            if user.settings.notifyWhenFavoritesAreBack and len(userNewFavoriteCoupons) > 0:
+                """ Avoid duplicates: If e.g. user has set favorite coupon to 'DoubleChiliCheese' and it's back in this run, we do not need to include it again in the list of new coupons.
+                 If this dict is empty after the loop this means that all of this users' favorites would also be in the "new coupons" list thus no need to include them in the post we send to the user (= duplicates).
+                 """
+                for couponID in allNewCoupons:
+                    if couponID not in userNewFavoriteCoupons:
+                        newCouponsListForThisUsersNotification[couponID] = allNewCoupons[couponID]
             else:
-                usertext += "\n---\n"
-            usertext += postTextNewCoupons
-            numberofNewCouponsNotifications += 1
-            remainingEntities -= len(newCoupons)
+                newCouponsListForThisUsersNotification = allNewCoupons
+            if len(newCouponsListForThisUsersNotification) > 0:
+                if len(usertext) == 0:
+                    # '<b>' entity only counts as one even if there are multiple of those used in one post
+                    remainingEntities -= 1
+                else:
+                    usertext += "\n---\n"
+                usertext += "<b>" + SYMBOLS.NEW + str(len(newCouponsListForThisUsersNotification)) + " neue Coupons verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(newCouponsListForThisUsersNotification, 49)
+                numberofNewCouponsNotifications += 1
+                remainingEntities -= len(newCouponsListForThisUsersNotification)
         if len(usertext) > 0:
             # Complete user text and save it to send it later
             if bkbot.getPublicChannelName() is None:
+                # Different text in case someone sets up this bot without a public channel (kinda makes no sense).
                 usertext += "\nMit /start gelangst du ins Hauptmenü des Bots."
             else:
-                usertext += "\nPer Klick kommst du zu den jeweiligen Coupons im " + bkbot.getPublicChannelHyperlinkWithCustomizedText(
+                usertext += "\nPer Klick gelangst du zu den jeweiligen Coupons im " + bkbot.getPublicChannelHyperlinkWithCustomizedText(
                     "Channel") + " und mit /start ins Hauptmenü des Bots."
             if remainingEntities < 0:
                 usertext += "\n" + SYMBOLS.WARNING + "Wegen Telegram Limits konnten evtl. nicht alle Coupons verlinkt werden."
                 usertext += "\nDas ist nicht weiter tragisch. Du findest alle Coupons im Bot/Channel."
-            # Store text to send to user and send it later
+            # Store text and send it later
             usersNotify[userIDStr] = usertext
     if len(usersNotify) == 0:
         logging.info("No users available who want to be notified on new coupons")

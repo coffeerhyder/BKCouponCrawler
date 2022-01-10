@@ -297,7 +297,10 @@ class User(Document):
 
     def isFavoriteCoupon(self, coupon: Coupon):
         """ Checks if given coupon is users' favorite """
-        if coupon.id in self.favoriteCoupons:
+        return self.isFavoriteCouponID(coupon.id)
+
+    def isFavoriteCouponID(self, couponID: str):
+        if couponID in self.favoriteCoupons:
             return True
         else:
             return False

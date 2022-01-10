@@ -134,6 +134,8 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
+* Server Auto reboot und Update jede Nacht
+* Favoriten Benachrichtigungen verbessern -> Favoriten anhand vereinheitlichter Produktnamen matchen und somit auch finden, wenn die z.B. unter neuer ID mit neuem Preis wieder verfügbar sind
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
 * Payback Coupons in "Alle Coupons" Ansicht ganz oben anzeigen (normale Coupons ohne Preis stehen derzeit ganz oben - aktuell nur einer)(?) -> Low Prio
 * Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden)

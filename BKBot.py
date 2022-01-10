@@ -392,7 +392,11 @@ class BKBot:
                     errorMessage += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
                 raise BetterBotException(errorMessage, InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
 
-            menuText = SYMBOLS.STAR + str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
+            menuText = SYMBOLS.STAR
+            if len(userFavorites.couponsUnavailable) == 0:
+                menuText += str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
+            else:
+                menuText += str(len(userFavorites.couponsAvailable)) + ' / ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
             numberofEatableCouponsWithoutPrice = 0
             totalPrice = 0
             for coupon in userFavorites.couponsAvailable:
@@ -867,7 +871,7 @@ class BKBot:
             logging.info('Deleting expired favorites of ' + str(len(dbUpdates)) + ' users')
             userDB.update(dbUpdates)
 
-    def getNewCouponsTextWithChannelHyperlinks(self, couponsDict: dict, maxNewCouponsDescriptionLines: int) -> str:
+    def getNewCouponsTextWithChannelHyperlinks(self, couponsDict: dict, maxNewCouponsToLink: int) -> str:
         infoText = ''
         """ Add detailed information about added coupons. Limit the max. number of that so our information message doesn't get too big. """
         index = 0
@@ -893,14 +897,14 @@ class BKBot:
                 couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=False)
             infoText += '\n' + couponText
 
-            if index == maxNewCouponsDescriptionLines - 1:
+            if index == maxNewCouponsToLink - 1:
                 # We processed the max. number of allowed items!
                 break
             else:
                 index += 1
                 continue
-        if len(couponsDict) > maxNewCouponsDescriptionLines:
-            numberOfNonHyperinkedItems = len(couponsDict) - maxNewCouponsDescriptionLines
+        if len(couponsDict) > maxNewCouponsToLink:
+            numberOfNonHyperinkedItems = len(couponsDict) - maxNewCouponsToLink
             if numberOfNonHyperinkedItems == 1:
                 infoText += '\n+ ' + str(numberOfNonHyperinkedItems) + ' weiterer'
             else:
