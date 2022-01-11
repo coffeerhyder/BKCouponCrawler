@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 
 import BotUtils
-from Helper import saveJson, loadPaperCouponConfigFile, getTimezone
+from Helper import saveJson, getTimezone, loadJson
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
@@ -91,3 +91,7 @@ def getActivePaperCouponInfo() -> dict:
             newPaperData['expire_timestamp'] = validuntil
             paperCouponInfo[paperIdentifier] = newPaperData
     return paperCouponInfo
+
+
+def loadPaperCouponConfigFile() -> dict:
+    return loadJson(BotUtils.BotProperty.paperCouponExtraDataPath)

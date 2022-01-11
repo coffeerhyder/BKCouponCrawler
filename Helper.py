@@ -9,7 +9,6 @@ import pytz
 import simplejson as json
 from PIL import Image
 
-import BotUtils
 from BotUtils import BotProperty
 
 
@@ -71,6 +70,11 @@ def couponOrOfferGetImageURL(data: dict) -> str:
 
 def setImageURLQuality(image_url: str) -> str:
     return image_url.replace('%{resolution}', '320')
+
+
+def normalizeString(string: str):
+    """ Returns lowercase String with all non-word characters removed. """
+    return replaceRegex(re.compile(r'[\W_]+'), '', string).lower()
 
 
 def shortenProductNames(couponTitle: str) -> str:
@@ -317,7 +321,3 @@ def isValidImageFile(path: str) -> bool:
         return True
     except:
         return False
-
-
-def loadPaperCouponConfigFile() -> dict:
-    return loadJson(BotUtils.BotProperty.paperCouponExtraDataPath)

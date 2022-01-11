@@ -8,7 +8,7 @@ from couchdb.mapping import TextField, FloatField, ListField, IntegerField, Bool
 from pydantic import BaseModel
 
 from CouponCategory import BotAllowedCouponSources, CouponSource
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString
 
 
 class Coupon(Document):
@@ -42,6 +42,9 @@ class Coupon(Document):
             return self.plu
         else:
             return self.id
+
+    def getNormalizedTitle(self):
+        return normalizeString(self.title)
 
     def isValid(self):
         expireDatetime = self.getExpireDatetime()
@@ -252,7 +255,8 @@ class Coupon(Document):
                 priceInfoText += " | " + reducedPercentage
         return priceInfoText
 
-class UserFavorites:
+
+class UserFavoritesInfo:
     """ Helper class for users favorites. """
 
     def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None, favoritesUnavailable: Union[List[Coupon], None] = None):
@@ -294,7 +298,7 @@ class User(Document):
         )
     )
     botBlockedCounter = IntegerField(default=0)
-    favoriteCoupons = DictField()
+    favoriteCoupons = DictField(default={})
 
     def isFavoriteCoupon(self, coupon: Coupon):
         """ Checks if given coupon is users' favorite """
@@ -306,14 +310,28 @@ class User(Document):
         else:
             return False
 
-    def getUserFavorites(self, couponsFromDB: Union[dict, Document]) -> UserFavorites:
+    def addFavoriteCoupon(self, coupon: Coupon):
+        self.favoriteCoupons[coupon.id] = coupon.data
+
+    def deleteFavoriteCouponID(self, couponID: str):
+        del self.favoriteCoupons[couponID]
+
+    def isAllowSendFavoritesNotification(self):
+        if self.settings.autoDeleteExpiredFavorites:
+            return False
+        elif self.settings.notifyWhenFavoritesAreBack:
+            return True
+        else:
+            return False
+
+    def getUserFavoritesInfo(self, couponsFromDB: Union[dict, Document]) -> UserFavoritesInfo:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
         Coupons from DB are required to get current dataset of available favorites.
         """
         if len(self.favoriteCoupons) == 0:
             # User does not have any favorites set --> There is no point to look for the additional information
-            return UserFavorites()
+            return UserFavoritesInfo()
         else:
             availableFavoriteCoupons = []
             unavailableFavoriteCoupons = []
@@ -328,7 +346,7 @@ class User(Document):
             # Sort all coupon arrays by price
             availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
             unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
-            return UserFavorites(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
+            return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
 
 
 class InfoEntry(Document):
