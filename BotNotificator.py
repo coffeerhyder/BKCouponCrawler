@@ -57,24 +57,26 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         userNewFavoriteCoupons = {}
         for coupon in userFavoritesInfo.couponsAvailable:
             userNewFavoriteCoupons[coupon.id] = coupon
+        """ Smart-update users favorites: Try to look for new coupons with the same product this was we can update users' favorite even if BK decided to change the price and/or ID of acoupon containing the same product(s). """
+        # Collect titles of all unavailable favorites to set so we don't get any duplicates
+        unavailableCouponNormalizedTitles = set()
+        for unavailableCoupon in userFavoritesInfo.couponsUnavailable:
+            unavailableCouponNormalizedTitles.add(unavailableCoupon.getNormalizedTitle())
+        # Look for alternative coupon based on names of currently unavailable favorite coupons
+        foundAtLeastOneAlternativeCoupon = False
+        for unavailableCouponNormalizedTitle in unavailableCouponNormalizedTitles:
+            alternativeCoupon = couponTitleMapping.get(unavailableCouponNormalizedTitle)
+            if alternativeCoupon is not None:
+                # Hit! Add it to users' favorite coupons.
+                user.addFavoriteCoupon(alternativeCoupon)
+                userNewFavoriteCoupons[alternativeCoupon.id] = alternativeCoupon
+                foundAtLeastOneAlternativeCoupon = True
+        if foundAtLeastOneAlternativeCoupon:
+            # DB update required
+            dbUserFavoritesUpdates.add(user)
         # Check if user wants to be notified about favorites that are back
         if user.isAllowSendFavoritesNotification():
             if len(userNewFavoriteCoupons) > 0:
-                """ Smart-update users favorites: Try to look for new coupons with the same product this was we can update users' favorite even if BK decided to change the price and/or ID of acoupon containing the same product(s). """
-                # Collect titles of all unavailable favorites to set so we don't get any duplicates
-                unavailableCouponNormalizedTitles = set()
-                for unavailableCoupon in userFavoritesInfo.couponsUnavailable:
-                    unavailableCouponNormalizedTitles.add(unavailableCoupon.getNormalizedTitle())
-                foundAtLeastOneAlternativeCoupon = False
-                for unavailableCouponNormalizedTitle in unavailableCouponNormalizedTitles:
-                    alternativeCoupon = couponTitleMapping.get(unavailableCouponNormalizedTitle)
-                    if alternativeCoupon is not None:
-                        user.addFavoriteCoupon(alternativeCoupon)
-                        userNewFavoriteCoupons[alternativeCoupon.id] = alternativeCoupon
-                        foundAtLeastOneAlternativeCoupon = True
-                if foundAtLeastOneAlternativeCoupon:
-                    # DB update required
-                    dbUserFavoritesUpdates.add(user)
 
                 usertext += "<b>" + SYMBOLS.STAR + str(
                     len(userNewFavoriteCoupons)) + " deiner favorisierten Coupons sind wieder verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(userNewFavoriteCoupons, 49)
