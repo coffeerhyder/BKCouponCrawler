@@ -10,7 +10,7 @@ from telegram.error import BadRequest, Unauthorized
 from BotUtils import getBotImpressum
 from Helper import INFO_DB, DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
 
-from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter, sortCouponsByPrice
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter, sortCouponsByPrice, getCouponTitleMapping
 from CouponCategory import BotAllowedCouponSources
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
@@ -30,10 +30,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         logging.info("No new coupons available to notify about")
         return
 
-    # Maps normalized coupon titles to coupons with the goal of being able to match coupons by title
-    couponTitleMappingTmp = {}
-    for coupon in allNewCoupons.values():
-        couponTitleMappingTmp.setdefault(coupon.getNormalizedTitle(), []).append(coupon)
+    couponTitleMappingTmp = getCouponTitleMapping(allNewCoupons)
     # Now clean our mapping: Sometimes one product may be available twice with multiple prices -> We want exactly one mapping per title
     couponTitleMapping = {}
     for normalizedTitle, coupons in couponTitleMappingTmp.items():
@@ -52,30 +49,31 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         usertext = ""
         # Obey Telegram entity limits...
         remainingEntities = 50
-        # Collect users favorite coupons that are currently new --> Those ones are 'Favorites that are back'
-        userFavoritesInfo = user.getUserFavoritesInfo(allNewCoupons)
         userNewFavoriteCoupons = {}
-        for coupon in userFavoritesInfo.couponsAvailable:
-            userNewFavoriteCoupons[coupon.id] = coupon
-        """ Smart-update users favorites: Try to look for new coupons with the same product this was we can update users' favorite even if BK decided to change the price and/or ID of acoupon containing the same product(s). """
-        # Collect titles of all unavailable favorites to set so we don't get any duplicates
-        unavailableCouponNormalizedTitles = set()
-        for unavailableCoupon in userFavoritesInfo.couponsUnavailable:
-            unavailableCouponNormalizedTitles.add(unavailableCoupon.getNormalizedTitle())
-        # Look for alternative coupon based on names of currently unavailable favorite coupons
-        foundAtLeastOneAlternativeCoupon = False
-        for unavailableCouponNormalizedTitle in unavailableCouponNormalizedTitles:
-            alternativeCoupon = couponTitleMapping.get(unavailableCouponNormalizedTitle)
-            if alternativeCoupon is not None:
-                # Hit! Add it to users' favorite coupons.
-                user.addFavoriteCoupon(alternativeCoupon)
-                userNewFavoriteCoupons[alternativeCoupon.id] = alternativeCoupon
-                foundAtLeastOneAlternativeCoupon = True
-        if foundAtLeastOneAlternativeCoupon:
-            # DB update required
-            dbUserFavoritesUpdates.add(user)
         # Check if user wants to be notified about favorites that are back
         if user.isAllowSendFavoritesNotification():
+            # Collect users favorite coupons that are currently new --> Those ones are 'Favorites that are back'
+            userFavoritesInfo = user.getUserFavoritesInfo(allNewCoupons)
+            for coupon in userFavoritesInfo.couponsAvailable:
+                userNewFavoriteCoupons[coupon.id] = coupon
+            """ Smart-update users favorites: Try to look for new coupons with the same product this was we can update users' favorite
+             even if BK decided to change the price and/or ID of acoupon containing the same product(s). """
+            # Collect titles of all unavailable favorites to set so we don't get any duplicates
+            unavailableCouponNormalizedTitles = set()
+            for unavailableCoupon in userFavoritesInfo.couponsUnavailable:
+                unavailableCouponNormalizedTitles.add(unavailableCoupon.getNormalizedTitle())
+            # Look for alternative coupon based on names of currently unavailable favorite coupons
+            foundAtLeastOneAlternativeCoupon = False
+            for unavailableCouponNormalizedTitle in unavailableCouponNormalizedTitles:
+                alternativeCoupon = couponTitleMapping.get(unavailableCouponNormalizedTitle)
+                if alternativeCoupon is not None:
+                    # Hit! Add it to users' favorite coupons.
+                    user.addFavoriteCoupon(alternativeCoupon)
+                    userNewFavoriteCoupons[alternativeCoupon.id] = alternativeCoupon
+                    foundAtLeastOneAlternativeCoupon = True
+            if foundAtLeastOneAlternativeCoupon:
+                # DB update required
+                dbUserFavoritesUpdates.add(user)
             if len(userNewFavoriteCoupons) > 0:
 
                 usertext += "<b>" + SYMBOLS.STAR + str(
@@ -126,7 +124,9 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         userDB.update(list(dbUserFavoritesUpdates))
     logging.info("Notifying " + str(len(usersNotify)) + " users about favorites / new coupons")
     index = -1
-    dbUserUpdates = set()
+    dbUserUpdates = []
+    usersToDelete = []
+    deleteBlockedUsersAfterDays = 2
     for userIDStr, postText in usersNotify.items():
         index += 1
         # isLastItem = index == len(usersNotify) - 1
@@ -137,16 +137,21 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
             if user.botBlockedCounter > 0:
                 """ User had blocked but at some point of time but unblocked it --> Reset this counter so upper handling will not delete user at some point of time. """
                 user.botBlockedCounter = 0
-                dbUserUpdates.add(user)
+                dbUserUpdates.append(user)
         except Unauthorized as botBlocked:
             # Almost certainly it will be "Forbidden: bot was blocked by the user"
-            logging.warning(botBlocked.message + " --> chat_id: " + userIDStr)
-            # TODO: Maybe auto-delete users who blocked the bot in DB.
+            logging.info(botBlocked.message + " --> chat_id: " + userIDStr)
             user.botBlockedCounter += 1
-            dbUserUpdates.add(user)
+            if user.botBlockedCounter >= deleteBlockedUsersAfterDays:
+                usersToDelete.append(user)
+            else:
+                dbUserUpdates.append(user)
     if len(dbUserUpdates) > 0:
         logging.info("Pushing DB updates for users who have blocked/unblocked bot: " + str(len(dbUserUpdates)))
-        userDB.update(list(dbUserUpdates))
+        userDB.update(dbUserUpdates)
+    if len(usersToDelete) > 0:
+        logging.info("Deleting users who blocked bot for >= " + str(deleteBlockedUsersAfterDays) + " days: " + str(len(usersToDelete)))
+        userDB.purge(usersToDelete)
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 

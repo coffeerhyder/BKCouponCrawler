@@ -71,7 +71,7 @@ class Coupon(Document):
             return True
 
     def getIsNew(self) -> bool:
-        """ Determines whether ir not this coupon is considered 'new'. """
+        """ Determines whether or not this coupon is considered 'new'. """
         if self.isNew is not None:
             return self.isNew
         elif self.isNewUntilDate is not None:
@@ -408,3 +408,12 @@ class CouponFilter(BaseModel):
     isNew: Optional[Union[bool, None]] = None
     isHidden: Optional[Union[bool, None]] = None
     sortMode: Optional[Union[None, CouponSortMode]]
+
+
+def getCouponTitleMapping(coupons: dict) -> dict:
+    """ Maps normalized coupon titles to coupons with the goal of being able to match coupons by title
+    e.g. to find duplicates or coupons with different IDs containing the same products. """
+    couponTitleMappingTmp = {}
+    for coupon in coupons.values():
+        couponTitleMappingTmp.setdefault(coupon.getNormalizedTitle(), []).append(coupon)
+    return couponTitleMappingTmp

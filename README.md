@@ -134,6 +134,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
+* couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Server Auto reboot und Update jede Nacht
 * User automatisch löschen, die noch Benachrichtigungen möchten, aber den Bot blockiert haben
 * Vergleichspreise anhand Produktnamen-Matching updaten, wenn es Produkte mehrfach als Coupons gibt (derzeit z.B. 6ChiliCheeseNuggets 2,49€ einmal mit Vergleichspreis und einmal ohne)
