@@ -20,6 +20,7 @@ class Coupon(Document):
     title = TextField()
     titleShortened = TextField()
     timestampStart = FloatField()
+    # TODO: Remove 2nd expire-date as we can't use it
     timestampExpire = FloatField()  # Internal expire-date
     timestampExpire2 = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
     dateFormattedStart = TextField()
