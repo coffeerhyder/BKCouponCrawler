@@ -842,30 +842,28 @@ class BKBot:
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
         userDB = self.crawler.getUsersDB()
         user = User.load(userDB, str(update.effective_user.id))
-        coupons = self.getBotCoupons()
-        userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(coupons)
-        if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0 and user.settings.autoDeleteExpiredFavorites:
-            for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
-                del user.favoriteCoupons[unavailableCoupon.id]
-            # Update DB
-            user.store(userDB)
-        else:
-            # This should never happen
-            logging.info("No expired favorites there to delete")
-        # Reload settings menu
+        self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
 
-    def batchprocessAutoDeleteUsersUnavailableFavorites(self):
+    def batchProcessAutoDeleteUsersUnavailableFavorites(self):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
         userDB = self.crawler.getUsersDB()
+        users = []
+        for userIDStr in userDB:
+            user = User.load(userDB, userIDStr)
+            if user.settings.autoDeleteExpiredFavorites:
+                users.append(user)
+        self.deleteUsersUnavailableFavorites(userDB, users)
+
+    def deleteUsersUnavailableFavorites(self, userDB: Database, users: list):
+        """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
         coupons = self.getBotCoupons()
         dbUpdates = []
-        for userID in userDB:
-            user = User.load(userDB, userID)
+        for user in users:
             userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(coupons)
-            if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0 and user.settings.autoDeleteExpiredFavorites:
+            if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0:
                 for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
-                    del user.favoriteCoupons[unavailableCoupon.id]
+                    user.deleteFavoriteCouponID(unavailableCoupon.id)
                 dbUpdates.append(user)
         if len(dbUpdates) > 0:
             logging.info('Deleting expired favorites of ' + str(len(dbUpdates)) + ' users')
@@ -915,7 +913,7 @@ class BKBot:
         """ Runs all processes which should only run once per day. """
         self.crawl()
         self.renewPublicChannel()
-        self.batchprocessAutoDeleteUsersUnavailableFavorites()
+        self.batchProcessAutoDeleteUsersUnavailableFavorites()
         self.notifyUsers()
         self.cleanupPublicChannel()
 
@@ -923,6 +921,7 @@ class BKBot:
         """ Runs all processes which should only run once per day:
          1. Crawler, 2. User notify favorites and user notify new coupons """
         self.crawl()
+        self.batchProcessAutoDeleteUsersUnavailableFavorites()
         self.notifyUsers()
 
     def crawl(self):
