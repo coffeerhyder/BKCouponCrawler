@@ -126,7 +126,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     index = -1
     dbUserUpdates = []
     usersToDelete = []
-    deleteBlockedUsersAfterDays = 2
+    deleteBlockedUsersAfterDays = 30
     for userIDStr, postText in usersNotify.items():
         index += 1
         # isLastItem = index == len(usersNotify) - 1

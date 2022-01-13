@@ -403,7 +403,7 @@ def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:
 class CouponFilter(BaseModel):
     activeOnly: Optional[bool] = True
     containsFriesAndCoke: Optional[Union[bool, None]] = None
-    excludeCouponsByDuplicatedProductTitles: Optional[bool] = False
+    excludeCouponsByDuplicatedProductTitles: Optional[bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
     allowedCouponSources: Optional[Union[List[int], None]] = None  # None = allow all sources!
     isNew: Optional[Union[bool, None]] = None
     isHidden: Optional[Union[bool, None]] = None
