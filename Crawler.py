@@ -428,6 +428,8 @@ class BKCrawler:
             if len(dbUpdates) > 0:
                 couponDB.update(dbUpdates)
                 logging.info("Pushed " + str(len(dbUpdates)) + " extra coupons DB updates")
+                # Important!
+                self.downloadProductiveCouponDBImagesAndCreateQRCodes()
 
     def processCrawledCoupons(self, crawledCouponsDict: dict):
         """ Process crawled coupons: Apply necessary corrections and update DB. """

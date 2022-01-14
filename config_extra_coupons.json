@@ -39,6 +39,16 @@
       "imageURL": "file://media/extra_coupons_pics/2022_03_04_PayBack_965_99110.png",
       "expire_date": "2022-03-04",
       "isNewUntilDate": "2022-01-08"
+    },
+    {
+      "uniqueID": "99139",
+	  "plu": "99139",
+      "title": "8Fach auf jede Bestellung",
+      "source": 8,
+      "imageURL": "file://media/extra_coupons_pics/2022_01_30_Payback_99139.jpg",
+      "expire_date": "2022-01-30",
+      "isNewUntilDate": "2022-01-16",
+	  "description": "Danke an: mydealz.de/gutscheine/5fach-payback-punkte-bei-burger-king-1932607"
     }
   ]
 }

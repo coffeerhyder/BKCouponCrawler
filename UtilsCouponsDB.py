@@ -158,7 +158,8 @@ class Coupon(Document):
         if os.path.exists(path):
             return open(path, mode='rb')
         else:
-            return None
+            # Return fallback --> This should never happen!
+            return open('media/fallback_image_missing_qr_image.jpeg', mode='rb')
 
     def generateCouponShortText(self, highlightIfNew: bool) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
