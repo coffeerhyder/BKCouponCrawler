@@ -214,7 +214,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     for uniqueCouponID in channelDB:
         if uniqueCouponID not in activeCoupons:
             channelCoupon = ChannelCoupon.load(channelDB, uniqueCouponID)
-            infoDBDoc[InfoEntry.messageIDsToDelete.name] += channelCoupon[ChannelCoupon.messageIDs.name]
+            infoDBDoc.addMessageIDsToDelete(channelCoupon.messageIDs)
             # Collect it here so we can delete it with only one DB request later.
             deletedChannelCoupons.append(channelCoupon)
     # Update DB if needed
@@ -246,7 +246,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         for coupon in couponsToSendOut.values():
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
             if channelCoupon is not None and len(channelCoupon.messageIDs) > 0:
-                infoDBDoc[InfoEntry.messageIDsToDelete.name] += channelCoupon[ChannelCoupon.messageIDs.name]
+                infoDBDoc.addMessageIDsToDelete(channelCoupon.messageIDs)
                 channelCoupon.messageIDs = ChannelCoupon().messageIDs  # Nuke array (default = [])
                 channelCouponDBUpdates.append(channelCoupon)
         # Update DB
@@ -295,7 +295,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Update channel information message if needed
     if len(updatedCoupons) > 0 or len(deletedChannelCoupons) > 0 or len(
             couponsToSendOut) > 0 or updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE or DEBUGNOTIFICATOR:
-        bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB, infoDBDoc=infoDBDoc, allowMessageEdit=False)
+        bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB, infoDBDoc=infoDBDoc)
 
         """ Generate new information message text. """
         infoText = '<b>Heutiges Update:</b>'

@@ -309,8 +309,7 @@ class BKBot:
         update.callback_query.answer()
         activeCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
-                                                channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None,
-                                                allowMessageEdit=False)
+                                                channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
         self.deleteMessage(chat_id=update.effective_user.id, messageID=update.callback_query.message.message_id)
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
@@ -976,7 +975,7 @@ class BKBot:
         cleanupCache(self.offerImageCache)
 
     def sendCouponOverviewWithChannelLinks(self, chat_id: Union[int, str], coupons: dict, useLongCouponTitles: bool, channelDB: Database, infoDB: Union[None, Database],
-                                           infoDBDoc: Union[None, InfoEntry], allowMessageEdit: bool):
+                                           infoDBDoc: Union[None, InfoEntry]):
         """ Sends all given coupons to given chat_id separated by source and split into multiple messages as needed. """
         couponsSeparatedByType = getCouponsSeparatedByType(coupons)
         """ Update/re-send coupon overview(s), spread this information on multiple pages if needed. """
@@ -994,20 +993,10 @@ class BKBot:
                 # Depends on the max entities per post limit of Telegram and we're not only using hyperlinks but also the "<b>" tag so we do not have 50 hyperlinks left but 49.
                 maxCouponsPerPage = 49
                 maxPage = math.ceil(len(coupons) / maxCouponsPerPage)
-                if allowMessageEdit and messageIDsForThisCategory is not None:
-                    # Delete pages if there are too many
-                    if len(messageIDsForThisCategory) > maxPage:
-                        deleteStartIndex = (len(messageIDsForThisCategory) - (len(messageIDsForThisCategory) - maxPage)) - 1
-                        for index in range(deleteStartIndex, len(messageIDsForThisCategory)):
-                            infoDBDoc.messageIDsToDelete.append(messageIDsForThisCategory[index])
-                        # Update our array as we fill it again later
-                        del messageIDsForThisCategory[deleteStartIndex: len(messageIDsForThisCategory)]
-                        # Update DB
-                        infoDBDoc.store(infoDB)
-                elif messageIDsForThisCategory is not None and len(messageIDsForThisCategory) > 0 and infoDBDoc is not None:
+                if messageIDsForThisCategory is not None and len(messageIDsForThisCategory) > 0 and infoDBDoc is not None:
                     # Delete all old pages for current coupon type
                     # Save old messages for later deletion
-                    infoDBDoc[InfoEntry.messageIDsToDelete.name] += messageIDsForThisCategory
+                    infoDBDoc.addMessageIDsToDelete(messageIDsForThisCategory)
                     messageIDsForThisCategory.clear()
                     # Update DB
                     infoDBDoc.store(infoDB)
@@ -1060,19 +1049,14 @@ class BKBot:
                         # Exit loop after last coupon info has been added
                         if couponIndex == len(coupons) - 1:
                             break
-                    if allowMessageEdit and page - 1 <= len(messageIDsForThisCategory) - 1:
-                        # Edit last post of current page
-                        msgIDToEdit = messageIDsForThisCategory[page - 1]
-                        self.editMessage(chat_id=chat_id, message_id=msgIDToEdit, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True)
-                    else:
-                        # Send new post containing current page
-                        msg = self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
-                                               disable_notification=True)
-                        if messageIDsForThisCategory is not None:
-                            messageIDsForThisCategory.append(msg.message_id)
-                        if infoDBDoc is not None:
-                            # Update DB
-                            infoDBDoc.store(infoDB)
+                    # Send new post containing current page
+                    msg = self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
+                                           disable_notification=True)
+                    if messageIDsForThisCategory is not None:
+                        messageIDsForThisCategory.append(msg.message_id)
+                    if infoDBDoc is not None:
+                        # Update DB
+                        infoDBDoc.store(infoDB)
             elif messageIDsForThisCategory is not None and len(messageIDsForThisCategory) > 0:
                 """ Cleanup chat:
                 Typically needed if a complete supported coupon type was there but is not existant anymore e.g. paper coupons were there but aren't existant anymore -> Delete old overview-message(s) """
