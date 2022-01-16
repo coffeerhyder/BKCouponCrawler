@@ -78,7 +78,6 @@ class BKCrawler:
             os.makedirs(getPathImagesProducts())
         # Do this here so manually added coupons will get added without extra crawl process
         self.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=True)
-        self.migrateDBs()
         # Make sure that our cache gets filled on init
         couponDB = self.getCouponDB()
         self.updateCache(couponDB)
@@ -137,6 +136,7 @@ class BKCrawler:
         """ Migrate DBs from old to new version - leave this function empty if there is nothing to migrate. """
         # logging.info("Migrating DBs...")
         # logging.info("Migrate DBs done")
+        # 2022-01-16: Not required anymore
         userDB = self.getUsersDB()
         keysMapping = {"timestampExpire": "timestampExpireInternal", "dateFormattedExpire": "dateFormattedExpireInternal", "timestampExpire2": "timestampExpire", "dateFormattedExpire2": "dateFormattedExpire"}
         for userID in userDB:
