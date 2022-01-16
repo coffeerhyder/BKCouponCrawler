@@ -1182,8 +1182,6 @@ if __name__ == '__main__':
     elif 'resumechannelupdate' in sys.argv:
         bkbot.resumePublicChannelUpdate()
         bkbot.cleanupPublicChannel()
-    elif 'usernotify' in sys.argv:
-        bkbot.notifyUsers()
     elif 'forcebatchprocess' in sys.argv:
         # bkbot.crawl()
         # bkbot.notifyUsers()
@@ -1197,6 +1195,8 @@ if __name__ == '__main__':
         cleanupChannel(bkbot)
     elif 'migrate' in sys.argv:
         bkbot.crawler.migrateDBs()
+    if 'usernotify' in sys.argv:
+        bkbot.notifyUsers()
     # schedule.every(10).seconds.do(bkbot.startBot)
     while True:
         schedule.run_pending()
