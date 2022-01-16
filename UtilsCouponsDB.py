@@ -33,7 +33,7 @@ class Coupon(Document):
     isNewUntilDate = TextField()
     isHidden = BooleanField(default=False)  # Typically only available for App coupons
     isUnsafeExpiredate = BooleanField(
-        default=False)  # Set this if timestampExpire2 is a made up date that is just there to ensure that the coupon is considered valid for a specified time
+        default=False)  # Set this if timestampExpire is a made up date that is just there to ensure that the coupon is considered valid for a specified time
     description = TextField()
     # TODO: Implement this so we can remove the extra database for coupons in channel
     # channelMessageID_image = IntegerField()
@@ -310,7 +310,7 @@ class User(Document):
             return False
 
     def addFavoriteCoupon(self, coupon: Coupon):
-        self.favoriteCoupons[coupon.id] = coupon.data
+        self.favoriteCoupons[coupon.id] = coupon['data']
 
     def deleteFavoriteCouponID(self, couponID: str):
         del self.favoriteCoupons[couponID]

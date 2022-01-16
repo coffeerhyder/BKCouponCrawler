@@ -78,6 +78,7 @@ class BKCrawler:
             os.makedirs(getPathImagesProducts())
         # Do this here so manually added coupons will get added without extra crawl process
         self.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=True)
+        self.migrateDBs()
         # Make sure that our cache gets filled on init
         couponDB = self.getCouponDB()
         self.updateCache(couponDB)
@@ -136,7 +137,20 @@ class BKCrawler:
         """ Migrate DBs from old to new version - leave this function empty if there is nothing to migrate. """
         # logging.info("Migrating DBs...")
         # logging.info("Migrate DBs done")
-        pass
+        userDB = self.getUsersDB()
+        keysMapping = {"timestampExpire": "timestampExpireInternal", "dateFormattedExpire": "dateFormattedExpireInternal", "timestampExpire2": "timestampExpire", "dateFormattedExpire2": "dateFormattedExpire"}
+        for userID in userDB:
+            user = User.load(userDB, userID)
+            needsUpdate = False
+            for couponData in user.favoriteCoupons.values():
+                for oldKey, newKey in keysMapping.items():
+                    valueOfOldKey = couponData.get(oldKey)
+                    if valueOfOldKey is not None:
+                        needsUpdate = True
+                        couponData[newKey] = valueOfOldKey
+                        del couponData[oldKey]
+            if needsUpdate:
+                user.store(userDB)
 
     def crawlAndProcessData(self):
         """ One function that does it all! Launch this every time you run the crawler. """
@@ -442,8 +456,8 @@ class BKCrawler:
             if paperCouponOverride is not None:
                 usedMappingToFindPaperCoupons = True
                 coupon.source = CouponSource.PAPER
-                coupon.timestampExpire = paperCouponOverride.timestampExpire2
-                coupon.dateFormattedExpire = paperCouponOverride.dateFormattedExpire2
+                coupon.timestampExpire = paperCouponOverride.timestampExpire
+                coupon.dateFormattedExpire = paperCouponOverride.dateFormattedExpire
                 coupon.plu = paperCouponOverride.plu
 
         foundPaperCoupons = []
