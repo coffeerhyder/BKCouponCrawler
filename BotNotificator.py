@@ -2,13 +2,13 @@ import logging
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Union, List
+from typing import Union
 
 from telegram import InputMediaPhoto
 from telegram.error import BadRequest, Unauthorized
 
 from BotUtils import getBotImpressum
-from Helper import INFO_DB, DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
+from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
 
 from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter, sortCouponsByPrice, getCouponTitleMapping
 from CouponCategory import BotAllowedCouponSources
@@ -204,10 +204,8 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != coupon.getUniqueIdentifier():
             # Current/new coupon data differs from coupon we've posted in channel (same unique ID but coupon data has changed)
             updatedCoupons[coupon.id] = coupon
-    # TODO: messageIDsToDelete can contain duplicates. This is not a fatal issue but we should avoid this anyways!
     if len(infoDBDoc.messageIDsToDelete) > 0:
         # This can happen but should only be a rare occurance!
-        # TODO: There might be a bug? This array is never empty?
         logging.warning("Found " + str(len(infoDBDoc.messageIDsToDelete)) + " leftover messageIDs to delete")
     # Collect deleted coupons from channel
     deletedChannelCoupons = []
@@ -328,13 +326,13 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         Did we only delete coupons and/or update existing ones while there were no new coupons coming in AND we were not forced to delete- and re-send all items?
         Edit our last message if existant so the user won't receive a new notification!
         """
-        oldInfoMsgID = infoDBDoc.get(INFO_DB.DB_INFO_channel_last_information_message_id)
+        oldInfoMsgID = infoDBDoc.informationMessageID
         # Post new message and store old for later deletion
         if oldInfoMsgID is not None:
             infoDBDoc.messageIDsToDelete.append(oldInfoMsgID)
         newMsg = bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True)
         # Store new messageID
-        infoDBDoc[INFO_DB.DB_INFO_channel_last_information_message_id] = newMsg.message_id
+        infoDBDoc.informationMessageID = newMsg.message_id
         infoDBDoc.store(infoDB)
     logging.info("Channel update done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
@@ -344,11 +342,11 @@ def cleanupChannel(bkbot):
     timestampStart = datetime.now().timestamp()
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
-    deleteLeftoverCouponMessageIDsToDelete(bkbot, infoDB, infoDoc)
+    deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc)
     logging.info("Channel cleanup done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
 
-def deleteLeftoverCouponMessageIDsToDelete(bkbot, infoDB, infoDoc):
+def deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc):
     """ Deletes all channel messages which were previously flagged for deletion. """
     if len(infoDoc.messageIDsToDelete) > 0:
         initialNumberofMsgsToDelete = len(infoDoc.messageIDsToDelete)
@@ -358,9 +356,9 @@ def deleteLeftoverCouponMessageIDsToDelete(bkbot, infoDB, infoDoc):
             logging.info("Deleting messageID " + str(index + 1) + "/" + str(initialNumberofMsgsToDelete) + " | " + str(messageID))
             bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID)
             infoDoc.messageIDsToDelete.remove(messageID)
-            # Save current state to DB
-            infoDoc.store(infoDB)
             index += 1
+        # Update DB
+        infoDoc.store(infoDB)
 
 
 def nukeChannel(bkbot):
@@ -368,7 +366,6 @@ def nukeChannel(bkbot):
     timestampStart = datetime.now().timestamp()
     logging.info("Nuking channel...")
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
-    justDeletedMessageIDs = []
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
     if len(channelDB) > 0:
@@ -382,37 +379,28 @@ def nukeChannel(bkbot):
             channelCoupon = ChannelCoupon.load(channelDB, couponID)
             for messageID in channelCoupon.messageIDs:
                 bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID)
-            justDeletedMessageIDs += channelCoupon.messageIDs
             del channelDB[couponID]
     # Delete coupon overview messages
     logging.info("Deleting information messages...")
+    updateInfoDoc = False
     for couponSource in BotAllowedCouponSources:
-        couponOverviewDBKey = INFO_DB.DB_INFO_channel_last_coupon_type_overview_message_ids + str(couponSource)
-        couponOverviewMessageIDs = infoDoc.get(couponOverviewDBKey, [])
+        couponOverviewMessageIDs = infoDoc.getMessageIDsForCouponCategory(couponSource)
         if len(couponOverviewMessageIDs) > 0:
-            deleteMessageIDs(bkbot, couponOverviewMessageIDs)
-            del infoDoc[couponOverviewDBKey]
+            bkbot.deleteMessages(chat_id=bkbot.getPublicChannelChatID(), messageIDs=couponOverviewMessageIDs)
+            infoDoc.deleteCouponCategoryMessageIDs(couponSource)
+            updateInfoDoc = True
     # Delete coupon information message
     if infoDoc.informationMessageID is not None:
         logging.info("Deleting channel overview message")
         bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=infoDoc.informationMessageID)
         infoDoc.informationMessageID = None
-        # Update DB
+        updateInfoDoc = True
+    if updateInfoDoc:
+        # Update DB if changes were made
         infoDoc.store(infoDB)
-    deleteLeftoverCouponMessageIDsToDelete(bkbot, infoDB, infoDoc)
+    deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc)
 
     logging.info("Cleanup channel DONE! --> Total time needed: " + getFormattedPassedTime(timestampStart))
-
-
-def deleteMessageIDs(bkbot, messageIDs: Union[List[int], None]):
-    """ Deletes array of messageIDs. """
-    if messageIDs is None:
-        return
-    index = 0
-    for msgID in messageIDs:
-        logging.info("Deleting message " + str(index + 1) + " / " + str(len(messageIDs)) + " | " + str(msgID))
-        bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=msgID)
-        index += 1
 
 
 def editMessageAndWait(bkbot, messageID: Union[int, str, None], messageText) -> bool:

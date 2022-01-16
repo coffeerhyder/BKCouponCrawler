@@ -25,12 +25,6 @@ class DATABASES:
     TELEGRAM_CHANNEL = 'telegram_channel'
 
 
-class INFO_DB:
-    """ Names of keys inside different DBs. """
-    DB_INFO_channel_last_information_message_id = 'channel_last_information_message_id'
-    DB_INFO_channel_last_coupon_type_overview_message_ids = 'channel_last_coupon_type_overview_message_ids_'
-
-
 class HISTORYDB:
     COUPONS_HISTORY_DOC = 'history'
 

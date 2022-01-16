@@ -20,12 +20,11 @@ class Coupon(Document):
     title = TextField()
     titleShortened = TextField()
     timestampStart = FloatField()
-    # TODO: Remove 2nd expire-date as we can't use it
-    timestampExpire = FloatField()  # Internal expire-date
-    timestampExpire2 = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
+    timestampExpireInternal = FloatField()  # Internal expire-date
+    timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
     dateFormattedStart = TextField()
+    dateFormattedExpireInternal = TextField()
     dateFormattedExpire = TextField()
-    dateFormattedExpire2 = TextField()
     imageURL = TextField()
     productIDs = ListField(IntegerField())
     source = IntegerField()
@@ -91,10 +90,7 @@ class Coupon(Document):
             return False
 
     def getExpireDatetime(self) -> Union[datetime, None]:
-        # First check for artificial expire-date which is usually shorter than the other date - prefer that!
-        if self.timestampExpire2 is not None:
-            return datetime.fromtimestamp(self.timestampExpire2, getTimezone())
-        elif self.timestampExpire is not None:
+        if self.timestampExpire is not None:
             return datetime.fromtimestamp(self.timestampExpire, getTimezone())
         else:
             # This should never happen
@@ -102,9 +98,7 @@ class Coupon(Document):
             return None
 
     def getExpireDateFormatted(self, fallback=None) -> Union[str, None]:
-        if self.dateFormattedExpire2 is not None:
-            return self.dateFormattedExpire2
-        elif self.dateFormattedExpire is not None:
+        if self.dateFormattedExpire is not None:
             return self.dateFormattedExpire
         else:
             return fallback
@@ -352,25 +346,38 @@ class User(Document):
 
 
 class InfoEntry(Document):
-    timestampLastCrawl = FloatField(name="timestamp_last_crawl", default=-1)
-    timestampLastChannelUpdate = FloatField(name="timestamp_last_telegram_channel_update", default=-1)
-    informationMessageID = TextField(name="channel_last_information_message_id")
-    couponTypeOverviewMessageIDs = ListField(TextField(), name="channel_last_coupon_type_overview_message_ids_")
-    messageIDsToDelete = ListField(IntegerField(), name="message_ids_to_delete", default=[])
+    timestampLastCrawl = FloatField(default=-1)
+    timestampLastChannelUpdate = FloatField(default=-1)
+    informationMessageID = TextField()
+    couponTypeOverviewMessageIDs = DictField(default={})
+    messageIDsToDelete = ListField(IntegerField(), default=[])
 
     def addMessageIDToDelete(self, messageID: int):
-        self.messageIDsToDelete.append(messageID)
+        # Avoid duplicates
+        if messageID not in self.messageIDsToDelete:
+            self.messageIDsToDelete.append(messageID)
 
     def addMessageIDsToDelete(self, messageIDs: List):
         for messageID in messageIDs:
             self.addMessageIDToDelete(messageID)
 
+    def addCouponCategoryMessageID(self, couponSource: int, messageID: int):
+        self.couponTypeOverviewMessageIDs.setdefault(couponSource, []).append(messageID)
+
+    def getMessageIDsForCouponCategory(self, couponSource: int) -> List[int]:
+        return self.couponTypeOverviewMessageIDs.get(str(couponSource), [])
+
+    def deleteCouponCategoryMessageIDs(self, couponSource: int):
+        if str(couponSource) in self.couponTypeOverviewMessageIDs:
+            del self.couponTypeOverviewMessageIDs[str(couponSource)]
+
 
 class ChannelCoupon(Document):
-    # names are given to ensure compatibility to older DB versions. TODO: Remove this whenever possible. To do this, channel needs to be manually wiped with current/older version. Then these names can be removed and channel update can be sent out.
-    uniqueIdentifier = TextField(name="coupon_unique_identifier")
-    messageIDs = ListField(IntegerField(), name="coupon_message_ids")
-    timestampMessagesPosted = FloatField(name="timestamp_tg_messages_posted", default=-1)
+    """ Represents a coupon posted in a Telegram channel.
+     Only contains minimum of required information as information about coupons itself is stored in another DB. """
+    uniqueIdentifier = TextField()
+    messageIDs = ListField(IntegerField())
+    timestampMessagesPosted = FloatField(default=-1)
 
 
 class CouponSortMode(Enum):

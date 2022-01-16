@@ -168,8 +168,8 @@ class BKCrawler:
                                source=CouponSource.APP, isHidden=coupon['hidden'])
             expireDatetime = couponGetExpireDatetime(coupon)
             if expireDatetime is not None:
-                newCoupon.timestampExpire2 = expireDatetime.timestamp()
-                newCoupon.dateFormattedExpire2 = formatDateGerman(expireDatetime)
+                newCoupon.timestampExpire = expireDatetime.timestamp()
+                newCoupon.dateFormattedExpire = formatDateGerman(expireDatetime)
             timestampStart = couponGetStartTimestamp(coupon)
             if timestampStart > -1:
                 newCoupon.timestampStart = timestampStart
@@ -406,8 +406,8 @@ class BKCrawler:
             coupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(coupon.title)
             expiredateStr = extraCouponJson["expire_date"] + " 23:59:59"
             expiredate = datetime.strptime(expiredateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
-            coupon.timestampExpire2 = expiredate.timestamp()
-            coupon.dateFormattedExpire2 = formatDateGerman(expiredate)
+            coupon.timestampExpire = expiredate.timestamp()
+            coupon.dateFormattedExpire = formatDateGerman(expiredate)
             # Only add coupon if it is valid
             if coupon.isValid():
                 extraCouponsToAdd[coupon.uniqueID] = coupon
@@ -442,8 +442,8 @@ class BKCrawler:
             if paperCouponOverride is not None:
                 usedMappingToFindPaperCoupons = True
                 coupon.source = CouponSource.PAPER
-                coupon.timestampExpire2 = paperCouponOverride.timestampExpire2
-                coupon.dateFormattedExpire2 = paperCouponOverride.dateFormattedExpire2
+                coupon.timestampExpire = paperCouponOverride.timestampExpire2
+                coupon.dateFormattedExpire = paperCouponOverride.dateFormattedExpire2
                 coupon.plu = paperCouponOverride.plu
 
         foundPaperCoupons = []
@@ -512,8 +512,8 @@ class BKCrawler:
                         artificialExpireTimestamp = todayDayEnd.timestamp() + 2 * 24 * 60
                         for paperCoupon in paperCoupons:
                             paperCoupon.source = CouponSource.PAPER
-                            paperCoupon.timestampExpire2 = artificialExpireTimestamp
-                            paperCoupon.dateFormattedExpire2 = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
+                            paperCoupon.timestampExpire = artificialExpireTimestamp
+                            paperCoupon.dateFormattedExpire = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
                             paperCoupon.isUnsafeExpiredate = True
                             paperCoupon.description = SYMBOLS.INFORMATION + "Das hier eingetragene Ablaufdatum ist vorläufig und wird zeitnah korrigiert!"
                         foundPaperCouponMap[paperPLUChar] = paperCoupons
@@ -895,8 +895,8 @@ class BKCrawler:
                                  'TYPE': coupon.source,
                                  'PRICE': coupon.get(Coupon.price.name, -1), 'PRICE_COMPARE': coupon.get(Coupon.priceCompare.name, -1),
                                  'START': (coupon.dateFormattedStart if coupon.dateFormattedStart is not None else "N/A"),
-                                 'EXP': (coupon.dateFormattedExpire if coupon.dateFormattedExpire is not None else "N/A"),
-                                 'EXP2': (coupon.dateFormattedExpire2 if coupon.dateFormattedExpire2 is not None else "N/A"),
+                                 'EXP': (coupon.dateFormattedExpireInternal if coupon.dateFormattedExpireInternal is not None else "N/A"),
+                                 'EXP2': (coupon.dateFormattedExpire if coupon.dateFormattedExpire is not None else "N/A"),
                                  'EXP_PRODUCTIVE': coupon.getExpireDateFormatted()
                                  })
 
