@@ -310,7 +310,7 @@ class User(Document):
             return False
 
     def addFavoriteCoupon(self, coupon: Coupon):
-        self.favoriteCoupons[coupon.id] = coupon['data']
+        self.favoriteCoupons[coupon.id] = coupon._data
 
     def deleteFavoriteCouponID(self, couponID: str):
         del self.favoriteCoupons[couponID]
