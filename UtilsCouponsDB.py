@@ -35,9 +35,6 @@ class Coupon(Document):
     isUnsafeExpiredate = BooleanField(
         default=False)  # Set this if timestampExpire is a made up date that is just there to ensure that the coupon is considered valid for a specified time
     description = TextField()
-    # TODO: Implement this so we can remove the extra database for coupons in channel
-    # channelMessageID_image = IntegerField()
-    # channelMessageID_qr = IntegerField()
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -79,8 +76,7 @@ class Coupon(Document):
             return self.isNew
         elif self.isNewUntilDate is not None:
             try:
-                enforceIsNewOverrideUntilDateStr = self.isNewUntilDate + ' 23:59:59'
-                enforceIsNewOverrideUntilDate = datetime.strptime(enforceIsNewOverrideUntilDateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
+                enforceIsNewOverrideUntilDate = datetime.strptime(self.isNewUntilDate + ' 23:59:59', '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
                 if enforceIsNewOverrideUntilDate.timestamp() > datetime.now().timestamp():
                     return True
                 else:
@@ -312,6 +308,9 @@ class User(Document):
     def addFavoriteCoupon(self, coupon: Coupon):
         self.favoriteCoupons[coupon.id] = coupon._data
 
+    def deleteFavoriteCoupon(self, coupon: Coupon):
+        self.deleteFavoriteCouponID(coupon.id)
+
     def deleteFavoriteCouponID(self, couponID: str):
         del self.favoriteCoupons[couponID]
 
@@ -381,6 +380,28 @@ class ChannelCoupon(Document):
     uniqueIdentifier = TextField()
     messageIDs = ListField(IntegerField())
     timestampMessagesPosted = FloatField(default=-1)
+    channelMessageID_image = IntegerField()
+    channelMessageID_qr = IntegerField()
+    channelMessageID_text = IntegerField()
+
+    def getMessageIDs(self) -> List[int]:
+        messageIDs = []
+        if self.channelMessageID_image is not None:
+            messageIDs.append(self.channelMessageID_image)
+        if self.channelMessageID_qr is not None:
+            messageIDs.append(self.channelMessageID_qr)
+        if self.channelMessageID_text is not None:
+            messageIDs.append(self.channelMessageID_text)
+        return messageIDs
+
+    def deleteMessageIDs(self):
+        # Nullification
+        self.channelMessageID_image = None
+        self.channelMessageID_qr = None
+        self.channelMessageID_text = None
+
+    def getMessageIDForChatHyperlink(self) -> Union[None, int]:
+        return self.channelMessageID_image
 
 
 class CouponSortMode(Enum):

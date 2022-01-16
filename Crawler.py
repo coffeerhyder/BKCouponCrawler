@@ -975,14 +975,13 @@ class BKCrawler:
     def getUsersDB(self):
         return self.couchdb[DATABASES.TELEGRAM_USERS]
 
-    def filterCoupons(
+    def getFilteredCoupons(
             self, filters: CouponFilter
     ) -> dict:
-        """ Use filters to only get the coupons you want.
+        """ Use this to only get the coupons you want.
          Returns all by default."""
         timestampStart = datetime.now().timestamp()
         couponDB = self.getCouponDB()
-        # TODO: Use couchDB built in filter functions which should improve performance
         # if True:
         #     allCoupons = {}
         #     for couponID in couponDB:
@@ -1079,11 +1078,11 @@ class BKCrawler:
             logging.debug("Time it took to get- and sort coupons: " + getFormattedPassedTime(timestampStart))
             return filteredAndSortedCouponsDict
 
-    def filterCouponsList(
+    def getFilteredCouponsAsList(
             self, filters: CouponFilter
     ) -> List[dict]:
-        """ Wrapper for filterCoupons """
-        filteredCouponsDict = self.filterCoupons(filters)
+        """ Wrapper """
+        filteredCouponsDict = self.getFilteredCoupons(filters)
         return list(filteredCouponsDict.values())
 
     def getOffersActive(self) -> list:
@@ -1098,7 +1097,7 @@ class BKCrawler:
 
     def getBotCoupons(self):
         """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
-        return self.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
+        return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
 
 
 def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
