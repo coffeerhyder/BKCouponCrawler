@@ -1169,8 +1169,8 @@ def getCouponMappingForCrawler() -> dict:
         if mappingTmp is not None:
             expireTimestamp = paperData['expire_timestamp']
             for uniquePaperCouponID, plu in mappingTmp.items():
-                paperCouponMapping[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, source=CouponSource.PAPER, plu=plu, timestampExpire2=expireTimestamp,
-                                                                 dateFormattedExpire2=formatDateGerman(datetime.fromtimestamp(expireTimestamp)))
+                paperCouponMapping[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, source=CouponSource.PAPER, plu=plu, timestampExpire=expireTimestamp,
+                                                                 dateFormattedExpire=formatDateGerman(datetime.fromtimestamp(expireTimestamp)))
     return paperCouponMapping
 
 
