@@ -9,7 +9,6 @@ import pytz
 import simplejson as json
 from PIL import Image
 
-import BotUtils
 from BotUtils import BotProperty
 
 
@@ -18,23 +17,12 @@ class DATABASES:
     INFO_DB = 'info_db'
     COUPONS = 'coupons'
     COUPONS_HISTORY = 'coupons_history'
-    COUPONS2_HISTORY = 'coupons2_history'
     OFFERS = 'offers'
-    OFFERS_HISTORY = 'offers_history'
     PRODUCTS = 'products'
     PRODUCTS_HISTORY = 'products_history'
     PRODUCTS2_HISTORY = 'products2_history'
     TELEGRAM_USERS = 'telegram_users'
     TELEGRAM_CHANNEL = 'telegram_channel'
-
-
-class INFO_DB:
-    """ Names of keys inside different DBs. """
-    DB_INFO_TIMESTAMP_LAST_CRAWL = 'timestamp_last_crawl'
-    DB_INFO_channel_last_information_message_id = 'channel_last_information_message_id'
-    DB_INFO_channel_last_coupon_type_overview_message_ids = 'channel_last_coupon_type_overview_message_ids_'
-    DB_INFO_TIMESTAMP_LAST_TELEGRAM_CHANNEL_UPDATE = 'timestamp_last_telegram_channel_update'
-    MESSAGE_IDS_TO_DELETE = 'message_ids_to_delete'
 
 
 class HISTORYDB:
@@ -71,6 +59,11 @@ def couponOrOfferGetImageURL(data: dict) -> str:
 
 def setImageURLQuality(image_url: str) -> str:
     return image_url.replace('%{resolution}', '320')
+
+
+def normalizeString(string: str):
+    """ Returns lowercase String with all non-word characters removed. """
+    return replaceRegex(re.compile(r'[\W_]+'), '', string).lower()
 
 
 def shortenProductNames(couponTitle: str) -> str:
@@ -317,7 +310,3 @@ def isValidImageFile(path: str) -> bool:
         return True
     except:
         return False
-
-
-def loadPaperCouponConfigFile() -> dict:
-    return loadJson(BotUtils.BotProperty.paperCouponExtraDataPath)

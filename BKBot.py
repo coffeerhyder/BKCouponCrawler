@@ -20,7 +20,7 @@ import logging
 from Helper import *
 from Crawler import BKCrawler
 
-from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavorites
+from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo
 from CouponCategory import CouponCategory, BotAllowedCouponSources, CouponSource
 from UtilsOffers import offerGetImagePath
 
@@ -309,8 +309,7 @@ class BKBot:
         update.callback_query.answer()
         activeCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
-                                                channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None,
-                                                allowMessageEdit=False)
+                                                channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
         self.deleteMessage(chat_id=update.effective_user.id, messageID=update.callback_query.message.message_id)
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
@@ -376,26 +375,30 @@ class BKBot:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_MAIN
 
-    def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavorites, str]:
+    def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavoritesInfo, str]:
         if len(user.favoriteCoupons) == 0:
             raise BetterBotException('<b>Du hast noch keine Favoriten!</b>', InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
         else:
             if coupons is None:
                 # Perform DB request if not already done before
                 coupons = self.getBotCoupons()
-            userFavorites = user.getUserFavorites(coupons)
-            if len(userFavorites.couponsAvailable) == 0:
+            userFavoritesInfo = user.getUserFavoritesInfo(coupons)
+            if len(userFavoritesInfo.couponsAvailable) == 0:
                 # Edge case
                 errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' favorisierten Coupons verfügbar:</b>'
-                errorMessage += '\n' + userFavorites.getUnavailableFavoritesText()
-                if user.settings.notifyWhenFavoritesAreBack:
+                errorMessage += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
+                if user.isAllowSendFavoritesNotification():
                     errorMessage += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
                 raise BetterBotException(errorMessage, InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
 
-            menuText = SYMBOLS.STAR + str(len(userFavorites.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
+            menuText = SYMBOLS.STAR
+            if len(userFavoritesInfo.couponsUnavailable) == 0:
+                menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
+            else:
+                menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' / ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
             numberofEatableCouponsWithoutPrice = 0
             totalPrice = 0
-            for coupon in userFavorites.couponsAvailable:
+            for coupon in userFavoritesInfo.couponsAvailable:
                 if coupon.price is not None:
                     totalPrice += coupon.price
                 elif coupon.isEatable():
@@ -404,12 +407,11 @@ class BKBot:
                 menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalPrice)
                 if numberofEatableCouponsWithoutPrice > 0:
                     menuText += "*\n* exklusive " + str(numberofEatableCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
-            if len(userFavorites.couponsUnavailable) > 0:
-                menuText += '\n' + SYMBOLS.WARNING + str(len(userFavorites.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
-                menuText += '\n' + userFavorites.getUnavailableFavoritesText()
-                if not user.settings.notifyWhenFavoritesAreBack:
-                    menuText += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
-            return userFavorites, menuText
+            if len(userFavoritesInfo.couponsUnavailable) > 0:
+                menuText += '\n' + SYMBOLS.WARNING + str(len(userFavoritesInfo.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
+                menuText += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
+                menuText += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
+            return userFavoritesInfo, menuText
 
     def displayCouponsAsButtons(self, update: Update, user: Union[User, None], coupons: list, menuText: str, urlquery, highlightFavorites: bool):
         if len(coupons) == 0:
@@ -432,7 +434,7 @@ class BKBot:
         desiredPageContainsAtLeastOneFavoriteCoupon = False
         while len(buttons) < maxCouponsPerPage and index < len(coupons):
             coupon = coupons[index]
-            if coupon.id in user.favoriteCoupons and highlightFavorites:
+            if user.isFavoriteCoupon(coupon) and highlightFavorites:
                 buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
                 desiredPageContainsAtLeastOneFavoriteCoupon = True
             else:
@@ -605,12 +607,12 @@ class BKBot:
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite set.
-            userFavorites = user.getUserFavorites(self.getBotCoupons())
-            if len(userFavorites.couponsUnavailable) > 0:
-                keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavorites.couponsUnavailable)) + ")?*²",
+            userFavoritesInfo = user.getUserFavoritesInfo(self.getBotCoupons())
+            if len(userFavoritesInfo.couponsUnavailable) > 0:
+                keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavoritesInfo.couponsUnavailable)) + ")?*²",
                                                       callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
                 menuText += "\n*²" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
-                menuText += "\n" + userFavorites.getUnavailableFavoritesText()
+                menuText += "\n" + userFavoritesInfo.getUnavailableFavoritesText()
         keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Meine Daten löschen",
                                               callback_data=CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND)])
         # Back button
@@ -715,11 +717,12 @@ class BKBot:
 
         if uniqueCouponID in user.favoriteCoupons:
             # Delete coupon from favorites
-            del user.favoriteCoupons[uniqueCouponID]
+            user.deleteFavoriteCouponID(uniqueCouponID)
             isFavorite = False
         else:
             # Add coupon to favorites
-            user.favoriteCoupons[uniqueCouponID] = self.crawler.getCouponDB()[uniqueCouponID]
+            # user.addFavoriteCoupon(self.crawler.getCouponDB()[uniqueCouponID])
+            user.addFavoriteCoupon(Coupon.load(self.crawler.getCouponDB(), uniqueCouponID))
             isFavorite = True
         # Update DB
         user.store(userDB)
@@ -838,36 +841,34 @@ class BKBot:
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
         userDB = self.crawler.getUsersDB()
         user = User.load(userDB, str(update.effective_user.id))
-        coupons = self.getBotCoupons()
-        userUnavailableFavoriteCouponInfo = user.getUserFavorites(coupons)
-        if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0 and user.settings.autoDeleteExpiredFavorites:
-            for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
-                del user.favoriteCoupons[unavailableCoupon.id]
-            # Update DB
-            user.store(userDB)
-        else:
-            # This should never happen
-            logging.info("No expired favorites there to delete")
-        # Reload settings menu
+        self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
 
-    def batchprocessAutoDeleteUsersUnavailableFavorites(self):
+    def batchProcessAutoDeleteUsersUnavailableFavorites(self):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
         userDB = self.crawler.getUsersDB()
+        users = []
+        for userIDStr in userDB:
+            user = User.load(userDB, userIDStr)
+            if user.settings.autoDeleteExpiredFavorites:
+                users.append(user)
+        self.deleteUsersUnavailableFavorites(userDB, users)
+
+    def deleteUsersUnavailableFavorites(self, userDB: Database, users: list):
+        """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
         coupons = self.getBotCoupons()
         dbUpdates = []
-        for userID in userDB:
-            user = User.load(userDB, userID)
-            userUnavailableFavoriteCouponInfo = user.getUserFavorites(coupons)
-            if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0 and user.settings.autoDeleteExpiredFavorites:
+        for user in users:
+            userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(coupons)
+            if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0:
                 for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
-                    del user.favoriteCoupons[unavailableCoupon.id]
+                    user.deleteFavoriteCouponID(unavailableCoupon.id)
                 dbUpdates.append(user)
         if len(dbUpdates) > 0:
             logging.info('Deleting expired favorites of ' + str(len(dbUpdates)) + ' users')
             userDB.update(dbUpdates)
 
-    def getNewCouponsTextWithChannelHyperlinks(self, couponsDict: dict, maxNewCouponsDescriptionLines: int) -> str:
+    def getNewCouponsTextWithChannelHyperlinks(self, couponsDict: dict, maxNewCouponsToLink: int) -> str:
         infoText = ''
         """ Add detailed information about added coupons. Limit the max. number of that so our information message doesn't get too big. """
         index = 0
@@ -893,14 +894,14 @@ class BKBot:
                 couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=False)
             infoText += '\n' + couponText
 
-            if index == maxNewCouponsDescriptionLines - 1:
+            if index == maxNewCouponsToLink - 1:
                 # We processed the max. number of allowed items!
                 break
             else:
                 index += 1
                 continue
-        if len(couponsDict) > maxNewCouponsDescriptionLines:
-            numberOfNonHyperinkedItems = len(couponsDict) - maxNewCouponsDescriptionLines
+        if len(couponsDict) > maxNewCouponsToLink:
+            numberOfNonHyperinkedItems = len(couponsDict) - maxNewCouponsToLink
             if numberOfNonHyperinkedItems == 1:
                 infoText += '\n+ ' + str(numberOfNonHyperinkedItems) + ' weiterer'
             else:
@@ -911,7 +912,7 @@ class BKBot:
         """ Runs all processes which should only run once per day. """
         self.crawl()
         self.renewPublicChannel()
-        self.batchprocessAutoDeleteUsersUnavailableFavorites()
+        self.batchProcessAutoDeleteUsersUnavailableFavorites()
         self.notifyUsers()
         self.cleanupPublicChannel()
 
@@ -919,6 +920,7 @@ class BKBot:
         """ Runs all processes which should only run once per day:
          1. Crawler, 2. User notify favorites and user notify new coupons """
         self.crawl()
+        self.batchProcessAutoDeleteUsersUnavailableFavorites()
         self.notifyUsers()
 
     def crawl(self):
@@ -973,7 +975,7 @@ class BKBot:
         cleanupCache(self.offerImageCache)
 
     def sendCouponOverviewWithChannelLinks(self, chat_id: Union[int, str], coupons: dict, useLongCouponTitles: bool, channelDB: Database, infoDB: Union[None, Database],
-                                           infoDBDoc: Union[None, InfoEntry], allowMessageEdit: bool):
+                                           infoDBDoc: Union[None, InfoEntry]):
         """ Sends all given coupons to given chat_id separated by source and split into multiple messages as needed. """
         couponsSeparatedByType = getCouponsSeparatedByType(coupons)
         """ Update/re-send coupon overview(s), spread this information on multiple pages if needed. """
@@ -983,29 +985,18 @@ class BKBot:
             logging.info("Working on coupon overview " + str(couponSourceIndex + 1) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.nameSingular)
             hasAddedSeparatorAfterCouponsWithoutMenu = False
             listContainsAtLeastOneItemWithoutMenu = False
-            dbKeyMessageIDsCouponType = INFO_DB.DB_INFO_channel_last_coupon_type_overview_message_ids + str(couponSource)
-            messageIDsForThisCategory = None if infoDBDoc is None else infoDBDoc.setdefault(dbKeyMessageIDsCouponType, [])
+            oldMessageIDsForThisCategory = None if infoDBDoc is None else infoDBDoc.getMessageIDsForCouponCategory(couponSource)
             if couponSource in couponsSeparatedByType:
                 # allowMessageEdit == True --> Handling untested!
                 coupons = couponsSeparatedByType[couponSource]
                 # Depends on the max entities per post limit of Telegram and we're not only using hyperlinks but also the "<b>" tag so we do not have 50 hyperlinks left but 49.
                 maxCouponsPerPage = 49
                 maxPage = math.ceil(len(coupons) / maxCouponsPerPage)
-                if allowMessageEdit and messageIDsForThisCategory is not None:
-                    # Delete pages if there are too many
-                    if len(messageIDsForThisCategory) > maxPage:
-                        deleteStartIndex = (len(messageIDsForThisCategory) - (len(messageIDsForThisCategory) - maxPage)) - 1
-                        for index in range(deleteStartIndex, len(messageIDsForThisCategory)):
-                            infoDBDoc.messageIDsToDelete.append(messageIDsForThisCategory[index])
-                        # Update our array as we fill it again later
-                        del messageIDsForThisCategory[deleteStartIndex: len(messageIDsForThisCategory)]
-                        # Update DB
-                        infoDBDoc.store(infoDB)
-                elif messageIDsForThisCategory is not None and len(messageIDsForThisCategory) > 0 and infoDBDoc is not None:
+                if oldMessageIDsForThisCategory is not None and len(oldMessageIDsForThisCategory) > 0 and infoDBDoc is not None:
                     # Delete all old pages for current coupon type
                     # Save old messages for later deletion
-                    infoDBDoc[InfoEntry.messageIDsToDelete.name] += messageIDsForThisCategory
-                    messageIDsForThisCategory.clear()
+                    infoDBDoc.addMessageIDsToDelete(oldMessageIDsForThisCategory)
+                    infoDBDoc.deleteCouponCategoryMessageIDs(couponSource)
                     # Update DB
                     infoDBDoc.store(infoDB)
                 for page in range(1, maxPage + 1):
@@ -1057,25 +1048,20 @@ class BKBot:
                         # Exit loop after last coupon info has been added
                         if couponIndex == len(coupons) - 1:
                             break
-                    if allowMessageEdit and page - 1 <= len(messageIDsForThisCategory) - 1:
-                        # Edit last post of current page
-                        msgIDToEdit = messageIDsForThisCategory[page - 1]
-                        self.editMessage(chat_id=chat_id, message_id=msgIDToEdit, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True)
-                    else:
-                        # Send new post containing current page
-                        msg = self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
-                                               disable_notification=True)
-                        if messageIDsForThisCategory is not None:
-                            messageIDsForThisCategory.append(msg.message_id)
-                        if infoDBDoc is not None:
-                            # Update DB
-                            infoDBDoc.store(infoDB)
-            elif messageIDsForThisCategory is not None and len(messageIDsForThisCategory) > 0:
+                    # Send new post containing current page
+                    msg = self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
+                                           disable_notification=True)
+                    if infoDBDoc is not None:
+                        # Update DB
+                        infoDBDoc.addCouponCategoryMessageID(couponSource, msg.message_id)
+                        infoDBDoc.store(infoDB)
+            elif oldMessageIDsForThisCategory is not None and len(oldMessageIDsForThisCategory) > 0:
                 """ Cleanup chat:
                 Typically needed if a complete supported coupon type was there but is not existant anymore e.g. paper coupons were there but aren't existant anymore -> Delete old overview-message(s) """
-                self.deleteMessages(chat_id=chat_id, messageIDs=messageIDsForThisCategory)
                 if infoDBDoc is not None:
-                    del infoDBDoc[dbKeyMessageIDsCouponType]
+                    # Save these messageIDs so we can delete them later
+                    infoDBDoc.addMessageIDsToDelete(oldMessageIDsForThisCategory)
+                    infoDBDoc.deleteCouponCategoryMessageIDs(couponSource)
                     infoDBDoc.store(infoDB)
             else:
                 # Rare case

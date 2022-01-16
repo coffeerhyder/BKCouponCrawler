@@ -2,15 +2,15 @@ import logging
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Union, List
+from typing import Union
 
 from telegram import InputMediaPhoto
 from telegram.error import BadRequest, Unauthorized
 
 from BotUtils import getBotImpressum
-from Helper import INFO_DB, DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
+from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
 
-from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter, sortCouponsByPrice, getCouponTitleMapping
 from CouponCategory import BotAllowedCouponSources
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
@@ -25,11 +25,22 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info("Checking for pending new coupons notifications")
     timestampStart = datetime.now().timestamp()
     userDB = bkbot.crawler.getUsersDB()
-    newCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
-    if len(newCoupons) == 0:
+    allNewCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
+    if len(allNewCoupons) == 0:
         logging.info("No new coupons available to notify about")
         return
-    postTextNewCoupons = "<b>" + SYMBOLS.NEW + str(len(newCoupons)) + " neue Coupons verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(newCoupons, 49)
+
+    couponTitleMappingTmp = getCouponTitleMapping(allNewCoupons)
+    # Now clean our mapping: Sometimes one product may be available twice with multiple prices -> We want exactly one mapping per title
+    couponTitleMapping = {}
+    for normalizedTitle, coupons in couponTitleMappingTmp.items():
+        if len(coupons) > 1:
+            # Sort these ones by price and pick the first (= cheapest) one for our mapping.
+            couponsSorted = sortCouponsByPrice(coupons)
+            couponTitleMapping[normalizedTitle] = couponsSorted[0]
+        else:
+            couponTitleMapping[normalizedTitle] = coupons[0]
+    dbUserFavoritesUpdates = set()
     usersNotify = {}
     numberofFavoriteNotifications = 0
     numberofNewCouponsNotifications = 0
@@ -38,55 +49,109 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         usertext = ""
         # Obey Telegram entity limits...
         remainingEntities = 50
-        if user.settings.notifyWhenFavoritesAreBack:
-            # Check if user has favorites that are new (back/valid again)
-            userNewCoupons = {}
-            for couponID in user.favoriteCoupons:
-                newCoupon = newCoupons.get(couponID)
-                if newCoupon is not None:
-                    userNewCoupons[couponID] = newCoupon
-            if len(userNewCoupons) > 0:
+        userNewFavoriteCoupons = {}
+        # Check if user wants to be notified about favorites that are back
+        if user.isAllowSendFavoritesNotification():
+            # Collect users favorite coupons that are currently new --> Those ones are 'Favorites that are back'
+            userFavoritesInfo = user.getUserFavoritesInfo(allNewCoupons)
+            for coupon in userFavoritesInfo.couponsAvailable:
+                userNewFavoriteCoupons[coupon.id] = coupon
+            """ Smart-update users favorites: Try to look for new coupons with the same product this was we can update users' favorite
+             even if BK decided to change the price and/or ID of acoupon containing the same product(s). """
+            # Collect titles of all unavailable favorites to set so we don't get any duplicates
+            unavailableCouponNormalizedTitles = set()
+            for unavailableCoupon in userFavoritesInfo.couponsUnavailable:
+                unavailableCouponNormalizedTitles.add(unavailableCoupon.getNormalizedTitle())
+            # Look for alternative coupon based on names of currently unavailable favorite coupons
+            foundAtLeastOneAlternativeCoupon = False
+            for unavailableCouponNormalizedTitle in unavailableCouponNormalizedTitles:
+                alternativeCoupon = couponTitleMapping.get(unavailableCouponNormalizedTitle)
+                if alternativeCoupon is not None:
+                    # Hit! Add it to users' favorite coupons.
+                    user.addFavoriteCoupon(alternativeCoupon)
+                    userNewFavoriteCoupons[alternativeCoupon.id] = alternativeCoupon
+                    foundAtLeastOneAlternativeCoupon = True
+            if foundAtLeastOneAlternativeCoupon:
+                # DB update required
+                dbUserFavoritesUpdates.add(user)
+            if len(userNewFavoriteCoupons) > 0:
+
                 usertext += "<b>" + SYMBOLS.STAR + str(
-                    len(userNewCoupons)) + " deiner favorisierten Coupons sind wieder verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(userNewCoupons, 49)
+                    len(userNewFavoriteCoupons)) + " deiner favorisierten Coupons sind wieder verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(userNewFavoriteCoupons, 49)
                 numberofFavoriteNotifications += 1
+                # The '<b>' entity is also one entity so let's substract this so we know how many are remaining
                 remainingEntities -= 1
-                remainingEntities -= len(userNewCoupons)
+                remainingEntities -= len(userNewFavoriteCoupons)
         # Check if user has enabled notifications for new coupons
         if user.settings.notifyWhenNewCouponsAreAvailable:
-            if len(usertext) == 0:
-                remainingEntities -= 1
+            newCouponsListForThisUsersNotification = {}
+            if user.isAllowSendFavoritesNotification() and len(userNewFavoriteCoupons) > 0:
+                """ Avoid duplicates: If e.g. user has set favorite coupon to 'DoubleChiliCheese' and it's back in this run, we do not need to include it again in the list of new coupons.
+                 If this dict is empty after the loop this means that all of this users' favorites would also be in the "new coupons" list thus no need to include them in the post we send to the user (= duplicates).
+                 """
+                for couponID in allNewCoupons:
+                    if couponID not in userNewFavoriteCoupons:
+                        newCouponsListForThisUsersNotification[couponID] = allNewCoupons[couponID]
             else:
-                usertext += "\n---\n"
-            usertext += postTextNewCoupons
-            numberofNewCouponsNotifications += 1
-            remainingEntities -= len(newCoupons)
+                newCouponsListForThisUsersNotification = allNewCoupons
+            if len(newCouponsListForThisUsersNotification) > 0:
+                if len(usertext) == 0:
+                    # '<b>' entity only counts as one even if there are multiple of those used in one post
+                    remainingEntities -= 1
+                else:
+                    usertext += "\n---\n"
+                usertext += "<b>" + SYMBOLS.NEW + str(len(newCouponsListForThisUsersNotification)) + " neue Coupons verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(newCouponsListForThisUsersNotification, 49)
+                numberofNewCouponsNotifications += 1
+                remainingEntities -= len(newCouponsListForThisUsersNotification)
         if len(usertext) > 0:
             # Complete user text and save it to send it later
             if bkbot.getPublicChannelName() is None:
+                # Different text in case someone sets up this bot without a public channel (kinda makes no sense).
                 usertext += "\nMit /start gelangst du ins Hauptmenü des Bots."
             else:
-                usertext += "\nPer Klick kommst du zu den jeweiligen Coupons im " + bkbot.getPublicChannelHyperlinkWithCustomizedText(
+                usertext += "\nPer Klick gelangst du zu den jeweiligen Coupons im " + bkbot.getPublicChannelHyperlinkWithCustomizedText(
                     "Channel") + " und mit /start ins Hauptmenü des Bots."
             if remainingEntities < 0:
                 usertext += "\n" + SYMBOLS.WARNING + "Wegen Telegram Limits konnten evtl. nicht alle Coupons verlinkt werden."
                 usertext += "\nDas ist nicht weiter tragisch. Du findest alle Coupons im Bot/Channel."
-            # Store text to send to user and send it later
+            # Store text and send it later
             usersNotify[userIDStr] = usertext
     if len(usersNotify) == 0:
         logging.info("No users available who want to be notified on new coupons")
         return
+    if len(dbUserFavoritesUpdates) > 0:
+        logging.info("Auto updated favorites of " + str(len(dbUserFavoritesUpdates)) + " users")
+        userDB.update(list(dbUserFavoritesUpdates))
     logging.info("Notifying " + str(len(usersNotify)) + " users about favorites / new coupons")
     index = -1
+    dbUserUpdates = []
+    usersToDelete = []
+    deleteBlockedUsersAfterDays = 30
     for userIDStr, postText in usersNotify.items():
         index += 1
-        logging.info("Sending user notification " + str(index + 1) + " / " + str(len(usersNotify)) + " to user " + userIDStr)
+        # isLastItem = index == len(usersNotify) - 1
+        logging.info("Sending user notification " + str(index + 1) + " / " + str(len(usersNotify)) + " to user: " + userIDStr)
+        user = User.load(userDB, userIDStr)
         try:
             bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
+            if user.botBlockedCounter > 0:
+                """ User had blocked but at some point of time but unblocked it --> Reset this counter so upper handling will not delete user at some point of time. """
+                user.botBlockedCounter = 0
+                dbUserUpdates.append(user)
         except Unauthorized as botBlocked:
-            # TODO: Maybe auto-delete users who blocked the bot in DB.
             # Almost certainly it will be "Forbidden: bot was blocked by the user"
-            logging.warning(botBlocked.message + " --> chat_id: " + userIDStr)
-            continue
+            logging.info(botBlocked.message + " --> chat_id: " + userIDStr)
+            user.botBlockedCounter += 1
+            if user.botBlockedCounter >= deleteBlockedUsersAfterDays:
+                usersToDelete.append(user)
+            else:
+                dbUserUpdates.append(user)
+    if len(dbUserUpdates) > 0:
+        logging.info("Pushing DB updates for users who have blocked/unblocked bot: " + str(len(dbUserUpdates)))
+        userDB.update(dbUserUpdates)
+    if len(usersToDelete) > 0:
+        logging.info("Deleting users who blocked bot for >= " + str(deleteBlockedUsersAfterDays) + " days: " + str(len(usersToDelete)))
+        userDB.purge(usersToDelete)
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 
@@ -139,17 +204,15 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != coupon.getUniqueIdentifier():
             # Current/new coupon data differs from coupon we've posted in channel (same unique ID but coupon data has changed)
             updatedCoupons[coupon.id] = coupon
-    # TODO: messageIDsToDelete can contain duplicates. This is not a fatal issue but we should avoid this anyways!
     if len(infoDBDoc.messageIDsToDelete) > 0:
         # This can happen but should only be a rare occurance!
-        # TODO: There might be a bug? This array is never empty?
         logging.warning("Found " + str(len(infoDBDoc.messageIDsToDelete)) + " leftover messageIDs to delete")
     # Collect deleted coupons from channel
     deletedChannelCoupons = []
     for uniqueCouponID in channelDB:
         if uniqueCouponID not in activeCoupons:
             channelCoupon = ChannelCoupon.load(channelDB, uniqueCouponID)
-            infoDBDoc[InfoEntry.messageIDsToDelete.name] += channelCoupon[ChannelCoupon.messageIDs.name]
+            infoDBDoc.addMessageIDsToDelete(channelCoupon.messageIDs)
             # Collect it here so we can delete it with only one DB request later.
             deletedChannelCoupons.append(channelCoupon)
     # Update DB if needed
@@ -181,7 +244,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         for coupon in couponsToSendOut.values():
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
             if channelCoupon is not None and len(channelCoupon.messageIDs) > 0:
-                infoDBDoc[InfoEntry.messageIDsToDelete.name] += channelCoupon[ChannelCoupon.messageIDs.name]
+                infoDBDoc.addMessageIDsToDelete(channelCoupon.messageIDs)
                 channelCoupon.messageIDs = ChannelCoupon().messageIDs  # Nuke array (default = [])
                 channelCouponDBUpdates.append(channelCoupon)
         # Update DB
@@ -230,7 +293,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Update channel information message if needed
     if len(updatedCoupons) > 0 or len(deletedChannelCoupons) > 0 or len(
             couponsToSendOut) > 0 or updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE or DEBUGNOTIFICATOR:
-        bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB, infoDBDoc=infoDBDoc, allowMessageEdit=False)
+        bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB, infoDBDoc=infoDBDoc)
 
         """ Generate new information message text. """
         infoText = '<b>Heutiges Update:</b>'
@@ -263,13 +326,13 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         Did we only delete coupons and/or update existing ones while there were no new coupons coming in AND we were not forced to delete- and re-send all items?
         Edit our last message if existant so the user won't receive a new notification!
         """
-        oldInfoMsgID = infoDBDoc.get(INFO_DB.DB_INFO_channel_last_information_message_id)
+        oldInfoMsgID = infoDBDoc.informationMessageID
         # Post new message and store old for later deletion
         if oldInfoMsgID is not None:
             infoDBDoc.messageIDsToDelete.append(oldInfoMsgID)
         newMsg = bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True)
         # Store new messageID
-        infoDBDoc[INFO_DB.DB_INFO_channel_last_information_message_id] = newMsg.message_id
+        infoDBDoc.informationMessageID = newMsg.message_id
         infoDBDoc.store(infoDB)
     logging.info("Channel update done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
@@ -279,11 +342,11 @@ def cleanupChannel(bkbot):
     timestampStart = datetime.now().timestamp()
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
-    deleteLeftoverCouponMessageIDsToDelete(bkbot, infoDB, infoDoc)
+    deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc)
     logging.info("Channel cleanup done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
 
-def deleteLeftoverCouponMessageIDsToDelete(bkbot, infoDB, infoDoc):
+def deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc):
     """ Deletes all channel messages which were previously flagged for deletion. """
     if len(infoDoc.messageIDsToDelete) > 0:
         initialNumberofMsgsToDelete = len(infoDoc.messageIDsToDelete)
@@ -293,9 +356,9 @@ def deleteLeftoverCouponMessageIDsToDelete(bkbot, infoDB, infoDoc):
             logging.info("Deleting messageID " + str(index + 1) + "/" + str(initialNumberofMsgsToDelete) + " | " + str(messageID))
             bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID)
             infoDoc.messageIDsToDelete.remove(messageID)
-            # Save current state to DB
-            infoDoc.store(infoDB)
             index += 1
+        # Update DB
+        infoDoc.store(infoDB)
 
 
 def nukeChannel(bkbot):
@@ -303,7 +366,6 @@ def nukeChannel(bkbot):
     timestampStart = datetime.now().timestamp()
     logging.info("Nuking channel...")
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
-    justDeletedMessageIDs = []
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
     if len(channelDB) > 0:
@@ -317,37 +379,28 @@ def nukeChannel(bkbot):
             channelCoupon = ChannelCoupon.load(channelDB, couponID)
             for messageID in channelCoupon.messageIDs:
                 bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID)
-            justDeletedMessageIDs += channelCoupon.messageIDs
             del channelDB[couponID]
     # Delete coupon overview messages
     logging.info("Deleting information messages...")
+    updateInfoDoc = False
     for couponSource in BotAllowedCouponSources:
-        couponOverviewDBKey = INFO_DB.DB_INFO_channel_last_coupon_type_overview_message_ids + str(couponSource)
-        couponOverviewMessageIDs = infoDoc.get(couponOverviewDBKey, [])
+        couponOverviewMessageIDs = infoDoc.getMessageIDsForCouponCategory(couponSource)
         if len(couponOverviewMessageIDs) > 0:
-            deleteMessageIDs(bkbot, couponOverviewMessageIDs)
-            del infoDoc[couponOverviewDBKey]
+            bkbot.deleteMessages(chat_id=bkbot.getPublicChannelChatID(), messageIDs=couponOverviewMessageIDs)
+            infoDoc.deleteCouponCategoryMessageIDs(couponSource)
+            updateInfoDoc = True
     # Delete coupon information message
     if infoDoc.informationMessageID is not None:
         logging.info("Deleting channel overview message")
         bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=infoDoc.informationMessageID)
         infoDoc.informationMessageID = None
-        # Update DB
+        updateInfoDoc = True
+    if updateInfoDoc:
+        # Update DB if changes were made
         infoDoc.store(infoDB)
-    deleteLeftoverCouponMessageIDsToDelete(bkbot, infoDB, infoDoc)
+    deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc)
 
     logging.info("Cleanup channel DONE! --> Total time needed: " + getFormattedPassedTime(timestampStart))
-
-
-def deleteMessageIDs(bkbot, messageIDs: Union[List[int], None]):
-    """ Deletes array of messageIDs. """
-    if messageIDs is None:
-        return
-    index = 0
-    for msgID in messageIDs:
-        logging.info("Deleting message " + str(index + 1) + " / " + str(len(messageIDs)) + " | " + str(msgID))
-        bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=msgID)
-        index += 1
 
 
 def editMessageAndWait(bkbot, messageID: Union[int, str, None], messageText) -> bool:

@@ -7,7 +7,7 @@ class CouponSource:
     UNKNOWN = -1
     APP = 0
     # APP_VALID_AFTER_DELETION = 1  # Deprecated!
-    APP_SAME_CHAR_AS_CURRENT_APP_COUPONS = 2
+    # APP_SAME_CHAR_AS_CURRENT_APP_COUPONS = 2 # Deprecated!
     PAPER = 3
     PAPER_UNSAFE = 4
     ONLINE_ONLY = 5

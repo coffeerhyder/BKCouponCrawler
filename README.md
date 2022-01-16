@@ -98,16 +98,22 @@ crawl | Crawler beim Start des Bots einmalig ausführen
 ### Bot mit Systemstart starten (Linux)
 1. Sichergehen, dass BKBot.py ausführbar ist. Falls nötig: ``chmod a+b BKBot.py``.
 2. Per ``crontab -e`` in crontab wechseln.
-3. Neue Zeile erstellen mit: ``@reboot sleep 10 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1``  
-Die Wartezeit wird benötigt, damit CouchDB auf jeden Fall vor dem Start des Bots läuft.  
-4. Beenden mit ``pkill python3`` (vereinfachte Variante).
+3. Folgendes hinzufügen:  
+```  
+# Bot nach Reboot starten. Die Wartezeit wird benötigt, damit CouchDB genug Zeit hat zu starten.  
+@reboot sleep 10 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
+# Updates nachts automatisch ausführen
+00 03 * * * root /usr/bin/apt update -q -y >> /var/log/apt/automaticupdates.log
+30 03 * * * root /usr/bin/apt upgrade -q -y >> /var/log/apt/automaticupdates.log
+# Jede Nacht um 4 Uhr neustarten
+00 04 * * * reboot
+```
+4. Falls gewollt, Bot beenden mit ``pkill python3`` (vereinfachte Variante).
 
 ### Interne Coupon-Typen und Beschreibung
 ID | Interne Bezeichnung | Beschreibung
 --- | --- | --- | 
 0 | APP | App Coupons
-1 | APP_VALID_AFTER_DELETION | App Coupons, die laut Ablaufdatum noch gültig sein müssten aber bereits nicht mehr per App-API zurückgegeben werden. **DEPRECATED!**
-2 | APP_SAME_CHAR_AS_CURRENT_APP_COUPONS | Coupons mit denselben Abfangsbuchstaben wie aktuelle App Coupons, die jedoch nicht in der App API sind -> Potentielle "Special App Coupons"
 3 | PAPER | Papiercoupons
 4 | PAPER_UNSAFE | Coupons aus der "Coupons2" API, die keinem anderen Coupon-Typen zugewiesen werden konnten.
 5 | ONLINE_ONLY | Coupons ohne short PLU Code, die wenn überhaupt nur online oder per QR Code (Terminal) bestellbar sind.
@@ -134,8 +140,8 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
+* couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
-* Payback Coupons in "Alle Coupons" Ansicht ganz oben anzeigen (normale Coupons ohne Preis stehen derzeit ganz oben - aktuell nur einer)(?) -> Low Prio
 * Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden)
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
@@ -272,7 +278,7 @@ Dezember | VM
 Über die BK App kann man in einigen Filialen [online vorbestellen](https://www.bundesverband-systemgastronomie.de/de/bdsnachricht/schnell-einfach-flexibel-bestellen-abholen-bei-burger-king-r.html).  
 Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes scannen.
 * Es sind alle PLUs bestellbar, auch laut Datum abgelaufene --> Vermutlich alles, was zu einem Produkt führt, das aktuell einen `availability_type` von `available` hat.
-* Es befinden sich fast alle App- UND Papiercoupons im "Filial-spezifischen" Endpoint: `mo.burgerking-app.eu/api/v2/stores/123456/menu`
+* Es befinden sich fast alle App- UND Papiercoupons im "Filial-spezifischen" Endpoint: `mo.burgerking-app.eu/api/v2/stores/486/menu`
 * Unterschiedliche Filialen können einen unterschiedlichen Pool von Coupons akzeptieren, aber die meisten Coupons funktionieren in allen Filialen
 * Die online aufgelisteten Gutscheine sind nicht alle, die akzeptiert werden: beispielsweise können aktuell gültige Papiercoupons teilweise fehlen, obwohl Restaurants Papiercoupons generell akzeptieren -> Bedeutet im Klartext: Manche Papiercoupons lassen sich bei manchen Restaurants nicht in der online Vorbestellung nutzen, obwohl sie offline in der Filiale funktionieren müssten -> Fehler in der BK DB?! -> Ergibt einfach keinen Sinn
 * Seit ca. September 2021 scheint die Vorbestellen Funktion bei allen BK Filialen entfernt worden zu sein. Kennt man die FilialIDs, die Vorbestellungen akzeptierten, kann man noch immer Coupons über den Endpoint abfragen.

@@ -8,7 +8,7 @@ from couchdb.mapping import TextField, FloatField, ListField, IntegerField, Bool
 from pydantic import BaseModel
 
 from CouponCategory import BotAllowedCouponSources, CouponSource
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString
 
 
 class Coupon(Document):
@@ -20,11 +20,11 @@ class Coupon(Document):
     title = TextField()
     titleShortened = TextField()
     timestampStart = FloatField()
-    timestampExpire = FloatField()  # Internal expire-date
-    timestampExpire2 = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
+    timestampExpireInternal = FloatField()  # Internal expire-date
+    timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
     dateFormattedStart = TextField()
+    dateFormattedExpireInternal = TextField()
     dateFormattedExpire = TextField()
-    dateFormattedExpire2 = TextField()
     imageURL = TextField()
     productIDs = ListField(IntegerField())
     source = IntegerField()
@@ -35,6 +35,9 @@ class Coupon(Document):
     isUnsafeExpiredate = BooleanField(
         default=False)  # Set this if timestampExpire2 is a made up date that is just there to ensure that the coupon is considered valid for a specified time
     description = TextField()
+    # TODO: Implement this so we can remove the extra database for coupons in channel
+    # channelMessageID_image = IntegerField()
+    # channelMessageID_qr = IntegerField()
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -42,6 +45,9 @@ class Coupon(Document):
             return self.plu
         else:
             return self.id
+
+    def getNormalizedTitle(self):
+        return normalizeString(self.title)
 
     def isValid(self):
         expireDatetime = self.getExpireDatetime()
@@ -68,7 +74,7 @@ class Coupon(Document):
             return True
 
     def getIsNew(self) -> bool:
-        """ Determines whether ir not this coupon is considered 'new'. """
+        """ Determines whether or not this coupon is considered 'new'. """
         if self.isNew is not None:
             return self.isNew
         elif self.isNewUntilDate is not None:
@@ -87,10 +93,7 @@ class Coupon(Document):
             return False
 
     def getExpireDatetime(self) -> Union[datetime, None]:
-        # First check for artificial expire-date which is usually shorter than the other date - prefer that!
-        if self.timestampExpire2 is not None:
-            return datetime.fromtimestamp(self.timestampExpire2, getTimezone())
-        elif self.timestampExpire is not None:
+        if self.timestampExpire is not None:
             return datetime.fromtimestamp(self.timestampExpire, getTimezone())
         else:
             # This should never happen
@@ -98,9 +101,7 @@ class Coupon(Document):
             return None
 
     def getExpireDateFormatted(self, fallback=None) -> Union[str, None]:
-        if self.dateFormattedExpire2 is not None:
-            return self.dateFormattedExpire2
-        elif self.dateFormattedExpire is not None:
+        if self.dateFormattedExpire is not None:
             return self.dateFormattedExpire
         else:
             return fallback
@@ -154,7 +155,8 @@ class Coupon(Document):
         if os.path.exists(path):
             return open(path, mode='rb')
         else:
-            return None
+            # Return fallback --> This should never happen!
+            return open('media/fallback_image_missing_qr_image.jpeg', mode='rb')
 
     def generateCouponShortText(self, highlightIfNew: bool) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
@@ -252,7 +254,8 @@ class Coupon(Document):
                 priceInfoText += " | " + reducedPercentage
         return priceInfoText
 
-class UserFavorites:
+
+class UserFavoritesInfo:
     """ Helper class for users favorites. """
 
     def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None, favoritesUnavailable: Union[List[Coupon], None] = None):
@@ -293,23 +296,41 @@ class User(Document):
             enableBetaFeatures=BooleanField(default=False)
         )
     )
-    favoriteCoupons = DictField()
+    botBlockedCounter = IntegerField(default=0)
+    favoriteCoupons = DictField(default={})
 
     def isFavoriteCoupon(self, coupon: Coupon):
         """ Checks if given coupon is users' favorite """
-        if coupon.id in self.favoriteCoupons:
+        return self.isFavoriteCouponID(coupon.id)
+
+    def isFavoriteCouponID(self, couponID: str):
+        if couponID in self.favoriteCoupons:
             return True
         else:
             return False
 
-    def getUserFavorites(self, couponsFromDB: Union[dict, Document]) -> UserFavorites:
+    def addFavoriteCoupon(self, coupon: Coupon):
+        self.favoriteCoupons[coupon.id] = coupon.data
+
+    def deleteFavoriteCouponID(self, couponID: str):
+        del self.favoriteCoupons[couponID]
+
+    def isAllowSendFavoritesNotification(self):
+        if self.settings.autoDeleteExpiredFavorites:
+            return False
+        elif self.settings.notifyWhenFavoritesAreBack:
+            return True
+        else:
+            return False
+
+    def getUserFavoritesInfo(self, couponsFromDB: Union[dict, Document]) -> UserFavoritesInfo:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
         Coupons from DB are required to get current dataset of available favorites.
         """
         if len(self.favoriteCoupons) == 0:
             # User does not have any favorites set --> There is no point to look for the additional information
-            return UserFavorites()
+            return UserFavoritesInfo()
         else:
             availableFavoriteCoupons = []
             unavailableFavoriteCoupons = []
@@ -324,22 +345,42 @@ class User(Document):
             # Sort all coupon arrays by price
             availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
             unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
-            return UserFavorites(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
+            return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
 
 
 class InfoEntry(Document):
-    timestampLastCrawl = FloatField(name="timestamp_last_crawl", default=-1)
-    timestampLastChannelUpdate = FloatField(name="timestamp_last_telegram_channel_update", default=-1)
-    informationMessageID = TextField(name="channel_last_information_message_id")
-    couponTypeOverviewMessageIDs = ListField(TextField(), name="channel_last_coupon_type_overview_message_ids_")
-    messageIDsToDelete = ListField(IntegerField(), name="message_ids_to_delete", default=[])
+    timestampLastCrawl = FloatField(default=-1)
+    timestampLastChannelUpdate = FloatField(default=-1)
+    informationMessageID = TextField()
+    couponTypeOverviewMessageIDs = DictField(default={})
+    messageIDsToDelete = ListField(IntegerField(), default=[])
+
+    def addMessageIDToDelete(self, messageID: int):
+        # Avoid duplicates
+        if messageID not in self.messageIDsToDelete:
+            self.messageIDsToDelete.append(messageID)
+
+    def addMessageIDsToDelete(self, messageIDs: List):
+        for messageID in messageIDs:
+            self.addMessageIDToDelete(messageID)
+
+    def addCouponCategoryMessageID(self, couponSource: int, messageID: int):
+        self.couponTypeOverviewMessageIDs.setdefault(couponSource, []).append(messageID)
+
+    def getMessageIDsForCouponCategory(self, couponSource: int) -> List[int]:
+        return self.couponTypeOverviewMessageIDs.get(str(couponSource), [])
+
+    def deleteCouponCategoryMessageIDs(self, couponSource: int):
+        if str(couponSource) in self.couponTypeOverviewMessageIDs:
+            del self.couponTypeOverviewMessageIDs[str(couponSource)]
 
 
 class ChannelCoupon(Document):
-    # names are given to ensure compatibility to older DB versions. TODO: Remove this whenever possible. To do this, channel needs to be manually wiped with current/older version. Then these names can be removed and channel update can be sent out.
-    uniqueIdentifier = TextField(name="coupon_unique_identifier")
-    messageIDs = ListField(IntegerField(), name="coupon_message_ids")
-    timestampMessagesPosted = FloatField(name="timestamp_tg_messages_posted", default=-1)
+    """ Represents a coupon posted in a Telegram channel.
+     Only contains minimum of required information as information about coupons itself is stored in another DB. """
+    uniqueIdentifier = TextField()
+    messageIDs = ListField(IntegerField())
+    timestampMessagesPosted = FloatField(default=-1)
 
 
 class CouponSortMode(Enum):
@@ -381,8 +422,17 @@ def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:
 class CouponFilter(BaseModel):
     activeOnly: Optional[bool] = True
     containsFriesAndCoke: Optional[Union[bool, None]] = None
-    excludeCouponsByDuplicatedProductTitles: Optional[bool] = False
+    excludeCouponsByDuplicatedProductTitles: Optional[bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
     allowedCouponSources: Optional[Union[List[int], None]] = None  # None = allow all sources!
     isNew: Optional[Union[bool, None]] = None
     isHidden: Optional[Union[bool, None]] = None
     sortMode: Optional[Union[None, CouponSortMode]]
+
+
+def getCouponTitleMapping(coupons: dict) -> dict:
+    """ Maps normalized coupon titles to coupons with the goal of being able to match coupons by title
+    e.g. to find duplicates or coupons with different IDs containing the same products. """
+    couponTitleMappingTmp = {}
+    for coupon in coupons.values():
+        couponTitleMappingTmp.setdefault(coupon.getNormalizedTitle(), []).append(coupon)
+    return couponTitleMappingTmp
