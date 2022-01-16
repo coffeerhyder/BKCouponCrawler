@@ -35,6 +35,9 @@ class Coupon(Document):
     isUnsafeExpiredate = BooleanField(
         default=False)  # Set this if timestampExpire2 is a made up date that is just there to ensure that the coupon is considered valid for a specified time
     description = TextField()
+    # TODO: Implement this so we can remove the extra database for coupons in channel
+    # channelMessageID_image = IntegerField()
+    # channelMessageID_qr = IntegerField()
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
