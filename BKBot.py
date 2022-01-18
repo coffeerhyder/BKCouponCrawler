@@ -29,7 +29,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 # Enable this to show BETA setting to users --> Only enable this if there are beta features available
 DISPLAY_BETA_SETTING = True
 
-
 """ This is a helper for basic user on/off settings """
 USER_SETTINGS_ON_OFF = {
     # TODO: Obtain these Keys and default values from "User" Mapping class and remove this mess!
@@ -177,7 +176,8 @@ class BKBot:
         dispatcher.add_handler(conv_handler)
         """ Handles deletion of userdata. """
         conv_handler2 = ConversationHandler(
-            entry_points=[CommandHandler('tschau', self.botUserDeleteSTART), CallbackQueryHandler(self.botUserDeleteSTART, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND + "$")],
+            entry_points=[CommandHandler('tschau', self.botUserDeleteSTART),
+                          CallbackQueryHandler(self.botUserDeleteSTART, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND + "$")],
             states={
                 CallbackVars.MENU_SETTINGS_USER_DELETE_DATA: [
                     CommandHandler('cancel', self.botUserDeleteCancel),
@@ -884,7 +884,8 @@ class BKBot:
                 channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
                 messageID = channelCoupon.getMessageIDForChatHyperlink()
                 if messageID is not None:
-                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=False, publicChannelName=self.getPublicChannelName(), messageID=messageID)
+                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=False, publicChannelName=self.getPublicChannelName(),
+                                                                                                   messageID=messageID)
                 else:
                     # This should never happen but we'll allow it to
                     logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
@@ -979,27 +980,26 @@ class BKBot:
                                            infoDBDoc: Union[None, InfoEntry]):
         """ Sends all given coupons to given chat_id separated by source and split into multiple messages as needed. """
         couponsSeparatedByType = getCouponsSeparatedByType(coupons)
-        """ Update/re-send coupon overview(s), spread this information on multiple pages if needed. """
+        if infoDBDoc is not None:
+            # Mark old coupon overview messageIDs for deletion
+            oldCategoryMsgIDs = infoDBDoc.getAllCouponCategoryMessageIDs()
+            if len(oldCategoryMsgIDs) > 0:
+                infoDBDoc.addMessageIDsToDelete(oldCategoryMsgIDs)
+                infoDBDoc.deleteAllCouponCategoryMessageIDs()
+                # Update DB
+                infoDBDoc.store(infoDB)
+        """ Re-send coupon overview(s), spread this information on multiple pages if needed. """
         for couponSourceIndex in range(len(BotAllowedCouponSources)):
             couponSource = BotAllowedCouponSources[couponSourceIndex]
             couponCategory = CouponCategory(couponSource)
             logging.info("Working on coupon overview " + str(couponSourceIndex + 1) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.nameSingular)
             hasAddedSeparatorAfterCouponsWithoutMenu = False
             listContainsAtLeastOneItemWithoutMenu = False
-            oldMessageIDsForThisCategory = None if infoDBDoc is None else infoDBDoc.getMessageIDsForCouponCategory(couponSource)
             if couponSource in couponsSeparatedByType:
-                # allowMessageEdit == True --> Handling untested!
                 coupons = couponsSeparatedByType[couponSource]
                 # Depends on the max entities per post limit of Telegram and we're not only using hyperlinks but also the "<b>" tag so we do not have 50 hyperlinks left but 49.
                 maxCouponsPerPage = 49
                 maxPage = math.ceil(len(coupons) / maxCouponsPerPage)
-                if oldMessageIDsForThisCategory is not None and len(oldMessageIDsForThisCategory) > 0 and infoDBDoc is not None:
-                    # Delete all old pages for current coupon type
-                    # Save old messages for later deletion
-                    infoDBDoc.addMessageIDsToDelete(oldMessageIDsForThisCategory)
-                    infoDBDoc.deleteCouponCategoryMessageIDs(couponSource)
-                    # Update DB
-                    infoDBDoc.store(infoDB)
                 for page in range(1, maxPage + 1):
                     logging.info("Sending category page: " + str(page) + "/" + str(maxPage))
                     couponOverviewText = "<b>[" + str(len(coupons)) + " Stück] " + couponCategory.nameSingular + " Übersicht"
@@ -1030,7 +1030,9 @@ class BKBot:
                                 if useLongCouponTitles:
                                     couponText = coupon.generateCouponLongTextFormattedWithHyperlinkToChannelPost(self.getPublicChannelName(), messageID)
                                 else:
-                                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=True, publicChannelName=self.getPublicChannelName(), messageID=messageID)
+                                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=True,
+                                                                                                                   publicChannelName=self.getPublicChannelName(),
+                                                                                                                   messageID=messageID)
                             else:
                                 # This should never happen but we'll allow it to
                                 logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
@@ -1057,17 +1059,8 @@ class BKBot:
                         # Update DB
                         infoDBDoc.addCouponCategoryMessageID(couponSource, msg.message_id)
                         infoDBDoc.store(infoDB)
-            elif oldMessageIDsForThisCategory is not None and len(oldMessageIDsForThisCategory) > 0:
-                """ Cleanup chat:
-                Typically needed if a complete supported coupon type was there but is not existant anymore e.g. paper coupons were there but aren't existant anymore -> Delete old overview-message(s) """
-                if infoDBDoc is not None:
-                    # Save these messageIDs so we can delete them later
-                    infoDBDoc.addMessageIDsToDelete(oldMessageIDsForThisCategory)
-                    infoDBDoc.deleteCouponCategoryMessageIDs(couponSource)
-                    infoDBDoc.store(infoDB)
             else:
-                # Rare case
-                logging.info("Nothing to do: No coupons of this type available and no old ones to delete :)")
+                logging.info("Nothing to do: No coupons of this type available :)")
 
         return
 
@@ -1158,6 +1151,22 @@ class BKBot:
         except BadRequest:
             """ Typically this means that this message has already been deleted """
             logging.warning("Failed to delete message with message_id: " + str(messageID))
+
+
+class ImageCache:
+    # TODO: Maybe replace current photo cache with this
+    def __init__(self):
+        self.imageURL = None
+
+    uniqueIdentifier = None
+    imageFileID = None
+    imageFileIDQR = None
+    imageURL = None
+    timestampCreated = -1
+    timestampLastUsed = -1
+
+    if __name__ == '__main__':
+        pass
 
 
 if __name__ == '__main__':

@@ -369,9 +369,18 @@ class InfoEntry(Document):
     def getMessageIDsForCouponCategory(self, couponSource: int) -> List[int]:
         return self.couponTypeOverviewMessageIDs.get(str(couponSource), [])
 
+    def getAllCouponCategoryMessageIDs(self) -> List[int]:
+        messageIDs = []
+        for messageIDsTemp in self.couponTypeOverviewMessageIDs.values():
+            messageIDs += messageIDsTemp
+        return messageIDs
+
     def deleteCouponCategoryMessageIDs(self, couponSource: int):
         if str(couponSource) in self.couponTypeOverviewMessageIDs:
             del self.couponTypeOverviewMessageIDs[str(couponSource)]
+
+    def deleteAllCouponCategoryMessageIDs(self):
+        self.couponTypeOverviewMessageIDs = {}
 
 
 class ChannelCoupon(Document):

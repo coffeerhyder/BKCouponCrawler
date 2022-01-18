@@ -70,4 +70,4 @@ crawler.setExportCSVs(False)
 # activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
 # activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=CouponSource.APP, containsFriesAndCoke=None, isHidden=True))
-crawler.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=False)
+# crawler.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=False)
