@@ -16,7 +16,7 @@ from furl import furl, urllib
 from urllib.parse import urlparse, parse_qs
 
 from Crawler import BKCrawler
-from UtilsCouponsDB import Coupon, ChannelCoupon, InfoEntry
+from UtilsCouponsDB import Coupon, InfoEntry
 
 url = "?action=displaycoupons&which=favorites&page=3"
 o = urlparse(url)
@@ -51,11 +51,7 @@ print(str(array3))
 
 
 infoDoc = InfoEntry(messageIDsToDelete=[1, 2, 3])
-cp = ChannelCoupon(messageIDs=[4, 5, 6])
 
-# + operator on docs doesnt work
-# infoDoc.messageIDsToDelete += cp.messageIDs
-infoDoc[InfoEntry.messageIDsToDelete.name] += cp[ChannelCoupon.messageIDs.name]
 print(str(infoDoc.messageIDsToDelete))
 
 # Crawler example code for readme.md
@@ -74,4 +70,4 @@ crawler.setExportCSVs(False)
 # activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
 # activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=CouponSource.APP, containsFriesAndCoke=None, isHidden=True))
-crawler.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=False)
+# crawler.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=False)

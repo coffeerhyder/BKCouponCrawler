@@ -25,7 +25,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info("Checking for pending new coupons notifications")
     timestampStart = datetime.now().timestamp()
     userDB = bkbot.crawler.getUsersDB()
-    allNewCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
+    allNewCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
     if len(allNewCoupons) == 0:
         logging.info("No new coupons available to notify about")
         return
@@ -183,7 +183,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Update channel info and DB
     channelInfoDoc.timestampLastChannelUpdate = getCurrentDate().timestamp()
     channelInfoDoc.store(channelInfoDB)
-    activeCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+    activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
@@ -212,7 +212,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     for uniqueCouponID in channelDB:
         if uniqueCouponID not in activeCoupons:
             channelCoupon = ChannelCoupon.load(channelDB, uniqueCouponID)
-            infoDBDoc.addMessageIDsToDelete(channelCoupon.messageIDs)
+            infoDBDoc.addMessageIDsToDelete(channelCoupon.getMessageIDs())
             # Collect it here so we can delete it with only one DB request later.
             deletedChannelCoupons.append(channelCoupon)
     # Update DB if needed
@@ -243,9 +243,9 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         channelCouponDBUpdates = []
         for coupon in couponsToSendOut.values():
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
-            if channelCoupon is not None and len(channelCoupon.messageIDs) > 0:
-                infoDBDoc.addMessageIDsToDelete(channelCoupon.messageIDs)
-                channelCoupon.messageIDs = ChannelCoupon().messageIDs  # Nuke array (default = [])
+            if channelCoupon is not None and len(channelCoupon.getMessageIDs()) > 0:
+                infoDBDoc.addMessageIDsToDelete(channelCoupon.getMessageIDs())
+                channelCoupon.deleteMessageIDs()
                 channelCouponDBUpdates.append(channelCoupon)
         # Update DB
         if len(channelCouponDBUpdates) > 0:
@@ -273,18 +273,17 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             photoAlbum = [InputMediaPhoto(media=bkbot.getCouponImage(coupon), caption=couponText, parse_mode='HTML'),
                           InputMediaPhoto(media=bkbot.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
                           ]
-            channelCoupon.messageIDs = []
             logging.debug("Sending new coupon messages 1/2: Coupon photos")
             chatMessages = bkbot.sendMediaGroup(chat_id=bkbot.getPublicChannelChatID(), media=photoAlbum, disable_notification=True)
-            for msg in chatMessages:
-                channelCoupon.messageIDs.append(msg.message_id)
+            channelCoupon.channelMessageID_image = chatMessages[0].message_id
+            channelCoupon.channelMessageID_qr = chatMessages[1].message_id
             # Update DB
             channelCoupon.store(channelDB)
             # Send coupon information as text (= last message for this coupon)
             logging.debug("Sending new coupon messages 2/2: Coupon text")
             couponTextMsg = bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=couponText, parse_mode='HTML', disable_notification=True,
                                               disable_web_page_preview=True)
-            channelCoupon.messageIDs.append(couponTextMsg.message_id)
+            channelCoupon.channelMessageID_text = couponTextMsg.message_id
             # Save timestamp so we roughly know when these messages have been posted
             channelCoupon.timestampMessagesPosted = datetime.now().timestamp()
             # Update DB
@@ -377,7 +376,8 @@ def nukeChannel(bkbot):
             index += 1
             logging.info("Working on coupon " + str(index) + " / " + str(initialItemNumber))
             channelCoupon = ChannelCoupon.load(channelDB, couponID)
-            for messageID in channelCoupon.messageIDs:
+            messageIDs = channelCoupon.getMessageIDs()
+            for messageID in messageIDs:
                 bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID)
             del channelDB[couponID]
     # Delete coupon overview messages

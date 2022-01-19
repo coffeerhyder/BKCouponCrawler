@@ -29,7 +29,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 # Enable this to show BETA setting to users --> Only enable this if there are beta features available
 DISPLAY_BETA_SETTING = True
 
-
 """ This is a helper for basic user on/off settings """
 USER_SETTINGS_ON_OFF = {
     # TODO: Obtain these Keys and default values from "User" Mapping class and remove this mess!
@@ -177,7 +176,8 @@ class BKBot:
         dispatcher.add_handler(conv_handler)
         """ Handles deletion of userdata. """
         conv_handler2 = ConversationHandler(
-            entry_points=[CommandHandler('tschau', self.botUserDeleteSTART), CallbackQueryHandler(self.botUserDeleteSTART, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND + "$")],
+            entry_points=[CommandHandler('tschau', self.botUserDeleteSTART),
+                          CallbackQueryHandler(self.botUserDeleteSTART, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND + "$")],
             states={
                 CallbackVars.MENU_SETTINGS_USER_DELETE_DATA: [
                     CommandHandler('cancel', self.botUserDeleteCancel),
@@ -307,7 +307,7 @@ class BKBot:
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
         """ Send list containing all coupons with long titles linked to coupon channel to user. This may result in up to 10 messages being sent! """
         update.callback_query.answer()
-        activeCoupons = bkbot.crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
                                                 channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
@@ -498,6 +498,7 @@ class BKBot:
 
     def displayCouponsWithImagesAndBackButton(self, update: Update, context: CallbackContext, coupons: list, topMsgText: str, bottomMsgText: str = "Zurück zum Hauptmenü?"):
         self.displayCouponsWithImages(update, context, coupons, topMsgText)
+        # Post back button
         update.effective_message.reply_text(text=bottomMsgText, parse_mode="HTML",
                                             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)], []]))
 
@@ -582,31 +583,30 @@ class BKBot:
         keyboard = []
         # TODO: Make this nicer
         dummyUser = User()
+        userWantsAutodeleteOfFavoriteCoupons = user.settings.autoDeleteExpiredFavorites
         for settingKey, setting in dummyUser["settings"].items():
             # All settings that are in 'USER_SETTINGS_ON_OFF' are simply on/off settings and will automatically be included in users' settings.
             if settingKey in USER_SETTINGS_ON_OFF:
                 description = USER_SETTINGS_ON_OFF[settingKey]["description"]
-                displaySetting = True
                 # Check for special cases where one setting depends of the state of another
-                if settingKey == 'notifyWhenFavoritesAreBack' and user.settings.get('autoDeleteExpiredFavorites', dummyUser.settings['autoDeleteExpiredFavorites']):
-                    displaySetting = False
-                if displaySetting:
-                    if user.settings.get(settingKey, dummyUser.settings[settingKey]):
-                        # Add symbol to enabled settings button text so user can see which settings are currently enabled
-                        keyboard.append(
-                            [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
-                    else:
-                        keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
+                if settingKey == 'notifyWhenFavoritesAreBack' and userWantsAutodeleteOfFavoriteCoupons:
+                    continue
+                if user.settings.get(settingKey, dummyUser.settings[settingKey]):
+                    # Add symbol to enabled settings button text so user can see which settings are currently enabled
+                    keyboard.append(
+                        [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
+                else:
+                    keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
-        # Add 'reset settings' button
+        # Add 'reset settings' button (only if user has changed settings to non-default)
         if user.settings.__dict__ != dummyUser.settings.__dict__:
             keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + "bleiben)" + SYMBOLS.WARNING,
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         if len(user.favoriteCoupons) > 0:
-            # Additional DB request required so let's only jump into this handling if the user has at least one favorite set.
+            # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
             userFavoritesInfo = user.getUserFavoritesInfo(self.getBotCoupons())
             if len(userFavoritesInfo.couponsUnavailable) > 0:
                 keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavoritesInfo.couponsUnavailable)) + ")?*²",
@@ -753,7 +753,7 @@ class BKBot:
 
     def getFilteredCoupons(self, couponFilter: CouponFilter):
         """  Wrapper for crawler.filterCouponsList with errorhandling when zero results are available. """
-        coupons = self.crawler.filterCouponsList(couponFilter)
+        coupons = self.crawler.getFilteredCouponsAsList(couponFilter)
         if len(coupons) == 0:
             menuText = SYMBOLS.DENY + ' <b>Es gibt derzeit keine Coupons in den von dir ausgewählten Kategorien und/oder in Kombination mit den eingestellten Filtern!</b>'
             # menuText += "\nZurück mit /start"
@@ -881,9 +881,11 @@ class BKBot:
             "Y15 | 2Whopper+M🍟+0,4LCola (https://t.me/betterkingpublic/1054) | 8,99€"
             """
             if coupon.id in channelDB:
-                messageIDs = ChannelCoupon.load(channelDB, coupon.id).messageIDs
-                if len(messageIDs) > 0:
-                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=False, publicChannelName=self.getPublicChannelName(), messageID=messageIDs[0])
+                channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
+                messageID = channelCoupon.getMessageIDForChatHyperlink()
+                if messageID is not None:
+                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=False, publicChannelName=self.getPublicChannelName(),
+                                                                                                   messageID=messageID)
                 else:
                     # This should never happen but we'll allow it to
                     logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
@@ -978,27 +980,26 @@ class BKBot:
                                            infoDBDoc: Union[None, InfoEntry]):
         """ Sends all given coupons to given chat_id separated by source and split into multiple messages as needed. """
         couponsSeparatedByType = getCouponsSeparatedByType(coupons)
-        """ Update/re-send coupon overview(s), spread this information on multiple pages if needed. """
+        if infoDBDoc is not None:
+            # Mark old coupon overview messageIDs for deletion
+            oldCategoryMsgIDs = infoDBDoc.getAllCouponCategoryMessageIDs()
+            if len(oldCategoryMsgIDs) > 0:
+                infoDBDoc.addMessageIDsToDelete(oldCategoryMsgIDs)
+                infoDBDoc.deleteAllCouponCategoryMessageIDs()
+                # Update DB
+                infoDBDoc.store(infoDB)
+        """ Re-send coupon overview(s), spread this information on multiple pages if needed. """
         for couponSourceIndex in range(len(BotAllowedCouponSources)):
             couponSource = BotAllowedCouponSources[couponSourceIndex]
             couponCategory = CouponCategory(couponSource)
             logging.info("Working on coupon overview " + str(couponSourceIndex + 1) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.nameSingular)
             hasAddedSeparatorAfterCouponsWithoutMenu = False
             listContainsAtLeastOneItemWithoutMenu = False
-            oldMessageIDsForThisCategory = None if infoDBDoc is None else infoDBDoc.getMessageIDsForCouponCategory(couponSource)
             if couponSource in couponsSeparatedByType:
-                # allowMessageEdit == True --> Handling untested!
                 coupons = couponsSeparatedByType[couponSource]
                 # Depends on the max entities per post limit of Telegram and we're not only using hyperlinks but also the "<b>" tag so we do not have 50 hyperlinks left but 49.
                 maxCouponsPerPage = 49
                 maxPage = math.ceil(len(coupons) / maxCouponsPerPage)
-                if oldMessageIDsForThisCategory is not None and len(oldMessageIDsForThisCategory) > 0 and infoDBDoc is not None:
-                    # Delete all old pages for current coupon type
-                    # Save old messages for later deletion
-                    infoDBDoc.addMessageIDsToDelete(oldMessageIDsForThisCategory)
-                    infoDBDoc.deleteCouponCategoryMessageIDs(couponSource)
-                    # Update DB
-                    infoDBDoc.store(infoDB)
                 for page in range(1, maxPage + 1):
                     logging.info("Sending category page: " + str(page) + "/" + str(maxPage))
                     couponOverviewText = "<b>[" + str(len(coupons)) + " Stück] " + couponCategory.nameSingular + " Übersicht"
@@ -1010,7 +1011,7 @@ class BKBot:
                     startIndex = page * maxCouponsPerPage - maxCouponsPerPage
                     for couponIndex in range(startIndex, startIndex + maxCouponsPerPage):
                         coupon = coupons[couponIndex]
-                        """ Add a little separator so it is easier for the user to distinguish between coupons with- and without menu. 
+                        """ Add a separator so it is easier for the user to distinguish between coupons with- and without menu. 
                         This only works as "simple" as that because we pre-sorted these coupons!
                         """
                         if not coupon.containsFriesOrCoke:
@@ -1024,11 +1025,14 @@ class BKBot:
                         """
                         if coupon.id in channelDB:
                             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
-                            if len(channelCoupon.messageIDs) > 0:
+                            messageID = channelCoupon.getMessageIDForChatHyperlink()
+                            if messageID is not None:
                                 if useLongCouponTitles:
-                                    couponText = coupon.generateCouponLongTextFormattedWithHyperlinkToChannelPost(self.getPublicChannelName(), channelCoupon.messageIDs[0])
+                                    couponText = coupon.generateCouponLongTextFormattedWithHyperlinkToChannelPost(self.getPublicChannelName(), messageID)
                                 else:
-                                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=True, publicChannelName=self.getPublicChannelName(), messageID=channelCoupon.messageIDs[0])
+                                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=True,
+                                                                                                                   publicChannelName=self.getPublicChannelName(),
+                                                                                                                   messageID=messageID)
                             else:
                                 # This should never happen but we'll allow it to
                                 logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
@@ -1055,17 +1059,8 @@ class BKBot:
                         # Update DB
                         infoDBDoc.addCouponCategoryMessageID(couponSource, msg.message_id)
                         infoDBDoc.store(infoDB)
-            elif oldMessageIDsForThisCategory is not None and len(oldMessageIDsForThisCategory) > 0:
-                """ Cleanup chat:
-                Typically needed if a complete supported coupon type was there but is not existant anymore e.g. paper coupons were there but aren't existant anymore -> Delete old overview-message(s) """
-                if infoDBDoc is not None:
-                    # Save these messageIDs so we can delete them later
-                    infoDBDoc.addMessageIDsToDelete(oldMessageIDsForThisCategory)
-                    infoDBDoc.deleteCouponCategoryMessageIDs(couponSource)
-                    infoDBDoc.store(infoDB)
             else:
-                # Rare case
-                logging.info("Nothing to do: No coupons of this type available and no old ones to delete :)")
+                logging.info("Nothing to do: No coupons of this type available :)")
 
         return
 
@@ -1156,6 +1151,22 @@ class BKBot:
         except BadRequest:
             """ Typically this means that this message has already been deleted """
             logging.warning("Failed to delete message with message_id: " + str(messageID))
+
+
+class ImageCache:
+    # TODO: Maybe replace current photo cache with this
+    def __init__(self):
+        self.imageURL = None
+
+    uniqueIdentifier = None
+    imageFileID = None
+    imageFileIDQR = None
+    imageURL = None
+    timestampCreated = -1
+    timestampLastUsed = -1
+
+    if __name__ == '__main__':
+        pass
 
 
 if __name__ == '__main__':
