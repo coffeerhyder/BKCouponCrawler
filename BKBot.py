@@ -984,6 +984,7 @@ class BKBot:
             # Mark old coupon overview messageIDs for deletion
             oldCategoryMsgIDs = infoDBDoc.getAllCouponCategoryMessageIDs()
             if len(oldCategoryMsgIDs) > 0:
+                logging.info("Saving coupon category messageIDs for deletion: " + str(oldCategoryMsgIDs))
                 infoDBDoc.addMessageIDsToDelete(oldCategoryMsgIDs)
                 infoDBDoc.deleteAllCouponCategoryMessageIDs()
                 # Update DB

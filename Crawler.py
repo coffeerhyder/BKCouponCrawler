@@ -46,6 +46,7 @@ class BKCrawler:
         self.cachedMissingPaperCouponsText = None
         # Create required DBs
         if DATABASES.INFO_DB not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.INFO_DB)
             infoDB = self.couchdb.create(DATABASES.INFO_DB)
         else:
             infoDB = self.couchdb[DATABASES.INFO_DB]
@@ -54,27 +55,38 @@ class BKCrawler:
             infoDoc = InfoEntry(id=DATABASES.INFO_DB)
             infoDoc.store(self.couchdb[DATABASES.INFO_DB])
         if DATABASES.TELEGRAM_USERS not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.TELEGRAM_USERS)
             self.couchdb.create(DATABASES.TELEGRAM_USERS)
         if DATABASES.COUPONS not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.COUPONS)
             self.couchdb.create(DATABASES.COUPONS)
         if DATABASES.OFFERS not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.OFFERS)
             self.couchdb.create(DATABASES.OFFERS)
         if DATABASES.COUPONS_HISTORY not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.COUPONS_HISTORY)
             self.couchdb.create(DATABASES.COUPONS_HISTORY)
         if DATABASES.PRODUCTS not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.PRODUCTS)
             self.couchdb.create(DATABASES.PRODUCTS)
         if DATABASES.PRODUCTS_HISTORY not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.PRODUCTS_HISTORY)
             self.couchdb.create(DATABASES.PRODUCTS_HISTORY)
         if DATABASES.PRODUCTS2_HISTORY not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.PRODUCTS2_HISTORY)
             self.couchdb.create(DATABASES.PRODUCTS2_HISTORY)
         if DATABASES.TELEGRAM_CHANNEL not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.TELEGRAM_CHANNEL)
             self.couchdb.create(DATABASES.TELEGRAM_CHANNEL)
         # Create required folders
         if not os.path.exists(getImageBasePath()):
+            logging.info("Creating missing filepath: " + getImageBasePath())
             os.makedirs(getImageBasePath())
         if not os.path.exists(getPathImagesOffers()):
+            logging.info("Creating missing filepath: " + getPathImagesOffers())
             os.makedirs(getPathImagesOffers())
         if not os.path.exists(getPathImagesProducts()):
+            logging.info("Creating missing filepath: " + getPathImagesProducts())
             os.makedirs(getPathImagesProducts())
         # Do this here so manually added coupons will get added without extra crawl process
         self.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=True)
