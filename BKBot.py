@@ -278,12 +278,6 @@ class BKBot:
         query = update.callback_query
         if query is not None:
             query.answer()
-        # if self.maintenanceMode:
-        #     text = SYMBOLS.DENY + '<b>Wartungsmodus!' + SYMBOLS.DENY + '</b>'
-        #     if self.getPublicChannelName() is not None:
-        #         text += '\nMehr Infos siehe ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + '.'
-        #     self.sendMessage(chat_id=update.effective_message.chat_id, text=text, parse_mode='HTML', disable_web_page_preview=True)
-        #     return
         userDB = self.crawler.getUsersDB()
         user = User.load(userDB, str(update.effective_user.id))
         """ New user? --> Add userID to DB. """
