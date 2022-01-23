@@ -353,6 +353,7 @@ class InfoEntry(Document):
     informationMessageID = TextField()
     couponTypeOverviewMessageIDs = DictField(default={})
     messageIDsToDelete = ListField(IntegerField(), default=[])
+    lastMaintenanceModeState = BooleanField()
 
     def addMessageIDToDelete(self, messageID: int):
         # Avoid duplicates

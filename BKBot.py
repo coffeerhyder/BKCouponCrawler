@@ -9,7 +9,7 @@ from couchdb import Database
 from furl import furl, urllib
 from telegram import Update, InlineKeyboardButton, InputMediaPhoto, Message, ReplyMarkup
 from telegram.error import RetryAfter, BadRequest
-from telegram.ext import Updater, CommandHandler, CallbackContext, ConversationHandler, CallbackQueryHandler, MessageHandler, Filters
+from telegram.ext import Updater, CommandHandler, CallbackContext, ConversationHandler, CallbackQueryHandler, MessageHandler, Filters, Handler
 from telegram.utils.helpers import DEFAULT_NONE
 from telegram.utils.types import ODVInput, FileInput
 
@@ -119,6 +119,9 @@ class BKBot:
     def __init__(self):
         self.couponImageCache = {}
         self.offerImageCache = {}
+        self.maintenanceMode = False
+        if 'maintenancemode' in sys.argv:
+            self.maintenanceMode = True
         self.cfg = loadConfig()
         if self.cfg is None:
             raise Exception('Broken or missing config')
@@ -173,7 +176,6 @@ class BKBot:
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="MainConversationHandler",
         )
-        dispatcher.add_handler(conv_handler)
         """ Handles deletion of userdata. """
         conv_handler2 = ConversationHandler(
             entry_points=[CommandHandler('tschau', self.botUserDeleteSTART),
@@ -190,7 +192,6 @@ class BKBot:
             name="DeleteUserConvHandler",
             allow_reentry=True,
         )
-        dispatcher.add_handler(conv_handler2)
         """ Handles 'favorite buttons' below single coupon-pictures. """
         conv_handler3 = ConversationHandler(
             entry_points=[CallbackQueryHandler(self.botCouponToggleFavorite, pattern=PATTERN.PLU_TOGGLE_FAV)],
@@ -203,6 +204,19 @@ class BKBot:
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="CouponToggleFavoriteWithImageHandler",
         )
+        if self.maintenanceMode:
+            # Re-route all callbacks to maintenance mode function
+            for convHandler in [conv_handler, conv_handler2, conv_handler3]:
+                # Collect all handlers
+                all_handlers: List[Handler] = []
+                all_handlers.extend(convHandler.entry_points)
+                all_handlers.extend(convHandler.fallbacks)
+                for handlers in convHandler.states.values():
+                    all_handlers.extend(handlers)
+                for handler in all_handlers:
+                    handler.callback = self.botDisplayMaintenanceMode
+        dispatcher.add_handler(conv_handler)
+        dispatcher.add_handler(conv_handler2)
         dispatcher.add_handler(conv_handler3)
         """
         2021-01-12: I've decided to drop these commands for now as our menu "back" button won't work like this.
@@ -251,10 +265,25 @@ class BKBot:
         Only call this if self.publicChannelName != None!!! """
         return "<a href=\"https://t.me/" + self.getPublicChannelName() + "\">" + linkText + "</a>"
 
+    def botDisplayMaintenanceMode(self, update: Update, context: CallbackContext):
+        query = update.callback_query
+        if query is not None:
+            query.answer()
+        text = SYMBOLS.DENY + '<b>Wartungsmodus!' + SYMBOLS.DENY + '</b>'
+        if self.getPublicChannelName() is not None:
+            text += '\nMehr Infos siehe ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + '.'
+        self.sendMessage(chat_id=update.effective_message.chat_id, text=text, parse_mode='HTML', disable_web_page_preview=True)
+
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
         query = update.callback_query
         if query is not None:
             query.answer()
+        # if self.maintenanceMode:
+        #     text = SYMBOLS.DENY + '<b>Wartungsmodus!' + SYMBOLS.DENY + '</b>'
+        #     if self.getPublicChannelName() is not None:
+        #         text += '\nMehr Infos siehe ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + '.'
+        #     self.sendMessage(chat_id=update.effective_message.chat_id, text=text, parse_mode='HTML', disable_web_page_preview=True)
+        #     return
         userDB = self.crawler.getUsersDB()
         user = User.load(userDB, str(update.effective_user.id))
         """ New user? --> Add userID to DB. """
@@ -1059,6 +1088,7 @@ class BKBot:
                     if infoDBDoc is not None:
                         # Update DB
                         infoDBDoc.addCouponCategoryMessageID(couponSource, msg.message_id)
+                        infoDBDoc.lastMaintenanceModeState = self.maintenanceMode
                         infoDBDoc.store(infoDB)
             else:
                 logging.info("Nothing to do: No coupons of this type available :)")
