@@ -294,11 +294,12 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
 * http://www.fastfood-forum.net/wbb3/upload/index.php/Board/9-Burger-King/
 
-### Ähnliche BK Projekte auf GitHub (teilweise veraltet)
+### Ähnliche Projekte auf GitHub (teilweise veraltet)
 * https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
 * https://github.com/reteps/burger-king-api-wrapper
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
 * https://bk.eris.cc/ --> https://gist.github.com/printfuck
+* https://t.me/freecokebot
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot
