@@ -24,6 +24,7 @@ class Config:
 
 
 class CallbackVars:
+    GENERIC_BACK = 'back'
     MENU_MAIN = 'menu_main'
     MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES = 'menu_display_all_coupons_list_with_full_titles'
     MENU_DISPLAY_COUPON = 'menu_display_coupon'
@@ -34,9 +35,9 @@ class CallbackVars:
     COUPON_LOOSE_WITH_FAVORITE_SETTING = 'coupon_loose_with_favorite_setting'
     MENU_FEEDBACK_CODES = 'menu_feedback_codes'
     MENU_SETTINGS = 'menu_settings'
-    MENU_SETTINGS_TOGGLE_NOTIFICATIONS_FAVORITES_COUPONS = 'menu_settings_toggle_notifications_favorites_coupons'
-    MENU_SETTINGS_TOGGLE_DISPLAY_QR_CODE = 'menu_settings_toggle_display_qr_code'
     MENU_SETTINGS_RESET = 'menu_settings_reset'
+    MENU_SETTINGS_ADD_PAYBACK_CARD = 'menu_settings_add_payback_card'
+    MENU_SETTINGS_DELETE_PAYBACK_CARD = 'menu_settings_delete_payback_card'
     MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS = 'menu_settings_delete_unavailable_favorite_coupons'
     MENU_SETTINGS_USER_DELETE_DATA_COMMAND = 'menu_settings_user_delete_data_command'
     MENU_SETTINGS_USER_DELETE_DATA = 'menu_settings_user_delete_data'

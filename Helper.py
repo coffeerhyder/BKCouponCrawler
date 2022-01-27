@@ -66,6 +66,20 @@ def normalizeString(string: str):
     return replaceRegex(re.compile(r'[\W_]+'), '', string).lower()
 
 
+def splitStringInPairs(string: str):
+    """ Changes input to pairs of 4 separated by spaces. """
+    addedChars = 0
+    index = 0
+    splitString = ''
+    for char in string:
+        isLast = index == len(splitString) - 1
+        splitString += char
+        if addedChars == 4 and not isLast:
+            splitString += ' '
+        index += 1
+        addedChars += 1
+
+
 def shortenProductNames(couponTitle: str) -> str:
     """ Cleans up coupon titles to make them shorter so they hopefully fit in the length of one button.
      E.g. "Long Chicken + Crispy Chicken + mittlere KING Pommes + 0,4 L Coca-Cola" -> "LngChn+CrispyCkn+M🍟+0,4LCola"

@@ -81,15 +81,6 @@ class CouponDisplayMode:
     FAVORITES = 'f'
 
 
-class PhotoCacheVars:
-    FILE_ID = 'file_id'
-    FILE_ID_QR = 'file_id_qr'
-    TIMESTAMP_CREATED = 'timestamp_created'
-    TIMESTAMP_LAST_USED = 'timestamp_last_used'
-    UNIQUE_IDENTIFIER = 'unique_identifier'
-    IMAGE_URL = 'image_url'
-
-
 def generateCallbackRegEx(settings: dict):
     # Generates one CallBack RegEx for a set of settings.
     settingsCallbackRegEx = '^'
@@ -107,8 +98,8 @@ def generateCallbackRegEx(settings: dict):
 def cleanupCache(cacheDict: dict):
     cacheDictCopy = cacheDict.copy()
     maxCacheAgeSeconds = 7 * 24 * 60 * 60
-    for cacheID, cache in cacheDictCopy.items():
-        cacheItemAge = datetime.now().timestamp() - cache[PhotoCacheVars.TIMESTAMP_LAST_USED]
+    for cacheID, cacheData in cacheDictCopy.items():
+        cacheItemAge = datetime.now().timestamp() - cacheData.timestampLastUsed
         if cacheItemAge > maxCacheAgeSeconds:
             logging.info("Deleting cache item " + str(cacheID) + " as it was last used before: " + str(cacheItemAge) + " seconds")
             del cacheDict[cacheID]
@@ -118,6 +109,7 @@ class BKBot:
 
     def __init__(self):
         self.couponImageCache = {}
+        self.couponImageQRCache = {}
         self.offerImageCache = {}
         self.maintenanceMode = False
         if 'maintenancemode' in sys.argv:
@@ -171,6 +163,19 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplaySettingsToggleSetting, pattern=generateCallbackRegEx(User().settings)),
                     CallbackQueryHandler(self.botResetSettings, pattern="^" + CallbackVars.MENU_SETTINGS_RESET + "$"),
                     CallbackQueryHandler(self.botDeleteUnavailableFavoriteCoupons, pattern="^" + CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS + "$"),
+                    CallbackQueryHandler(self.botAddPaybackSTART, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
+                ],
+                CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD: [
+                    # TODO
+                    # Back to settings menu
+                    CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
+                    MessageHandler(Filters.text, self.botAddPayback),
+                ],
+                CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD: [
+                    # TODO
+                    # Back to settings menu
+                    CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
+                    MessageHandler(Filters.text, self.botUserDelete),
                 ],
             },
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
@@ -554,7 +559,6 @@ class BKBot:
         prePhotosText = '<b>Es sind derzeit ' + str(len(activeOffers)) + ' Angebote verfügbar:</b>'
         query.edit_message_text(text=prePhotosText, parse_mode='HTML')
         for offer in activeOffers:
-            offerID = offer['id']
             offerText = offer['title']
             subtitle = offer.get('subline')
             if subtitle is not None and len(subtitle) > 0:
@@ -568,10 +572,7 @@ class BKBot:
             # This is a bit f*cked up but should work - offerIDs are not really unique but we'll compare the URL too and if the current URL is not in our cache we'll have to re-upload that file!
             sentMessage = self.sendPhoto(chat_id=update.effective_message.chat_id, photo=self.getOfferImage(offer), caption=offerText)
             # Save Telegram fileID pointing to that image in our cache
-            if offerID not in self.offerImageCache or self.offerImageCache[offerID][PhotoCacheVars.IMAGE_URL] != couponOrOfferGetImageURL(offer):
-                self.offerImageCache[offerID] = {PhotoCacheVars.FILE_ID: sentMessage.photo[0].file_id, PhotoCacheVars.IMAGE_URL: couponOrOfferGetImageURL(offer),
-                                                 PhotoCacheVars.TIMESTAMP_CREATED: datetime.now().timestamp(),
-                                                 PhotoCacheVars.TIMESTAMP_LAST_USED: datetime.now().timestamp()}
+            self.offerImageCache.setdefault(couponOrOfferGetImageURL(offer), ImageCache(fileID=sentMessage.photo[0].file_id))
 
         menuText = '<b>Nix dabei?</b>'
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN),
@@ -620,6 +621,10 @@ class BKBot:
                         [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
                 else:
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
+        if len(user.paybackCards) == 0:
+            keyboard.append([InlineKeyboardButton('Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
+        else:
+            keyboard.append([InlineKeyboardButton('Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
@@ -704,7 +709,6 @@ class BKBot:
         couponText = coupon.generateCouponLongTextFormattedWithDescription(highlightIfNew=True)
         if additionalText is not None:
             couponText += '\n' + additionalText
-        msgQR = None
         if user.settings.displayQR:
             # We need to send two images -> Send as album
             photoCoupon = InputMediaPhoto(media=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML')
@@ -714,20 +718,13 @@ class BKBot:
             msgQR = chatMessages[1]
             self.sendMessage(chat_id=update.effective_message.chat_id, text=couponText, parse_mode='HTML', reply_markup=replyMarkupWithoutBackButton,
                              disable_web_page_preview=True)
+            # Add to cache if not already present
+            self.couponImageQRCache.setdefault(coupon.id, ImageCache(fileID=msgQR.photo[0].file_id))
         else:
             msgCoupon = self.sendPhoto(chat_id=update.effective_message.chat_id, photo=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML',
                                        reply_markup=replyMarkupWithoutBackButton)
-        # Update coupon image cache
-        if coupon.id not in self.couponImageCache:
-            self.couponImageCache[coupon.id] = {PhotoCacheVars.UNIQUE_IDENTIFIER: coupon.getUniqueIdentifier(), PhotoCacheVars.FILE_ID: msgCoupon.photo[0].file_id,
-                                                PhotoCacheVars.TIMESTAMP_CREATED: datetime.now().timestamp(),
-                                                PhotoCacheVars.TIMESTAMP_LAST_USED: datetime.now().timestamp()}
-        elif self.couponImageCache[coupon.id][PhotoCacheVars.UNIQUE_IDENTIFIER] != coupon.getUniqueIdentifier():
-            logging.info("Refreshing coupon cache of: " + coupon.id)
-            self.couponImageCache[coupon.id] = {PhotoCacheVars.UNIQUE_IDENTIFIER: coupon.getUniqueIdentifier(), PhotoCacheVars.FILE_ID: msgCoupon.photo[0].file_id,
-                                                PhotoCacheVars.TIMESTAMP_LAST_USED: datetime.now().timestamp()}
-        if msgQR is not None:
-            self.couponImageCache[coupon.id][PhotoCacheVars.FILE_ID_QR] = msgQR.photo[0].file_id
+        # Add to cache if not already present
+        self.couponImageCache.setdefault(coupon.getUniqueIdentifier(), ImageCache(fileID=msgCoupon.photo[0].file_id))
         return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
 
     def botCouponToggleFavorite(self, update: Update, context: CallbackContext):
@@ -744,7 +741,6 @@ class BKBot:
             isFavorite = False
         else:
             # Add coupon to favorites
-            # user.addFavoriteCoupon(self.crawler.getCouponDB()[uniqueCouponID])
             user.addFavoriteCoupon(Coupon.load(self.crawler.getCouponDB(), uniqueCouponID))
             isFavorite = True
         # Update DB
@@ -786,16 +782,16 @@ class BKBot:
 
     def getCouponImage(self, coupon: Coupon):
         """ Returns either image URL or file or Telegram file_id of a given coupon. """
-        cachedImageData = self.couponImageCache.get(coupon.id)
+        cachedImageData = self.couponImageCache.get(coupon.getUniqueIdentifier())
         """ Re-use Telegram file-ID if possible: https://core.telegram.org/bots/api#message
         If the PLU has changed, we cannot just re-use the old ID because the images can contain that PLU code and the PLU code in our saved image can lead to a completely different product now!
         According to the Telegram FAQ, sich file_ids can be trusted to be persistent: https://core.telegram.org/bots/faq#can-i-count-on-file-ids-to-be-persistent """
         imagePath = coupon.getImagePath()
-        if cachedImageData is not None and cachedImageData[PhotoCacheVars.UNIQUE_IDENTIFIER] == coupon.getUniqueIdentifier():
+        if cachedImageData is not None:
             # Re-use cached image_id and update cache timestamp
-            self.couponImageCache[coupon.id][PhotoCacheVars.TIMESTAMP_LAST_USED] = datetime.now().timestamp()
-            logging.debug("Returning coupon image file_id: " + cachedImageData[PhotoCacheVars.FILE_ID])
-            return cachedImageData[PhotoCacheVars.FILE_ID]
+            cachedImageData.updateLastUsedTimestamp()
+            logging.debug("Returning coupon image file_id: " + cachedImageData.imageFileID)
+            return cachedImageData.imageFileID
         elif isValidImageFile(imagePath):
             # Return image file
             logging.debug("Returning coupon image file in path: " + imagePath)
@@ -807,27 +803,26 @@ class BKBot:
 
     def getCouponImageQR(self, coupon: Coupon):
         """ Returns either image URL or file or Telegram file_id of a given coupon QR image. """
-        cachedImageData = self.couponImageCache.get(coupon.id)
+        cachedQRImageData = self.couponImageQRCache.get(coupon.id)
         # Re-use Telegram file-ID if possible: https://core.telegram.org/bots/api#message
-        if cachedImageData is not None and PhotoCacheVars.FILE_ID_QR in cachedImageData:
+        if cachedQRImageData is not None:
             # Return cached image_id and update cache timestamp
-            self.couponImageCache[coupon.id][PhotoCacheVars.TIMESTAMP_LAST_USED] = datetime.now().timestamp()
-            logging.debug("Returning QR image file_id: " + cachedImageData[PhotoCacheVars.FILE_ID_QR])
-            return cachedImageData[PhotoCacheVars.FILE_ID_QR]
+            cachedQRImageData.updateLastUsedTimestamp()
+            logging.debug("Returning QR image file_id: " + cachedQRImageData.imageFileID)
+            return cachedQRImageData.imageFileID
         else:
             # Return image
             logging.debug("Returning QR image file")
             return coupon.getImageQR()
 
-    def getOfferImage(self, offer):
+    def getOfferImage(self, offer: dict):
         """ Returns either image URL or file or Telegram file_id of a given offer. """
-        offerID = offer['id']
         image_url = couponOrOfferGetImageURL(offer)
-        cachedImageData = self.offerImageCache.get(offerID)
-        if cachedImageData is not None and cachedImageData[PhotoCacheVars.IMAGE_URL] == image_url:
+        cachedImageData = self.offerImageCache.get(image_url)
+        if cachedImageData is not None:
             # Re-use cached image_id and update cache timestamp
-            self.offerImageCache[offerID][PhotoCacheVars.TIMESTAMP_LAST_USED] = datetime.now().timestamp()
-            return cachedImageData[PhotoCacheVars.FILE_ID]
+            cachedImageData.updateLastUsedTimestamp()
+            return cachedImageData.imageFileID
         if os.path.exists(offerGetImagePath(offer)):
             # Return image file
             return open(offerGetImagePath(offer), mode='rb')
@@ -866,6 +861,32 @@ class BKBot:
         user = User.load(userDB, str(update.effective_user.id))
         self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
+
+    def botAddPaybackSTART(self, update: Update, context: CallbackContext):
+        update.callback_query.answer()
+        update.callback_query.edit_message_text(text='Antworte mit deiner Payback Kartennummer, um diese hinzuzufügen.', parse_mode='HTML',
+                                                reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+        return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
+
+    def botAddPayback(self, update: Update, context: CallbackContext):
+        userInput = update.message.text
+        # Validate input
+        if userInput is not None and userInput.isdecimal() and len(userInput) == 10:
+            text = SYMBOLS.CONFIRM + 'Karte ' + userInput + ' wurde hinzugefügt.'
+            # return self.displayPaybackCard(update, context, text)
+            self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode='HTML')
+        else:
+            self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML')
+            # TODO: Maybe navigate to the added card directly
+        return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
+
+    def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
+        # TODO
+        pass
+
+    def displayPaybackCard(self, update: Update, context: CallbackContext, text: str):
+        # TODO
+        pass
 
     def batchProcessAutoDeleteUsersUnavailableFavorites(self):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
@@ -997,6 +1018,7 @@ class BKBot:
 
     def cleanupCaches(self):
         cleanupCache(self.couponImageCache)
+        cleanupCache(self.couponImageQRCache)
         cleanupCache(self.offerImageCache)
 
     def sendCouponOverviewWithChannelLinks(self, chat_id: Union[int, str], coupons: dict, useLongCouponTitles: bool, channelDB: Database, infoDB: Union[None, Database],
@@ -1179,19 +1201,15 @@ class BKBot:
 
 
 class ImageCache:
-    # TODO: Maybe replace current photo cache with this
-    def __init__(self):
-        self.imageURL = None
+    # TODO: Replace current photo cache with this
+    def __init__(self, fileID: str):
+        self.imageFileID = fileID
+        self.timestampCreated = datetime.now().timestamp()
+        self.timestampLastUsed = datetime.now().timestamp()
 
-    uniqueIdentifier = None
-    imageFileID = None
-    imageFileIDQR = None
-    imageURL = None
-    timestampCreated = -1
-    timestampLastUsed = -1
-
-    if __name__ == '__main__':
-        pass
+    def updateLastUsedTimestamp(self):
+        """ Updates last used timestamp to current timestamp. """
+        self.timestampLastUsed = datetime.now().timestamp()
 
 
 if __name__ == '__main__':

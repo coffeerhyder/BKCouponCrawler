@@ -294,6 +294,12 @@ class User(Document):
     )
     botBlockedCounter = IntegerField(default=0)
     favoriteCoupons = DictField(default={})
+    paybackCards = ListField(
+                Mapping.build(
+                    paybackCardNumber=TextField(),
+                    addedTimestamp=FloatField()
+                )
+    )
 
     def isFavoriteCoupon(self, coupon: Coupon):
         """ Checks if given coupon is users' favorite """
@@ -321,6 +327,21 @@ class User(Document):
             return True
         else:
             return False
+
+    def getPrimaryPaybackCardNumber(self):
+        # TODO
+        if len(self.paybackCards) > 0:
+            return self.paybackCards[0]['paybackCardNumber']
+        else:
+            return None
+
+    def addPaybackCard(self, paybackCardNumber: str):
+        # TODO
+        self.paybackCards.append({'paybackCardNumber': paybackCardNumber, 'addedTimestamp': datetime.now().timestamp()})
+
+    def deletePaybackCard(self, paybackCardNumber: str):
+        #TODO
+        pass
 
     def getUserFavoritesInfo(self, couponsFromDB: Union[dict, Document]) -> UserFavoritesInfo:
         """
