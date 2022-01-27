@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Union, List, Optional
 
-from couchdb.mapping import TextField, FloatField, ListField, IntegerField, BooleanField, Document, DictField, Mapping
+from couchdb.mapping import TextField, FloatField, ListField, IntegerField, BooleanField, Document, DictField, Mapping, DateTimeField
 from pydantic import BaseModel
 
 from CouponCategory import BotAllowedCouponSources, CouponSource
@@ -294,12 +294,10 @@ class User(Document):
     )
     botBlockedCounter = IntegerField(default=0)
     favoriteCoupons = DictField(default={})
-    paybackCards = ListField(
-                Mapping.build(
-                    paybackCardNumber=TextField(),
-                    addedTimestamp=FloatField()
-                )
-    )
+    paybackCards = ListField(DictField(Mapping.build(
+         paybackCardNumber=TextField(),
+         addedDate=DateTimeField(default=datetime.now())
+     )))
 
     def isFavoriteCoupon(self, coupon: Coupon):
         """ Checks if given coupon is users' favorite """
@@ -329,6 +327,7 @@ class User(Document):
             return False
 
     def getPrimaryPaybackCardNumber(self):
+        """ Returns number of first Payback card in list. """
         # TODO
         if len(self.paybackCards) > 0:
             return self.paybackCards[0]['paybackCardNumber']
@@ -336,12 +335,10 @@ class User(Document):
             return None
 
     def addPaybackCard(self, paybackCardNumber: str):
-        # TODO
-        self.paybackCards.append({'paybackCardNumber': paybackCardNumber, 'addedTimestamp': datetime.now().timestamp()})
+        self.paybackCards.append({'paybackCardNumber': paybackCardNumber, 'addedDate': datetime.now()})
 
-    def deletePaybackCard(self, paybackCardNumber: str):
-        #TODO
-        pass
+    def deletePrimaryPaybackCard(self):
+        del self.paybackCards[0]
 
     def getUserFavoritesInfo(self, couponsFromDB: Union[dict, Document]) -> UserFavoritesInfo:
         """

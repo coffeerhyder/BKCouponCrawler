@@ -439,7 +439,6 @@ class BKCrawler:
                 extraCouponsToAdd[coupon.uniqueID] = coupon
                 crawledCouponsDict[coupon.uniqueID] = coupon
         if immediatelyAddToDB and len(extraCouponsToAdd) > 0:
-            logging.info("Adding " + str(len(extraCouponsToAdd)) + " valid extra coupons to DB now")
             # Add items to DB
             couponDB = self.getCouponDB()
             dbUpdates = []

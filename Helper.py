@@ -66,18 +66,20 @@ def normalizeString(string: str):
     return replaceRegex(re.compile(r'[\W_]+'), '', string).lower()
 
 
-def splitStringInPairs(string: str):
-    """ Changes input to pairs of 4 separated by spaces. """
-    addedChars = 0
+def splitStringInPairs(string: str) -> str:
+    """ Changes input to pairs of max. 4 separated by spaces. """
+    addedCharsBlock = 0
     index = 0
     splitString = ''
     for char in string:
-        isLast = index == len(splitString) - 1
+        isLast = index == len(string) - 1
         splitString += char
-        if addedChars == 4 and not isLast:
-            splitString += ' '
         index += 1
-        addedChars += 1
+        addedCharsBlock += 1
+        if addedCharsBlock == 4 and not isLast:
+            splitString += ' '
+            addedCharsBlock = 0
+    return splitString
 
 
 def shortenProductNames(couponTitle: str) -> str:
