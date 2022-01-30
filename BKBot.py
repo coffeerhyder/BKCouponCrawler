@@ -49,7 +49,7 @@ USER_SETTINGS_ON_OFF = {
         "default": False
     },
     "displayCouponCategoryPayback": {
-        "description": "Payback Coupons im Hauptmenü zeigen",
+        "description": "Payback Coupons/Karte im Hauptmenü zeigen",
         "default": True
     },
     "highlightFavoriteCouponsInButtonTexts": {
@@ -137,6 +137,7 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplayCouponsWithImagesFavorites, pattern='^' + CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES + '$'),
                     CallbackQueryHandler(self.botDisplayOffers, pattern='^' + CallbackVars.MENU_OFFERS + '$'),
                     CallbackQueryHandler(self.botDisplayFeedbackCodes, pattern='^' + CallbackVars.MENU_FEEDBACK_CODES + '$'),
+                    CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
                     CallbackQueryHandler(self.botDisplayPaybackCard, pattern='^' + CallbackVars.MENU_DISPLAY_PAYBACK_CARD + '$'),
                     CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$'),
                 ],
@@ -168,8 +169,8 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplaySettingsToggleSetting, pattern=generateCallbackRegEx(User().settings)),
                     CallbackQueryHandler(self.botResetSettings, pattern="^" + CallbackVars.MENU_SETTINGS_RESET + "$"),
                     CallbackQueryHandler(self.botDeleteUnavailableFavoriteCoupons, pattern="^" + CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS + "$"),
-                    CallbackQueryHandler(self.botAddPaybackCardSTART, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
-                    CallbackQueryHandler(self.botDeletePaybackCardSTART, pattern="^" + CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD + "$"),
+                    CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
+                    CallbackQueryHandler(self.botDeletePaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD + "$"),
                 ],
                 CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD: [
                     # Back to settings menu
@@ -179,7 +180,6 @@ class BKBot:
                 CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD: [
                     # Back to settings menu
                     CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
-                    CommandHandler('cancel', self.botDisplaySettings),
                     MessageHandler(Filters.text, self.botDeletePaybackCard),
                 ],
             },
@@ -321,8 +321,11 @@ class BKBot:
         keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data="?a=dcs&m=" + CouponDisplayMode.FAVORITES),
                                     InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten + Pics' + SYMBOLS.STAR, callback_data=CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES)]
         allButtons.append(keyboardCouponsFavorites)
-        if user.getPrimaryPaybackCardNumber() is not None:
-            allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte zeigen', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
+        if user.settings.displayCouponCategoryPayback:
+            if user.getPrimaryPaybackCardNumber() is None:
+                allButtons.append([InlineKeyboardButton(SYMBOLS.NEW + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
+            else:
+                allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte zeigen', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         allButtons.append(
             [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS), InlineKeyboardButton('KING Finder', url='https://www.burgerking.de/kingfinder')])
         if user.settings.enableBetaFeatures:
@@ -627,8 +630,8 @@ class BKBot:
                         [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
                 else:
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
-        if len(user.paybackCards) == 0:
-            keyboard.append([InlineKeyboardButton('Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
+        if user.getPrimaryPaybackCardNumber() is None:
+            keyboard.append([InlineKeyboardButton(SYMBOLS.NEW + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
         else:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
@@ -868,66 +871,61 @@ class BKBot:
         self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
 
-    def botAddPaybackCardSTART(self, update: Update, context: CallbackContext):
-        update.callback_query.answer()
-        update.callback_query.edit_message_text(text='Antworte mit deiner Payback Kartennummer, um diese hinzuzufügen.', parse_mode='HTML',
-                                                reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
-        return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
-
     def botAddPaybackCard(self, update: Update, context: CallbackContext):
-        query = update.callback_query
-        if query is not None:
-            query.answer()
-        userInput = update.message.text
-        # Validate input
-        if userInput is not None and userInput.isdecimal() and len(userInput) == 10:
+        userInput = None if update.message is None else update.message.text
+        if userInput is None:
+            text = 'Antworte mit deiner Payback Kartennummer, um diese hinzuzufügen.'
+            text += '\nDeine Kartennummer wird ausschließlich gespeichert, um sie dir in diesem Chat als EAN13 Code zu zeigen.'
+            text += '\nDu kannst deine Karte in den Einstellungen jederzeit sofort und endgültig aus dem Bot löschen.'
+            self.editOrSendMessage(update, text=text, parse_mode='HTML',
+                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+            return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
+        elif userInput.isdecimal() and len(userInput) == 10:
             userDB = self.crawler.getUsersDB()
             user = User.load(userDB, str(update.effective_user.id))
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
-            return self.displayPaybackCard(update=update, context=context, user=user, text=SYMBOLS.CONFIRM + 'Karte ' + userInput + ' wurde erfolgreich eingetragen.')
+            return self.displayPaybackCard(update=update, context=context, user=user, headerText=SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.')
         else:
-            self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML')
-        return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
-
-    def botDeletePaybackCardSTART(self, update: Update, context: CallbackContext):
-        update.callback_query.answer()
-        user = self.getUser(userID=update.effective_user.id)
-        update.callback_query.edit_message_text(text='Antworte mit deiner Payback Kartennummer <b>' + user.getPrimaryPaybackCardNumber() + '</b>, um diese zu löschen.',
-                                                parse_mode='HTML',
-                                                reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
-        return CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD
+            self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML',
+                             reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+            return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
 
     def botDeletePaybackCard(self, update: Update, context: CallbackContext):
         """ Deletes Payback card from users account if his answer is matching his Payback card number. """
-        query = update.callback_query
-        if query is not None:
-            query.answer()
-        userInput = update.message.text
         # Validate input
         userDB = self.crawler.getUsersDB()
         user = User.load(userDB, str(update.effective_user.id))
-        if userInput is not None and userInput == user.getPrimaryPaybackCardNumber():
+        userInput = None if update.message is None else update.message.text
+        if userInput is None:
+            self.editOrSendMessage(update, text='Antworte mit deiner Payback Kartennummer <b>' + user.getPrimaryPaybackCardNumber() + '</b>, um diese zu löschen.',
+                                   parse_mode='HTML',
+                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+        elif userInput == user.getPrimaryPaybackCardNumber():
             user.deletePrimaryPaybackCard()
             user.store(userDB)
-            text = SYMBOLS.CONFIRM + 'Karte ' + userInput + ' wurde erfolgreich gelöscht.'
-            self.sendMessage(chat_id=update.effective_user.id, text=text,
-                             parse_mode='HTML',
-                             reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+            text = SYMBOLS.CONFIRM + 'Payback Karte ' + userInput + ' wurde erfolgreich gelöscht.'
+            self.editOrSendMessage(update, text=text,
+                                   parse_mode='HTML',
+                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
         else:
-            self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.DENY + 'Ungültige Eingabe!\nAbbruch mit /cancel', parse_mode='HTML')
+            self.editOrSendMessage(update, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML',
+                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
         return CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD
 
     def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id)
-        text = 'Payback Karte <b>' + splitStringInPairs(user.getPrimaryPaybackCardNumber()) + '</b>'
-        return self.displayPaybackCard(update, context, user, text)
+        return self.displayPaybackCard(update, context, user, None)
 
-    def displayPaybackCard(self, update: Update, context: CallbackContext, user: User, text: str):
+    def displayPaybackCard(self, update: Update, context: CallbackContext, user: User, headerText: Union[str, None]):
         # TODO: Add EAN13 Payback card image
+        text = 'Payback Kartennummer: <b>' + splitStringInPairs(user.getPrimaryPaybackCardNumber()) + '</b>'
+        text += '\n<b>Tipp:</b> Pinne diese Nachricht an, um im Bot Chat noch einfacher auf deine Payback Karte zugreifen zu können.'
+        if headerText is not None:
+            text = headerText + '\n' + text
         replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
-        update.callback_query.edit_message_text(text=text, parse_mode='HTML',
-                                                reply_markup=replyMarkup)
+        self.editOrSendMessage(update, text=text, parse_mode='HTML',
+                               reply_markup=replyMarkup)
         return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
 
     def batchProcessAutoDeleteUsersUnavailableFavorites(self):
@@ -1163,7 +1161,8 @@ class BKBot:
             self.deleteMessage(chat_id=chat_id, messageID=msgID)
             index += 1
 
-    def editOrSendMessage(self, update: Update, text: str, parse_mode: str = None, reply_markup: ReplyMarkup = None, disable_web_page_preview: bool = False, disable_notification = False) -> Union[Message, bool]:
+    def editOrSendMessage(self, update: Update, text: str, parse_mode: str = None, reply_markup: ReplyMarkup = None, disable_web_page_preview: bool = False,
+                          disable_notification=False) -> Union[Message, bool]:
         """ Edits last message if possible. Sends new message otherwise.
          Usable for message with text-content only!
          Returns:
@@ -1175,7 +1174,8 @@ class BKBot:
             query.answer()
             return query.edit_message_text(text=text, parse_mode=parse_mode, reply_markup=reply_markup, disable_web_page_preview=disable_web_page_preview)
         else:
-            return self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode=parse_mode, reply_markup=reply_markup, disable_web_page_preview=disable_web_page_preview, disable_notification=disable_notification)
+            return self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode=parse_mode, reply_markup=reply_markup,
+                                    disable_web_page_preview=disable_web_page_preview, disable_notification=disable_notification)
 
     def editMessage(self, chat_id: Union[int, str], message_id: Union[int, str], text: str, parse_mode: str = None, disable_web_page_preview: bool = False):
         self.updater.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text, parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
