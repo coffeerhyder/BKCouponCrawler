@@ -11,7 +11,10 @@
 # test2 = border=10 -> Looks good
 # test3 = border=8 -> Looks also good (?)
 # img.save("test3.png")
+from io import BytesIO
 
+from barcode import EAN13
+from barcode.writer import ImageWriter
 from furl import furl, urllib
 from urllib.parse import urlparse, parse_qs
 
@@ -71,3 +74,11 @@ crawler.setExportCSVs(False)
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
 # activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=CouponSource.APP, containsFriesAndCoke=None, isHidden=True))
 # crawler.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=False)
+
+
+# python-barcode tests
+rv = BytesIO()
+EAN13(str(240000902922), writer=ImageWriter()).write(rv)
+
+with open('test.png', 'wb') as f:
+    EAN13('240000902922', writer=ImageWriter()).write(f)

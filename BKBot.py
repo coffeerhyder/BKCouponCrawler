@@ -175,7 +175,7 @@ class BKBot:
                 CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD: [
                     # Back to settings menu
                     CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
-                    MessageHandler(Filters.text, self.botAddPaybackCard),
+                    MessageHandler(filters=Filters.text and (~Filters.command), callback=self.botAddPaybackCard),
                 ],
                 CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD: [
                     # Back to settings menu
@@ -192,6 +192,8 @@ class BKBot:
                           CallbackQueryHandler(self.botUserDeleteAccount, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT + "$")],
             states={
                 CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT: [
+                    # Back to settings menu
+                    CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
                     # Delete users account
                     MessageHandler(filters=Filters.text and (~Filters.command), callback=self.botUserDeleteAccount),
                 ],
@@ -234,7 +236,7 @@ class BKBot:
         # dispatcher.add_handler(CommandHandler('favoriten', self.botDisplayCouponsFavorites))
         # dispatcher.add_handler(CommandHandler('coupons', self.botDisplayCoupons))
         # dispatcher.add_handler(CommandHandler('coupons2', self.botDisplayCouponsWithoutFriesAndCoke))
-        # dispatcher.add_handler(CommandHandler('angebote', self.botDisplayOffers))
+        dispatcher.add_handler(CommandHandler('angebote', self.botDisplayOffers))
         dispatcher.add_error_handler(self.botErrorCallback)
         # dispatcher.add_handler(MessageHandler(Filters.command, self.botUnknownCommand))
 
@@ -275,26 +277,18 @@ class BKBot:
         return "<a href=\"https://t.me/" + self.getPublicChannelName() + "\">" + linkText + "</a>"
 
     def botDisplayMaintenanceMode(self, update: Update, context: CallbackContext):
-        query = update.callback_query
-        if query is not None:
-            query.answer()
         text = SYMBOLS.DENY + '<b>Wartungsmodus!' + SYMBOLS.DENY + '</b>'
         if self.getPublicChannelName() is not None:
             text += '\nMehr Infos siehe ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + '.'
-        self.sendMessage(chat_id=update.effective_message.chat_id, text=text, parse_mode='HTML', disable_web_page_preview=True)
+        self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
-        query = update.callback_query
-        if query is not None:
-            query.answer()
         userDB = self.crawler.getUsersDB()
         user = User.load(userDB, str(update.effective_user.id))
         """ New user? --> Add userID to DB. """
         if user is None:
             # Add user to DB for the first time
-            user = User(
-                id=str(update.effective_user.id)
-            )
+            user = User(id=str(update.effective_user.id))
             user.store(userDB)
         allButtons = []
         if self.getPublicChannelName() is not None:
@@ -303,7 +297,7 @@ class BKBot:
         allButtons.append([InlineKeyboardButton('Alle Coupons', callback_data="?a=dcs&m=" + CouponDisplayMode.ALL + "&cs=")])
         allButtons.append([InlineKeyboardButton('Alle Coupons ohne Menü', callback_data="?a=dcs&m=" + CouponDisplayMode.ALL_WITHOUT_MENU + "&cs=")])
         for couponSrc in BotAllowedCouponSources:
-            # Only add buttons for coupon sources for which at least one coupon is available
+            # Only add buttons for coupon categories for which at least one coupon is available
             couponCategory = self.crawler.cachedAvailableCouponCategories.get(couponSrc)
             if couponCategory is None:
                 continue
@@ -335,10 +329,7 @@ class BKBot:
         menuText += '\n' + getBotImpressum()
         if self.crawler.cachedMissingPaperCouponsText is not None:
             menuText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Bot fehlende Papiercoupons: ' + bkbot.crawler.cachedMissingPaperCouponsText + '</b>'
-        if query is not None:
-            query.edit_message_text(text=menuText, reply_markup=reply_markup, parse_mode='HTML')
-        else:
-            self.sendMessage(chat_id=update.effective_message.chat_id, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
+        self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
         return CallbackVars.MENU_MAIN
 
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
@@ -556,17 +547,15 @@ class BKBot:
         """
         Posts all current offers (= photos with captions) into current chat.
         """
-        query = update.callback_query
-        query.answer()
         activeOffers = self.crawler.getOffersActive()
         if len(activeOffers) == 0:
             # BK should always have offers but let's check for this case anyways.
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
             menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote!</b>'
-            query.edit_message_text(text=menuText, reply_markup=reply_markup, parse_mode='HTML')
+            self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
             return CallbackVars.MENU_MAIN
         prePhotosText = '<b>Es sind derzeit ' + str(len(activeOffers)) + ' Angebote verfügbar:</b>'
-        query.edit_message_text(text=prePhotosText, parse_mode='HTML')
+        self.editOrSendMessage(update, text=prePhotosText, parse_mode='HTML')
         for offer in activeOffers:
             offerText = offer['title']
             subtitle = offer.get('subline')
@@ -591,9 +580,6 @@ class BKBot:
 
     def botDisplayFeedbackCodes(self, update: Update, context: CallbackContext):
         """ 2021-07-15: New- and unfinished feature """
-        query = update.callback_query
-        query.answer()
-        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
         numberOfFeedbackCodesToGenerate = 3
         text = SYMBOLS.WARNING + "<b>Achtung! BETA Feature und unklar, ob diese 'random' Codes so funktionieren!</b>" + SYMBOLS.WARNING
         text += "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
@@ -604,7 +590,8 @@ class BKBot:
         text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ ;)"
         text += "\nDie Konditionen der Feedback Codes variieren.\nAktuell gibt es: Gratis Eiswaffel oder Kaffee(klein) [Stand 14.04.2021]"
         text += "\nDanke an <a href=\"https://edik.ch/posts/hack-the-burger-king.html\">Edik</a>!"
-        query.edit_message_text(text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
+        self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         return CallbackVars.MENU_FEEDBACK_CODES
 
     def botDisplaySettings(self, update: Update, context: CallbackContext):
@@ -679,28 +666,33 @@ class BKBot:
     def botUserDeleteAccountSTART(self, update: Update, context: CallbackContext):
         menuText = '<b>\"Dann geh\' doch zu Netto!\"</b>\nAntworte mit deiner Benutzer-ID <b>' + str(
             update.effective_user.id) + '</b>, um deine Benutzerdaten <b>endgültig</b> vom Server zu löschen.'
-        self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
+        # Only display back button if user triggered this in context of a bot menu
+        if update.callback_query is not None:
+            self.editOrSendMessage(update, text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+        else:
+            self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
         return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
 
     def botUserDeleteAccount(self, update: Update, context: CallbackContext):
         """ Deletes users' account from DB. """
         userInput = None if update.message is None else update.message.text
         if userInput is None:
-            return self.botUserDeleteAccountSTART(update, context)
+            self.botUserDeleteAccountSTART(update, context)
+            return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
         elif userInput == str(update.effective_user.id):
             userDB = self.crawler.getUsersDB()
             # Delete user from DB
             del userDB[str(update.effective_user.id)]
-            menuText = SYMBOLS.CONFIRM + ' Dein BetterKing Account wurde vernichtet!'
+            menuText = SYMBOLS.CONFIRM + 'Dein BetterKing Account wurde vernichtet!'
             menuText += '\nDu kannst diesen Chat nun löschen.'
             menuText += '\n<b>Viel Erfolg beim Abnehmen!</b>'
             menuText += '\nIn loving memory of <i>blauelagunepb</i> ' + SYMBOLS.HEART
             self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
             return ConversationHandler.END
         else:
-            menuText = SYMBOLS.DENY + '<b> Falsche Antwort!</b>\n'
-            menuText += 'Hast du dich umentschieden?\n'
-            menuText += 'Mit /start gelangst du zurück ins Hauptmenü.'
+            menuText = SYMBOLS.DENY + '<b>Falsche Antwort!</b>'
+            menuText += '\nHast du dich umentschieden?'
+            menuText += '\nMit /start gelangst du zurück ins Hauptmenü.'
             self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
             return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
 
@@ -868,6 +860,9 @@ class BKBot:
 
     def botAddPaybackCard(self, update: Update, context: CallbackContext):
         userInput = None if update.message is None else update.message.text
+        if userInput is not None and len(userInput) == 13:
+            # Maybe user entered barcode instead of Payback number --> Correct input
+            userInput = userInput[3:13]
         if userInput is None:
             text = 'Antworte mit deiner Payback Kartennummer, um diese hinzuzufügen.'
             text += '\nDeine Kartennummer wird ausschließlich gespeichert, um sie dir in diesem Chat als EAN13 Code zu zeigen.'
@@ -880,7 +875,10 @@ class BKBot:
             user = User.load(userDB, str(update.effective_user.id))
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
-            return self.displayPaybackCard(update=update, context=context, user=user, headerText=SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.')
+            # TODO: Maybe send this as an extra message so the final payback card view is cleaner
+            headerText = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.'
+            # self.sendMessage(chat_id=update.effective_user.id, text=headerText)
+            return self.displayPaybackCard(update=update, context=context, user=user, headerText=headerText)
         else:
             self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML',
                              reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
@@ -919,8 +917,9 @@ class BKBot:
         if headerText is not None:
             text = headerText + '\n' + text
         replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
-        self.editOrSendMessage(update, text=text, parse_mode='HTML',
-                               reply_markup=replyMarkup)
+        self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPrimaryPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True, reply_markup=replyMarkup)
+        # self.editOrSendMessage(update, text=text, parse_mode='HTML',
+        #                        reply_markup=replyMarkup)
         return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
 
     def batchProcessAutoDeleteUsersUnavailableFavorites(self):
@@ -1165,7 +1164,7 @@ class BKBot:
         edited Message is returned, otherwise :obj:`True` is returned.
         """
         query = update.callback_query
-        if query is not None:
+        if query is not None and query.message.text is not None:
             query.answer()
             return query.edit_message_text(text=text, parse_mode=parse_mode, reply_markup=reply_markup, disable_web_page_preview=disable_web_page_preview)
         else:
