@@ -159,7 +159,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ### Bot Commands Liste
 ```
 start - Hauptmenü
-tschau - 🚫 Meine Daten löschen
+tschau - 🚫 Meinen Account löschen
  ```
 
 ### Bot About

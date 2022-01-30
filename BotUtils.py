@@ -25,6 +25,7 @@ class Config:
 
 class CallbackVars:
     GENERIC_BACK = 'back'
+    GENERIC_CANCEL = 'cancel'
     MENU_MAIN = 'menu_main'
     MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES = 'menu_display_all_coupons_list_with_full_titles'
     MENU_DISPLAY_COUPON = 'menu_display_coupon'
@@ -40,8 +41,7 @@ class CallbackVars:
     MENU_SETTINGS_ADD_PAYBACK_CARD = 'menu_settings_add_payback_card'
     MENU_SETTINGS_DELETE_PAYBACK_CARD = 'menu_settings_delete_payback_card'
     MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS = 'menu_settings_delete_unavailable_favorite_coupons'
-    MENU_SETTINGS_USER_DELETE_DATA_COMMAND = 'menu_settings_user_delete_data_command'
-    MENU_SETTINGS_USER_DELETE_DATA = 'menu_settings_user_delete_data'
+    MENU_SETTINGS_USER_DELETE_ACCOUNT = 'menu_settings_user_delete_account'
     EASTER_EGG = 'easter_egg'
 
 

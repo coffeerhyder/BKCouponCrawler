@@ -188,13 +188,12 @@ class BKBot:
         )
         """ Handles deletion of userdata. """
         conv_handler2 = ConversationHandler(
-            entry_points=[CommandHandler('tschau', self.botUserDeleteSTART),
-                          CallbackQueryHandler(self.botUserDeleteSTART, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND + "$")],
+            entry_points=[CommandHandler('tschau', self.botUserDeleteAccountSTART),
+                          CallbackQueryHandler(self.botUserDeleteAccount, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT + "$")],
             states={
-                CallbackVars.MENU_SETTINGS_USER_DELETE_DATA: [
-                    CommandHandler('cancel', self.botUserDeleteCancel),
+                CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT: [
                     # Delete users account
-                    MessageHandler(Filters.text, self.botUserDelete),
+                    MessageHandler(filters=Filters.text and (~Filters.command), callback=self.botUserDeleteAccount),
                 ],
 
             },
@@ -650,8 +649,8 @@ class BKBot:
                                                       callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
                 menuText += "\n*²" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
                 menuText += "\n" + userFavoritesInfo.getUnavailableFavoritesText()
-        keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Meine Daten löschen",
-                                              callback_data=CallbackVars.MENU_SETTINGS_USER_DELETE_DATA_COMMAND)])
+        keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Meinen Account löschen",
+                                              callback_data=CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT)])
         # Back button
         keyboard.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
         self.editOrSendMessage(update=update, text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard), disable_web_page_preview=True)
@@ -677,37 +676,33 @@ class BKBot:
         context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
         return CallbackVars.MENU_DISPLAY_COUPON
 
-    def botUserDeleteSTART(self, update: Update, context: CallbackContext):
+    def botUserDeleteAccountSTART(self, update: Update, context: CallbackContext):
         menuText = '<b>\"Dann geh\' doch zu Netto!\"</b>\nAntworte mit deiner Benutzer-ID <b>' + str(
-            update.effective_user.id) + '</b>, um deine Benutzerdaten vom Server zu löschen.'
-        menuText += '\nAbbruch mit /cancel'
-        update.effective_message.reply_text(text=menuText, parse_mode='HTML')
-        return CallbackVars.MENU_SETTINGS_USER_DELETE_DATA
+            update.effective_user.id) + '</b>, um deine Benutzerdaten <b>endgültig</b> vom Server zu löschen.'
+        self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
+        return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
 
-    def botUserDelete(self, update: Update, context: CallbackContext):
+    def botUserDeleteAccount(self, update: Update, context: CallbackContext):
         """ Deletes users' account from DB. """
-        userInput = update.message.text
-        if userInput is not None and userInput == str(update.effective_user.id):
+        userInput = None if update.message is None else update.message.text
+        if userInput is None:
+            return self.botUserDeleteAccountSTART(update, context)
+        elif userInput == str(update.effective_user.id):
             userDB = self.crawler.getUsersDB()
             # Delete user from DB
             del userDB[str(update.effective_user.id)]
-            menuText = SYMBOLS.CONFIRM + ' Deine Daten wurden vernichtet!'
+            menuText = SYMBOLS.CONFIRM + ' Dein BetterKing Account wurde vernichtet!'
             menuText += '\nDu kannst diesen Chat nun löschen.'
             menuText += '\n<b>Viel Erfolg beim Abnehmen!</b>'
             menuText += '\nIn loving memory of <i>blauelagunepb</i> ' + SYMBOLS.HEART
-            update.effective_message.reply_text(text=menuText, parse_mode='HTML')
+            self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
+            return ConversationHandler.END
         else:
             menuText = SYMBOLS.DENY + '<b> Falsche Antwort!</b>\n'
             menuText += 'Hast du dich umentschieden?\n'
-            menuText += 'Mit /start gelangst du zurück in\'s Hauptmenü und mit /tschau kannst du deine Daten löschen!'
-            update.effective_message.reply_text(text=menuText, parse_mode='HTML')
-        return ConversationHandler.END
-
-    def botUserDeleteCancel(self, update: Update, context: CallbackContext):
-        """ Gets called if user cancels deletion of his own data. """
-        menuText = SYMBOLS.DENY + ' <b>Löschen der Benutzerdaten abgebrochen!</b>\nMit /start gelangst du zurück in\'s Hauptmenü.'
-        update.effective_message.reply_text(text=menuText, parse_mode='HTML')
-        return ConversationHandler.END
+            menuText += 'Mit /start gelangst du zurück ins Hauptmenü.'
+            self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
+            return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
 
     def displayCouponWithImage(self, update: Update, context: CallbackContext, coupon: Coupon, user: User, additionalText: Union[str, None] = None):
         """
@@ -876,7 +871,7 @@ class BKBot:
         if userInput is None:
             text = 'Antworte mit deiner Payback Kartennummer, um diese hinzuzufügen.'
             text += '\nDeine Kartennummer wird ausschließlich gespeichert, um sie dir in diesem Chat als EAN13 Code zu zeigen.'
-            text += '\nDu kannst deine Karte in den Einstellungen jederzeit sofort und endgültig aus dem Bot löschen.'
+            text += '\nDu kannst deine Karte in den Einstellungen jederzeit und endgültig aus dem Bot löschen.'
             self.editOrSendMessage(update, text=text, parse_mode='HTML',
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
