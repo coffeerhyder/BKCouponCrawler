@@ -160,7 +160,12 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ### Bot Commands Liste
 ```
 start - Hauptmenü
-angebote - Angebote zeigen
+coupons - Alle Coupons
+coupons2 - Alle Coupons ohne Menü
+favoriten - ⭐Favoriten⭐
+angebote - Angebote
+payback - 🅿️ayback Karte
+einstellungen - 🔧Einstellungen
 tschau - 🚫 Meinen Account löschen
  ```
 

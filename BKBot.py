@@ -81,6 +81,12 @@ class CouponDisplayMode:
     FAVORITES = 'f'
 
 
+class CouponCallbackVars:
+    ALL_COUPONS = "?a=dcs&m=" + CouponDisplayMode.ALL + "&cs="
+    ALL_COUPONS_WITHOUT_MENU = "?a=dcs&m=" + CouponDisplayMode.ALL_WITHOUT_MENU + "&cs="
+    FAVORITES = "?a=dcs&m=" + CouponDisplayMode.FAVORITES + "&cs="
+
+
 def generateCallbackRegEx(settings: dict):
     # Generates one CallBack RegEx for a set of settings.
     settingsCallbackRegEx = '^'
@@ -133,16 +139,22 @@ class BKBot:
                     # Main menu
                     CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),  # E.g. "back" button on error -> Go back to main menu
                     CallbackQueryHandler(self.botDisplayAllCouponsListWithFullTitles, pattern='^' + CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES + '$'),
-                    CallbackQueryHandler(self.botDisplayCoupons, pattern='.*a=dcs.*'),
+                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
                     CallbackQueryHandler(self.botDisplayCouponsWithImagesFavorites, pattern='^' + CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES + '$'),
                     CallbackQueryHandler(self.botDisplayOffers, pattern='^' + CallbackVars.MENU_OFFERS + '$'),
                     CallbackQueryHandler(self.botDisplayFeedbackCodes, pattern='^' + CallbackVars.MENU_FEEDBACK_CODES + '$'),
                     CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
                     CallbackQueryHandler(self.botDisplayPaybackCard, pattern='^' + CallbackVars.MENU_DISPLAY_PAYBACK_CARD + '$'),
-                    CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$'),
+                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$'),
+                    CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND),
+                    CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND),
+                    CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND),
+                    CommandHandler('angebote', self.botDisplayOffers),
+                    CommandHandler('payback', self.botDisplayPaybackCard),
+                    CommandHandler('einstellungen', self.botDisplayMenuSettings)
                 ],
                 CallbackVars.MENU_OFFERS: [
-                    CallbackQueryHandler(self.botDisplayCoupons, pattern='.*a=dcs.*'),
+                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
                     # Back to main menu
                     CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),
                 ],
@@ -152,7 +164,7 @@ class BKBot:
                 ],
                 CallbackVars.MENU_DISPLAY_COUPON: [
                     # Back to last coupons menu
-                    CallbackQueryHandler(self.botDisplayCoupons, pattern='.*a=dcs.*'),
+                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
                     # Display single coupon
                     CallbackQueryHandler(self.botDisplaySingleCoupon, pattern='.*a=dc.*'),
                     # Back to main menu
@@ -161,7 +173,8 @@ class BKBot:
                 ],
                 CallbackVars.MENU_DISPLAY_PAYBACK_CARD: [
                     # Back to last coupons menu
-                    CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),
+                    CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
+                    CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$")
                 ],
                 CallbackVars.MENU_SETTINGS: [
                     # Back to main menu
@@ -174,12 +187,12 @@ class BKBot:
                 ],
                 CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD: [
                     # Back to settings menu
-                    CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
+                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
                     MessageHandler(filters=Filters.text and (~Filters.command), callback=self.botAddPaybackCard),
                 ],
                 CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD: [
                     # Back to settings menu
-                    CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
+                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
                     MessageHandler(Filters.text, self.botDeletePaybackCard),
                 ],
             },
@@ -193,7 +206,7 @@ class BKBot:
             states={
                 CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT: [
                     # Back to settings menu
-                    CallbackQueryHandler(self.botDisplaySettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
+                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
                     # Delete users account
                     MessageHandler(filters=Filters.text and (~Filters.command), callback=self.botUserDeleteAccount),
                 ],
@@ -233,10 +246,11 @@ class BKBot:
         2021-01-12: I've decided to drop these commands for now as our menu "back" button won't work like this.
         It would need a lot of refactoring to make the menus and commands work at the same time!
         """
-        # dispatcher.add_handler(CommandHandler('favoriten', self.botDisplayCouponsFavorites))
-        # dispatcher.add_handler(CommandHandler('coupons', self.botDisplayCoupons))
-        # dispatcher.add_handler(CommandHandler('coupons2', self.botDisplayCouponsWithoutFriesAndCoke))
+        dispatcher.add_handler(CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND))
+        dispatcher.add_handler(CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND))
+        dispatcher.add_handler(CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND))
         dispatcher.add_handler(CommandHandler('angebote', self.botDisplayOffers))
+        dispatcher.add_handler(CommandHandler('einstellungen', self.botDisplayMenuSettings))
         dispatcher.add_error_handler(self.botErrorCallback)
         # dispatcher.add_handler(MessageHandler(Filters.command, self.botUnknownCommand))
 
@@ -253,9 +267,7 @@ class BKBot:
 
     def handleBotErrorGently(self, update: Update, context: CallbackContext, botError: BetterBotException):
         """ Can handle BetterBotExceptions -> Answers user with the previously hopefully meaningful messages defined in BetterBotException.getErrorMsg(). """
-        query = update.callback_query
-        query.answer()
-        query.edit_message_text(text=botError.getErrorMsg(), parse_mode="HTML", reply_markup=botError.getReplyMarkup())
+        self.editOrSendMessage(update, text=botError.getErrorMsg(), parse_mode="HTML", reply_markup=botError.getReplyMarkup())
 
     def getPublicChannelName(self, fallback=None) -> Union[str, None]:
         """ Returns name of public channel which this bot is taking care of. """
@@ -294,8 +306,8 @@ class BKBot:
         if self.getPublicChannelName() is not None:
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste + Pics + News', url='https://t.me/' + self.getPublicChannelName())])
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste lange Titel + Pics', callback_data=CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES)])
-        allButtons.append([InlineKeyboardButton('Alle Coupons', callback_data="?a=dcs&m=" + CouponDisplayMode.ALL + "&cs=")])
-        allButtons.append([InlineKeyboardButton('Alle Coupons ohne Menü', callback_data="?a=dcs&m=" + CouponDisplayMode.ALL_WITHOUT_MENU + "&cs=")])
+        allButtons.append([InlineKeyboardButton('Alle Coupons', callback_data=CouponCallbackVars.ALL_COUPONS)])
+        allButtons.append([InlineKeyboardButton('Alle Coupons ohne Menü', callback_data=CouponCallbackVars.ALL_COUPONS_WITHOUT_MENU)])
         for couponSrc in BotAllowedCouponSources:
             # Only add buttons for coupon categories for which at least one coupon is available
             couponCategory = self.crawler.cachedAvailableCouponCategories.get(couponSrc)
@@ -318,7 +330,7 @@ class BKBot:
             if user.getPrimaryPaybackCardNumber() is None:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.NEW + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
             else:
-                allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte zeigen', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
+                allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         allButtons.append(
             [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS), InlineKeyboardButton('KING Finder', url='https://www.burgerking.de/kingfinder')])
         if user.settings.enableBetaFeatures:
@@ -351,9 +363,24 @@ class BKBot:
         """ Wrapper """
         return self.crawler.getBotCoupons()
 
-    def botDisplayCoupons(self, update: Update, context: CallbackContext):
+    def botDisplayCouponsFromBotMenu(self, update: Update, context: CallbackContext):
+        """ Wrapper """
+        return self.displayCoupons(update, context, update.callback_query.data)
+
+    def botDisplayAllCouponsCOMMAND(self, update: Update, context: CallbackContext):
+        """ Wrapper and this is only to be used for commands. """
+        return self.displayCoupons(update, context, CouponCallbackVars.ALL_COUPONS)
+
+    def botDisplayAllCouponsWithoutMenuCOMMAND(self, update: Update, context: CallbackContext):
+        """ Wrapper and this is only to be used for commands. """
+        return self.displayCoupons(update, context, CouponCallbackVars.ALL_COUPONS_WITHOUT_MENU)
+
+    def botDisplayFavoritesCOMMAND(self, update: Update, context: CallbackContext):
+        """ Wrapper and this is only to be used for commands. """
+        return self.displayCoupons(update, context, CouponCallbackVars.FAVORITES)
+
+    def displayCoupons(self, update: Update, context: CallbackContext, callbackVar: str):
         """ Displays all coupons in a pre selected mode """
-        callbackVar = update.callback_query.data
         # Important! This is required so that we can e.g. jump from "Category 'App coupons' page 2 display single coupon" back into "Category 'App coupons' page 2"
         callbackVar += "&cb=" + urllib.parse.quote(callbackVar)
         urlQuery = furl(callbackVar)
@@ -447,7 +474,8 @@ class BKBot:
             raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
                                      InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=urlquery.url)]]))
         query = update.callback_query
-        query.answer()
+        if query is not None:
+            query.answer()
         urlquery_callbackBack = furl(urlquery.args["cb"])
         buttons = []
         maxCouponsPerPage = 20
@@ -498,7 +526,7 @@ class BKBot:
             buttons.append(navigationButtons)
         buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
         reply_markup = InlineKeyboardMarkup(buttons)
-        query.edit_message_text(text=menuText, reply_markup=reply_markup, parse_mode='HTML')
+        self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
         return CallbackVars.MENU_DISPLAY_COUPON
 
     def botDisplayEasterEgg(self, update: Update, context: CallbackContext):
@@ -594,7 +622,7 @@ class BKBot:
         self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         return CallbackVars.MENU_FEEDBACK_CODES
 
-    def botDisplaySettings(self, update: Update, context: CallbackContext):
+    def botDisplayMenuSettings(self, update: Update, context: CallbackContext):
         user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
         return self.displaySettings(update, context, user)
 
@@ -668,7 +696,8 @@ class BKBot:
             update.effective_user.id) + '</b>, um deine Benutzerdaten <b>endgültig</b> vom Server zu löschen.'
         # Only display back button if user triggered this in context of a bot menu
         if update.callback_query is not None:
-            self.editOrSendMessage(update, text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+            self.editOrSendMessage(update, text=menuText, parse_mode='HTML',
+                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
         else:
             self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
         return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
@@ -875,10 +904,9 @@ class BKBot:
             user = User.load(userDB, str(update.effective_user.id))
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
-            # TODO: Maybe send this as an extra message so the final payback card view is cleaner
-            headerText = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.'
-            # self.sendMessage(chat_id=update.effective_user.id, text=headerText)
-            return self.displayPaybackCard(update=update, context=context, user=user, headerText=headerText)
+            text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.'
+            self.sendMessage(chat_id=update.effective_user.id, text=text)
+            return self.displayPaybackCard(update=update, context=context, user=user)
         else:
             self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML',
                              reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
@@ -903,23 +931,24 @@ class BKBot:
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
         else:
             self.editOrSendMessage(update, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML',
-                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+                                   reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
         return CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD
 
     def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id)
-        return self.displayPaybackCard(update, context, user, None)
+        return self.displayPaybackCard(update, context, user)
 
-    def displayPaybackCard(self, update: Update, context: CallbackContext, user: User, headerText: Union[str, None]):
-        # TODO: Add EAN13 Payback card image
-        text = 'Payback Kartennummer: <b>' + splitStringInPairs(user.getPrimaryPaybackCardNumber()) + '</b>'
-        text += '\n<b>Tipp:</b> Pinne diese Nachricht an, um im Bot Chat noch einfacher auf deine Payback Karte zugreifen zu können.'
-        if headerText is not None:
-            text = headerText + '\n' + text
-        replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
-        self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPrimaryPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True, reply_markup=replyMarkup)
-        # self.editOrSendMessage(update, text=text, parse_mode='HTML',
-        #                        reply_markup=replyMarkup)
+    def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
+        # TODO: Make EAN13 Payback card image nicer
+        if user.getPrimaryPaybackCardNumber() is None:
+            text = SYMBOLS.WARNING + 'Du hast noch keine Payback Karte eingetragen!'
+            self.editOrSendMessage(update, text=text, parse_mode='html', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK), InlineKeyboardButton('Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)]]))
+        else:
+            text = 'Payback Kartennummer: <b>' + splitStringInPairs(user.getPrimaryPaybackCardNumber()) + '</b>'
+            text += '\n<b>Tipp:</b> Pinne diese Nachricht an, um im Bot Chat noch einfacher auf deine Payback Karte zugreifen zu können.'
+            replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]])
+            self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPrimaryPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True,
+                           reply_markup=replyMarkup)
         return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
 
     def batchProcessAutoDeleteUsersUnavailableFavorites(self):
