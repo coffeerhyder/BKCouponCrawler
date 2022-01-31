@@ -133,7 +133,10 @@ class BKBot:
 
         # Main conversation handler - handles nearly all bot menus.
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler('start', self.botDisplayMenuMain)],
+            entry_points=[CommandHandler('start', self.botDisplayMenuMain), CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND),
+                          CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND), CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND),
+                          CommandHandler('angebote', self.botDisplayOffers), CommandHandler('payback', self.botDisplayPaybackCard),
+                          CommandHandler('einstellungen', self.botDisplayMenuSettings)],
             states={
                 CallbackVars.MENU_MAIN: [
                     # Main menu
@@ -145,13 +148,7 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplayFeedbackCodes, pattern='^' + CallbackVars.MENU_FEEDBACK_CODES + '$'),
                     CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
                     CallbackQueryHandler(self.botDisplayPaybackCard, pattern='^' + CallbackVars.MENU_DISPLAY_PAYBACK_CARD + '$'),
-                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$'),
-                    CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND),
-                    CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND),
-                    CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND),
-                    CommandHandler('angebote', self.botDisplayOffers),
-                    CommandHandler('payback', self.botDisplayPaybackCard),
-                    CommandHandler('einstellungen', self.botDisplayMenuSettings)
+                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$')
                 ],
                 CallbackVars.MENU_OFFERS: [
                     CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
@@ -174,7 +171,8 @@ class BKBot:
                 CallbackVars.MENU_DISPLAY_PAYBACK_CARD: [
                     # Back to last coupons menu
                     CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
-                    CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$")
+                    CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
+                    CallbackQueryHandler(self.botDeletePaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD + "$")
                 ],
                 CallbackVars.MENU_SETTINGS: [
                     # Back to main menu
@@ -198,6 +196,7 @@ class BKBot:
             },
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="MainConversationHandler",
+            allow_reentry=True
         )
         """ Handles deletion of userdata. """
         conv_handler2 = ConversationHandler(
@@ -214,7 +213,7 @@ class BKBot:
             },
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="DeleteUserConvHandler",
-            allow_reentry=True,
+            allow_reentry=True
         )
         """ Handles 'favorite buttons' below single coupon-pictures. """
         conv_handler3 = ConversationHandler(
@@ -895,7 +894,7 @@ class BKBot:
         if userInput is None:
             text = 'Antworte mit deiner Payback Kartennummer, um diese hinzuzufügen.'
             text += '\nDeine Kartennummer wird ausschließlich gespeichert, um sie dir in diesem Chat als EAN13 Code zu zeigen.'
-            text += '\nDu kannst deine Karte in den Einstellungen jederzeit und endgültig aus dem Bot löschen.'
+            text += '\nDu kannst deine Karte in den Einstellungen jederzeit aus dem Bot löschen.'
             self.editOrSendMessage(update, text=text, parse_mode='HTML',
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
@@ -939,14 +938,16 @@ class BKBot:
         return self.displayPaybackCard(update, context, user)
 
     def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
-        # TODO: Make EAN13 Payback card image nicer
         if user.getPrimaryPaybackCardNumber() is None:
             text = SYMBOLS.WARNING + 'Du hast noch keine Payback Karte eingetragen!'
-            self.editOrSendMessage(update, text=text, parse_mode='html', reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK), InlineKeyboardButton('Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)]]))
+            reply_markup = InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK),
+                                                      InlineKeyboardButton(SYMBOLS.PLUS + 'Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)]])
+            self.editOrSendMessage(update, text=text, parse_mode='html',
+                                   reply_markup=reply_markup)
         else:
             text = 'Payback Kartennummer: <b>' + splitStringInPairs(user.getPrimaryPaybackCardNumber()) + '</b>'
             text += '\n<b>Tipp:</b> Pinne diese Nachricht an, um im Bot Chat noch einfacher auf deine Payback Karte zugreifen zu können.'
-            replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]])
+            replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK), InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)]])
             self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPrimaryPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True,
                            reply_markup=replyMarkup)
         return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
@@ -1284,7 +1285,6 @@ class BKBot:
 
 
 class ImageCache:
-    # TODO: Replace current photo cache with this
     def __init__(self, fileID: str):
         self.imageFileID = fileID
         self.timestampCreated = datetime.now().timestamp()

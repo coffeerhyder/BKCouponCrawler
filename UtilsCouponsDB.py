@@ -339,12 +339,10 @@ class User(Document):
             return None
 
     def getPrimaryPaybackCardImage(self) -> bytes:
-        writer = ImageWriter()
         # writer.set_options(options={'background': 'blue'})
-        ean = EuropeanArticleNumber13(ean='240' + self.getPrimaryPaybackCardNumber(), writer=writer)
-        ean.render(text='Payback')
+        ean = EuropeanArticleNumber13(ean='240' + self.getPrimaryPaybackCardNumber(), writer=ImageWriter())
         file = BytesIO()
-        ean.write(file)
+        ean.write(file, options={'foreground': 'black'})
         return file.getvalue()
 
     def addPaybackCard(self, paybackCardNumber: str):

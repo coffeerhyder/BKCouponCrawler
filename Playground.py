@@ -1,25 +1,7 @@
-# import qrcode
-#
-# qr = qrcode.QRCode(
-#     version=1,
-#     border=8
-# )
-# qr.add_data("1234")
-# """ 2021-01-25: Use the same color they're using in their app. """
-# img = qr.make_image(fill_color="#4A1E0D", back_color="white")
-# test1 = border=4
-# test2 = border=10 -> Looks good
-# test3 = border=8 -> Looks also good (?)
-# img.save("test3.png")
-from io import BytesIO
-
 from barcode import EAN13
 from barcode.writer import ImageWriter
 from furl import furl, urllib
 from urllib.parse import urlparse, parse_qs
-
-from Crawler import BKCrawler
-from UtilsCouponsDB import Coupon, InfoEntry
 
 url = "?action=displaycoupons&which=favorites&page=3"
 o = urlparse(url)
@@ -40,33 +22,16 @@ print(quotedStr)
 urlquery.args['page'] = 3
 print("furl url: " + urlquery.url)
 
-test = Coupon(plu='', id="")
-test.plu = "44"
-
-print("plu=" + test.plu)
-print("gettest=" + str(test.data.get(Coupon.priceCompare.name, 1337.77)))
-print("varTest = " + test.data.get(Coupon.plu.name, "123456"))
-
-array1 = [1, 2, 3]
-array2 = [4, 5, 6]
-array3 = array1 + array2
-print(str(array3))
-
-
-infoDoc = InfoEntry(messageIDsToDelete=[1, 2, 3])
-
-print(str(infoDoc.messageIDsToDelete))
-
 # Crawler example code for readme.md
 
-crawler = BKCrawler()
+# crawler = BKCrawler()
 """ Nur für den Bot geeignete Coupons crawlen oder alle?
  Wenn du den Bot 'produktiv' einsetzt, solltest du alle ressourcenhungrigen Schalter deaktivieren (= default). """
-crawler.setCrawlOnlyBotCompatibleCoupons(True)
+# crawler.setCrawlOnlyBotCompatibleCoupons(True)
 # History Datenbank aufbauen z.B. zur späteren Auswertung?
-crawler.setKeepHistory(True)
+# crawler.setKeepHistory(True)
 # CSV Export bei jedem Crawlvorgang (de-)aktivieren
-crawler.setExportCSVs(False)
+# crawler.setExportCSVs(False)
 # Coupons crawlen
 # crawler.crawlAndProcessData()
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
@@ -77,8 +42,13 @@ crawler.setExportCSVs(False)
 
 
 # python-barcode tests
-rv = BytesIO()
-EAN13(str(240000902922), writer=ImageWriter()).write(rv)
+# rv = BytesIO()
+# EAN13(str(240000902922), writer=ImageWriter()).write(rv)
+#
+# with open('test.png', 'wb') as f:
+#     EAN13('240000902922', writer=ImageWriter()).write(f)
 
-with open('test.png', 'wb') as f:
-    EAN13('240000902922', writer=ImageWriter()).write(f)
+f = open('somefile.png', 'wb')
+ean = EAN13(ean='100000011111', writer=ImageWriter())
+ean.save(filename='test22.png', options={'foreground': 'black', 'text': 'Test'})
+
