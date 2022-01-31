@@ -246,11 +246,11 @@ class BKBot:
         2021-01-12: I've decided to drop these commands for now as our menu "back" button won't work like this.
         It would need a lot of refactoring to make the menus and commands work at the same time!
         """
-        dispatcher.add_handler(CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND))
-        dispatcher.add_handler(CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND))
-        dispatcher.add_handler(CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND))
-        dispatcher.add_handler(CommandHandler('angebote', self.botDisplayOffers))
-        dispatcher.add_handler(CommandHandler('einstellungen', self.botDisplayMenuSettings))
+        # dispatcher.add_handler(CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND))
+        # dispatcher.add_handler(CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND))
+        # dispatcher.add_handler(CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND))
+        # dispatcher.add_handler(CommandHandler('angebote', self.botDisplayOffers))
+        # dispatcher.add_handler(CommandHandler('einstellungen', self.botDisplayMenuSettings))
         dispatcher.add_error_handler(self.botErrorCallback)
         # dispatcher.add_handler(MessageHandler(Filters.command, self.botUnknownCommand))
 
