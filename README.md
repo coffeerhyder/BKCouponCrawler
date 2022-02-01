@@ -94,6 +94,7 @@ nukechannel | Alle Nachrichten im Channel automatisiert löschen (debug/dev Funk
 cleanupchannel | Zu löschende alte Coupon-Posts aus dem Channel löschen
 migrate | DB Migrationen ausführen falls verfügbar
 crawl | Crawler beim Start des Bots einmalig ausführen
+maintenancemode | Wartungsmodus - zeigt im Bot und Channel eine entsprechende Meldung. Deaktiviert alle Bot Funktionen.
 
 ### Bot mit Systemstart starten (Linux)
 1. Sichergehen, dass BKBot.py ausführbar ist. Falls nötig: ``chmod a+b BKBot.py``.
@@ -158,7 +159,13 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ### Bot Commands Liste
 ```
 start - Hauptmenü
-tschau - 🚫 Meine Daten löschen
+coupons - Alle Coupons
+coupons2 - Alle Coupons ohne Menü
+favoriten - ⭐Favoriten⭐
+angebote - Angebote
+payback - 🅿️ayback Karte
+einstellungen - 🔧Einstellungen
+tschau - 🚫 Meinen Account löschen
  ```
 
 ### Bot About
@@ -293,11 +300,12 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
 * http://www.fastfood-forum.net/wbb3/upload/index.php/Board/9-Burger-King/
 
-### Ähnliche BK Projekte auf GitHub (teilweise veraltet)
+### Ähnliche Projekte auf GitHub (teilweise veraltet)
 * https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
 * https://github.com/reteps/burger-king-api-wrapper
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
 * https://bk.eris.cc/ --> https://gist.github.com/printfuck
+* https://t.me/freecokebot
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot

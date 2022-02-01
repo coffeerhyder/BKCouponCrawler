@@ -18,10 +18,10 @@ def offerGetImage(offer):
         return None
 
 
-def offerIsValid(coupon) -> bool:
+def offerIsValid(offer) -> bool:
     """ Checks whether or not an offer has expired or is still valid.
     Returns true if no 'expiration_date' field is present. """
-    expiration_date = coupon.get('expiration_date')
+    expiration_date = offer.get('expiration_date')
     if expiration_date is None:
         return True
     else:

@@ -9,3 +9,4 @@ qrcode==7.3.1
 python-telegram-bot~=13.2
 pydantic==1.9.0
 furl~=2.1.2
+python-barcode~=0.13.1

@@ -198,7 +198,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         if coupon.id not in channelDB:
             # New coupon - save information into both dicts
             couponsToSendOut[coupon.id] = coupon
-            if coupon.getIsNew():
+            if coupon.isNewCoupon():
                 newCoupons[coupon.id] = coupon
             numberOfCouponsNewToThisChannel += 1
         elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != coupon.getUniqueIdentifier():
@@ -289,50 +289,52 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             # Update DB
             channelCoupon.store(channelDB)
 
-    # Update channel information message if needed
-    if len(updatedCoupons) > 0 or len(deletedChannelCoupons) > 0 or len(
-            couponsToSendOut) > 0 or updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE or DEBUGNOTIFICATOR:
-        bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB, infoDBDoc=infoDBDoc)
+    bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB, infoDBDoc=infoDBDoc)
 
-        """ Generate new information message text. """
-        infoText = '<b>Heutiges Update:</b>'
-        if len(deletedChannelCoupons) > 0:
-            infoText += '\n' + SYMBOLS.DENY + ' ' + str(len(deletedChannelCoupons)) + ' Coupons gelöscht'
-        if len(updatedCoupons) > 0:
-            infoText += '\n' + SYMBOLS.ARROW_UP_RIGHT + ' ' + str(len(updatedCoupons)) + ' Coupons aktualisiert'
-        if len(newCoupons) > 0:
-            # Add detailed information about added coupons. Limit the max. number of that so our information message doesn't get too big.
-            infoText += '\n<b>' + SYMBOLS.NEW + ' ' + str(len(newCoupons)) + ' Coupons hinzugefügt:</b>'
-            infoText += bkbot.getNewCouponsTextWithChannelHyperlinks(newCoupons, 10)
-        if updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE:
-            infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
-        if DEBUGNOTIFICATOR:
-            infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!! ' + SYMBOLS.WARNING + '</b>'
-        if bkbot.crawler.cachedMissingPaperCouponsText is not None:
-            infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + bkbot.crawler.cachedMissingPaperCouponsText + '</b>'
-        infoText += '\n<b>------</b>'
-        infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
-        infoText += "\nStören dich die Benachrichtigungen?"
-        infoText += "\nErstelle eine Verknüpfung: Drücke oben auf den Namen des Chats -> Rechts auf die drei Punkte -> Verknüpfung hinzufügen (funktioniert auch mit Bots)"
-        infoText += "\nNun kannst du den Channel verlassen und ihn jederzeit wie eine App öffnen, ohne erneut beizutreten!"
-        infoText += "\n... oder verwende <a href=\"https://t.me/" + bkbot.botName + "\">den Bot</a>."
-        infoText += "\n<b>Der Bot kann außerdem deine Favoriten speichern, Coupons filtern und einiges mehr ;)</b>"
-        infoText += "\nMöchtest du diesen Channel mit jemandem teilen, der kein Telegram verwendet?"
-        infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a> oder <a href=\"https://app.element.io/#/room/#BetterKingDE:matrix.org\">Element per Matrix Bridge</a>."
-        infoText += "\n<b>Guten Hunger!</b>"
-        infoText += "\n" + getBotImpressum()
-        """ 
-        Did we only delete coupons and/or update existing ones while there were no new coupons coming in AND we were not forced to delete- and re-send all items?
-        Edit our last message if existant so the user won't receive a new notification!
-        """
-        oldInfoMsgID = infoDBDoc.informationMessageID
-        # Post new message and store old for later deletion
-        if oldInfoMsgID is not None:
-            infoDBDoc.messageIDsToDelete.append(oldInfoMsgID)
-        newMsg = bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True)
-        # Store new messageID
-        infoDBDoc.informationMessageID = newMsg.message_id
-        infoDBDoc.store(infoDB)
+    """ Generate new information message text. """
+    infoText = '<b>Heutiges Update:</b>'
+    if len(deletedChannelCoupons) > 0:
+        infoText += '\n' + SYMBOLS.DENY + ' ' + str(len(deletedChannelCoupons)) + ' Coupons gelöscht'
+    if len(updatedCoupons) > 0:
+        infoText += '\n' + SYMBOLS.ARROW_UP_RIGHT + ' ' + str(len(updatedCoupons)) + ' Coupons aktualisiert'
+    if len(newCoupons) > 0:
+        # Add detailed information about added coupons. Limit the max. number of that so our information message doesn't get too big.
+        infoText += '\n<b>' + SYMBOLS.NEW + ' ' + str(len(newCoupons)) + ' Coupons hinzugefügt:</b>'
+        infoText += bkbot.getNewCouponsTextWithChannelHyperlinks(newCoupons, 10)
+    if updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE:
+        infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
+    if DEBUGNOTIFICATOR:
+        infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!!' + SYMBOLS.WARNING + '</b>'
+    if bkbot.maintenanceMode:
+        infoText += '\n<b>' + SYMBOLS.DENY + 'Wartungsmodus!' + SYMBOLS.DENY
+        infoText += '\nDie Funktionalität von Bot/Channel kann derzeit nicht gewährleistet werden!'
+        infoText += '\nFalls vorhanden, bitte die angepinnten Infos im Channel beachten.'
+        infoText += '</b>'
+    if bkbot.crawler.cachedMissingPaperCouponsText is not None:
+        infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + bkbot.crawler.cachedMissingPaperCouponsText + '</b>'
+    infoText += '\n<b>------</b>'
+    infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
+    infoText += "\nStören dich die Benachrichtigungen?"
+    infoText += "\nErstelle eine Verknüpfung: Drücke oben auf den Namen des Chats -> Rechts auf die drei Punkte -> Verknüpfung hinzufügen (funktioniert auch mit Bots)"
+    infoText += "\nNun kannst du den Channel verlassen und ihn jederzeit wie eine App öffnen, ohne erneut beizutreten!"
+    infoText += "\n... oder verwende <a href=\"https://t.me/" + bkbot.botName + "\">den Bot</a>."
+    infoText += "\n<b>Der Bot kann außerdem deine Favoriten speichern, Coupons filtern und einiges mehr ;)</b>"
+    infoText += "\nMöchtest du diesen Channel mit jemandem teilen, der kein Telegram verwendet?"
+    infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a> oder <a href=\"https://app.element.io/#/room/#BetterKingDE:matrix.org\">Element per Matrix Bridge</a>."
+    infoText += "\n<b>Guten Hunger!</b>"
+    infoText += "\n" + getBotImpressum()
+    """ 
+    Did we only delete coupons and/or update existing ones while there were no new coupons coming in AND we were not forced to delete- and re-send all items?
+    Edit our last message if existant so the user won't receive a new notification!
+    """
+    oldInfoMsgID = infoDBDoc.informationMessageID
+    # Post new message and store old for later deletion
+    if oldInfoMsgID is not None:
+        infoDBDoc.messageIDsToDelete.append(oldInfoMsgID)
+    newMsg = bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True)
+    # Store new messageID
+    infoDBDoc.informationMessageID = newMsg.message_id
+    infoDBDoc.store(infoDB)
     logging.info("Channel update done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
 
