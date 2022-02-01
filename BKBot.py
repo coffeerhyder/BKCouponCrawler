@@ -323,7 +323,7 @@ class BKBot:
                                     InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten + Pics' + SYMBOLS.STAR, callback_data=CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES)]
         allButtons.append(keyboardCouponsFavorites)
         if user.settings.displayCouponCategoryPayback:
-            if user.getPrimaryPaybackCardNumber() is None:
+            if user.getPaybackCardNumber() is None:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.NEW + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
             else:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
@@ -643,7 +643,7 @@ class BKBot:
                         [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
                 else:
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
-        if user.getPrimaryPaybackCardNumber() is None:
+        if user.getPaybackCardNumber() is None:
             keyboard.append([InlineKeyboardButton(SYMBOLS.NEW + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
         else:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
@@ -705,7 +705,8 @@ class BKBot:
         else:
             menuText = '<b>\"Dann geh\' doch zu Netto!\"</b>\nAntworte mit deiner Benutzer-ID <b>' + str(
                 update.effective_user.id) + '</b>, um deine Benutzerdaten <b>endgültig</b> vom Server zu löschen.'
-            self.editOrSendMessage(update, text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=callbackBackButton)]]))
+            self.editOrSendMessage(update, text=menuText, parse_mode='HTML',
+                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=callbackBackButton)]]))
         return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
 
     def botUserDeleteAccount(self, update: Update, context: CallbackContext):
@@ -876,8 +877,7 @@ class BKBot:
         """ Resets users' settings to default """
         userDB = self.crawler.getUsersDB()
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
-        dummyUser = User()
-        user.settings = dummyUser.settings
+        user.resetSettings()
         # Update DB
         user.store(userDB)
         # Reload settings menu
@@ -922,11 +922,11 @@ class BKBot:
         user = self.getUserFromDB(userDB, userID=update.effective_user.id, addIfNew=False)
         userInput = None if update.message is None else update.message.text
         if userInput is None:
-            self.editOrSendMessage(update, text='Antworte mit deiner Payback Kartennummer <b>' + user.getPrimaryPaybackCardNumber() + '</b>, um diese zu löschen.',
+            self.editOrSendMessage(update, text='Antworte mit deiner Payback Kartennummer <b>' + user.getPaybackCardNumber() + '</b>, um diese zu löschen.',
                                    parse_mode='HTML',
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
-        elif userInput == user.getPrimaryPaybackCardNumber():
-            user.deletePrimaryPaybackCard()
+        elif userInput == user.getPaybackCardNumber():
+            user.deletePaybackCard()
             user.store(userDB)
             text = SYMBOLS.CONFIRM + 'Payback Karte ' + userInput + ' wurde erfolgreich gelöscht.'
             self.editOrSendMessage(update, text=text,
@@ -942,17 +942,18 @@ class BKBot:
         return self.displayPaybackCard(update, context, user)
 
     def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
-        if user.getPrimaryPaybackCardNumber() is None:
+        if user.getPaybackCardNumber() is None:
             text = SYMBOLS.WARNING + 'Du hast noch keine Payback Karte eingetragen!'
             reply_markup = InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK),
                                                       InlineKeyboardButton(SYMBOLS.PLUS + 'Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)]])
             self.editOrSendMessage(update, text=text, parse_mode='html',
                                    reply_markup=reply_markup)
         else:
-            text = 'Payback Kartennummer: <b>' + splitStringInPairs(user.getPrimaryPaybackCardNumber()) + '</b>'
+            text = 'Payback Kartennummer: <b>' + splitStringInPairs(user.getPaybackCardNumber()) + '</b>'
             text += '\n<b>Tipp:</b> Pinne diese Nachricht an, um im Bot Chat noch einfacher auf deine Payback Karte zugreifen zu können.'
-            replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK), InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)]])
-            self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPrimaryPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True,
+            replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK),
+                                                 InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)]])
+            self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True,
                            reply_markup=replyMarkup)
         return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
 
@@ -1295,6 +1296,14 @@ class BKBot:
             # Add user to DB for the first time
             logging.info('Storing new userID: ' + str(userID))
             user = User(id=str(userID))
+            user.store(userDB)
+        if 'paybackCard' not in user:
+            # 2022-02-01: Workaround for WTF bug; only affects existing users
+            logging.info('Doing Payback DB workaround for user:' + str(userID))
+            user['paybackCard'] = {
+                'paybackCardNumber': None,
+                'addedDate': None
+            }
             user.store(userDB)
         return user
 
