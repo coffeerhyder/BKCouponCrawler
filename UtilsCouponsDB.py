@@ -301,7 +301,7 @@ class User(Document):
     #     paybackCardNumber=TextField(),
     #     addedDate=DateTimeField()
     # )))
-    paybackCards = DictField()
+    paybackCards = DictField(default={})
 
     def isFavoriteCoupon(self, coupon: Coupon):
         """ Checks if given coupon is users' favorite """
