@@ -198,7 +198,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         if coupon.id not in channelDB:
             # New coupon - save information into both dicts
             couponsToSendOut[coupon.id] = coupon
-            if coupon.getIsNew():
+            if coupon.isNewCoupon():
                 newCoupons[coupon.id] = coupon
             numberOfCouponsNewToThisChannel += 1
         elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != coupon.getUniqueIdentifier():

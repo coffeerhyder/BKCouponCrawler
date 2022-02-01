@@ -954,7 +954,7 @@ class BKCrawler:
                     category.setNumberofCouponsHidden(category.numberofCouponsHidden + 1)
                 if coupon.isEatable():
                     category.setNumberofCouponsEatable(category.numberofCouponsEatable + 1)
-                if coupon.getIsNew():
+                if coupon.isNewCoupon():
                     category.setNumberofCouponsNew(category.numberofCouponsNew + 1)
                 if coupon.containsFriesOrCoke:
                     category.setNumberofCouponsWithFriesOrCoke(category.numberofCouponsWithFriesOrCoke + 1)
@@ -1014,7 +1014,7 @@ class BKCrawler:
             elif filters.containsFriesAndCoke is not None and coupon.containsFriesOrCoke != filters.containsFriesAndCoke:
                 # Skip items if they do not have the expected "containsFriesOrCoke" state
                 continue
-            elif filters.isNew is not None and coupon.getIsNew() != filters.isNew:
+            elif filters.isNew is not None and coupon.isNewCoupon() != filters.isNew:
                 # Skip item if it does not have the expected "is_new" state
                 continue
             elif filters.isHidden is not None and coupon.isHidden != filters.isHidden:

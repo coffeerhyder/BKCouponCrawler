@@ -136,11 +136,12 @@ class BKBot:
             entry_points=[CommandHandler('start', self.botDisplayMenuMain), CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND),
                           CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND), CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND),
                           CommandHandler('angebote', self.botDisplayOffers), CommandHandler('payback', self.botDisplayPaybackCard),
-                          CommandHandler('einstellungen', self.botDisplayMenuSettings)],
+                          CommandHandler('einstellungen', self.botDisplayMenuSettings),
+                          CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$')],
             states={
                 CallbackVars.MENU_MAIN: [
                     # Main menu
-                    CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),  # E.g. "back" button on error -> Go back to main menu
+                    # CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),  # E.g. "back" button on error -> Go back to main menu
                     CallbackQueryHandler(self.botDisplayAllCouponsListWithFullTitles, pattern='^' + CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES + '$'),
                     CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
                     CallbackQueryHandler(self.botDisplayCouponsWithImagesFavorites, pattern='^' + CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES + '$'),
@@ -198,14 +199,16 @@ class BKBot:
             name="MainConversationHandler",
             allow_reentry=True
         )
-        """ Handles deletion of userdata. """
+        """ Handles deletion of user accounts. """
         conv_handler2 = ConversationHandler(
-            entry_points=[CommandHandler('tschau', self.botUserDeleteAccountSTART),
-                          CallbackQueryHandler(self.botUserDeleteAccount, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT + "$")],
+            entry_points=[CommandHandler('tschau', self.botUserDeleteAccountSTART_COMMAND),
+                          CallbackQueryHandler(self.botUserDeleteAccountSTART_MENU, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT + "$")],
             states={
                 CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT: [
                     # Back to settings menu
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
+                    # Back to main menu
+                    CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),
                     # Delete users account
                     MessageHandler(filters=Filters.text and (~Filters.command), callback=self.botUserDeleteAccount),
                 ],
@@ -215,7 +218,7 @@ class BKBot:
             name="DeleteUserConvHandler",
             allow_reentry=True
         )
-        """ Handles 'favorite buttons' below single coupon-pictures. """
+        """ Handles 'favorite buttons' below single coupon images. """
         conv_handler3 = ConversationHandler(
             entry_points=[CallbackQueryHandler(self.botCouponToggleFavorite, pattern=PATTERN.PLU_TOGGLE_FAV)],
             states={
@@ -294,13 +297,7 @@ class BKBot:
         self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
-        userDB = self.crawler.getUsersDB()
-        user = User.load(userDB, str(update.effective_user.id))
-        """ New user? --> Add userID to DB. """
-        if user is None:
-            # Add user to DB for the first time
-            user = User(id=str(update.effective_user.id))
-            user.store(userDB)
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True)
         allButtons = []
         if self.getPublicChannelName() is not None:
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste + Pics + News', url='https://t.me/' + self.getPublicChannelName())])
@@ -690,24 +687,28 @@ class BKBot:
         context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
         return CallbackVars.MENU_DISPLAY_COUPON
 
-    def botUserDeleteAccountSTART(self, update: Update, context: CallbackContext):
-        menuText = '<b>\"Dann geh\' doch zu Netto!\"</b>\nAntworte mit deiner Benutzer-ID <b>' + str(
-            update.effective_user.id) + '</b>, um deine Benutzerdaten <b>endgültig</b> vom Server zu löschen.'
-        # Only display back button if user triggered this in context of a bot menu
-        if update.callback_query is not None:
-            self.editOrSendMessage(update, text=menuText, parse_mode='HTML',
-                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
-        else:
+    def botUserDeleteAccountSTART_COMMAND(self, update: Update, context: CallbackContext):
+        return self.botUserDeleteAccountSTART(update, context, CallbackVars.MENU_MAIN)
+
+    def botUserDeleteAccountSTART_MENU(self, update: Update, context: CallbackContext):
+        return self.botUserDeleteAccountSTART(update, context, CallbackVars.GENERIC_BACK)
+
+    def botUserDeleteAccountSTART(self, update: Update, context: CallbackContext, callbackBackButton: str):
+        user = self.getUser(userID=update.effective_user.id, addIfNew=False)
+        if user is None:
+            menuText = SYMBOLS.WARNING + 'Es existiert kein Benutzer mit der ID ' + str(update.effective_user.id) + ' in der Datenbank.'
+            menuText += '\nMit /start meldest du dich erstmalig an.'
             self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
+        else:
+            menuText = '<b>\"Dann geh\' doch zu Netto!\"</b>\nAntworte mit deiner Benutzer-ID <b>' + str(
+                update.effective_user.id) + '</b>, um deine Benutzerdaten <b>endgültig</b> vom Server zu löschen.'
+            self.editOrSendMessage(update, text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=callbackBackButton)]]))
         return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
 
     def botUserDeleteAccount(self, update: Update, context: CallbackContext):
         """ Deletes users' account from DB. """
         userInput = None if update.message is None else update.message.text
-        if userInput is None:
-            self.botUserDeleteAccountSTART(update, context)
-            return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
-        elif userInput == str(update.effective_user.id):
+        if userInput is not None and userInput == str(update.effective_user.id):
             userDB = self.crawler.getUsersDB()
             # Delete user from DB
             del userDB[str(update.effective_user.id)]
@@ -934,7 +935,7 @@ class BKBot:
         return CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD
 
     def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
-        user = self.getUser(userID=update.effective_user.id)
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True)
         return self.displayPaybackCard(update, context, user)
 
     def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
@@ -1279,9 +1280,20 @@ class BKBot:
             """ Typically this means that this message has already been deleted """
             logging.warning("Failed to delete message with message_id: " + str(messageID))
 
-    def getUser(self, userID: Union[int, str]) -> User:
-        """ Wrapper """
-        return User.load(self.crawler.getUsersDB(), str(userID))
+    def getUser(self, userID: Union[int, str], addIfNew: bool = False) -> User:
+        """ Wrapper. Only call this if you do not wish to write to the userDB in the calling methods otherwise you're wasting resources! """
+        return self.getUserFromDB(self.crawler.getUsersDB(), userID, addIfNew=addIfNew)
+
+    def getUserFromDB(self, userDB: Database, userID: Union[str, int], addIfNew: bool) -> Union[User, None]:
+        """ Returns user from given DB. Adds it to DB if wished and it doesn't exist. """
+        user = User.load(userDB, str(userID))
+        if user is None and addIfNew:
+            """ New user? --> Add userID to DB if wished. """
+            # Add user to DB for the first time
+            logging.info('Storing new userID: ' + str(userID))
+            user = User(id=str(userID))
+            user.store(userDB)
+        return user
 
 
 class ImageCache:

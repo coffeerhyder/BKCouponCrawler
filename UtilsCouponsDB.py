@@ -5,10 +5,9 @@ from enum import Enum
 from io import BytesIO
 from typing import Union, List, Optional
 
-from barcode import EAN13
 from barcode.ean import EuropeanArticleNumber13
 from barcode.writer import ImageWriter
-from couchdb.mapping import TextField, FloatField, ListField, IntegerField, BooleanField, Document, DictField, Mapping, DateTimeField
+from couchdb.mapping import TextField, FloatField, ListField, IntegerField, BooleanField, Document, DictField, Mapping
 from pydantic import BaseModel
 
 from CouponCategory import BotAllowedCouponSources, CouponSource
@@ -74,7 +73,7 @@ class Coupon(Document):
         else:
             return True
 
-    def getIsNew(self) -> bool:
+    def isNewCoupon(self) -> bool:
         """ Determines whether or not this coupon is considered 'new'. """
         if self.isNew is not None:
             return self.isNew
@@ -161,7 +160,7 @@ class Coupon(Document):
     def generateCouponShortText(self, highlightIfNew: bool) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
         couponText = ''
-        if self.getIsNew() and highlightIfNew:
+        if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
         couponText += self.getPLUOrUniqueID() + " | " + self.titleShortened
         couponText = self.appendPriceInfoText(couponText)
@@ -170,7 +169,7 @@ class Coupon(Document):
     def generateCouponShortTextFormatted(self, highlightIfNew: bool) -> str:
         """ Returns e.g. "<b>Y15</b> | 2Whopper+M🍟+0,4Cola | 8,99€" """
         couponText = ''
-        if self.getIsNew() and highlightIfNew:
+        if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
         couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.titleShortened
         couponText = self.appendPriceInfoText(couponText)
@@ -180,7 +179,7 @@ class Coupon(Document):
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         couponText = "<b>" + self.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
             messageID) + "\">"
-        if self.getIsNew() and highlightIfNew:
+        if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
         couponText += self.titleShortened + "</a>"
         couponText = self.appendPriceInfoText(couponText)
@@ -190,7 +189,7 @@ class Coupon(Document):
         """ Returns e.g. "2 Whopper + Mittlere Pommes + 0,4L Cola
          <b>Y15</b> | 8,99€ | -25% " """
         couponText = ''
-        if self.getIsNew():
+        if self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.title
         couponText += "\n<b>" + self.getPLUOrUniqueID() + "</b>"
@@ -202,7 +201,7 @@ class Coupon(Document):
          <b>Y15</b> | 8,99€ | -25% " """
         couponText = "<a href=\"https://t.me/" + publicChannelName + '/' + str(
             messageID) + "\">"
-        if self.getIsNew():
+        if self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.title
         couponText += "</a>"
@@ -216,7 +215,7 @@ class Coupon(Document):
         :return: E.g. "<b>B3</b> | 1234 | 13.99€ | -50%\nGültig bis:19.06.2021\nCoupon.description"
         """
         couponText = ''
-        if self.getIsNew() and highlightIfNew:
+        if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
         couponText += self.title + '\n'
         if self.plu is not None:
