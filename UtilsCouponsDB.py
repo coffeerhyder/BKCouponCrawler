@@ -7,7 +7,7 @@ from typing import Union, List, Optional
 
 from barcode.ean import EuropeanArticleNumber13
 from barcode.writer import ImageWriter
-from couchdb.mapping import TextField, FloatField, ListField, IntegerField, BooleanField, Document, DictField, Mapping
+from couchdb.mapping import TextField, FloatField, ListField, IntegerField, BooleanField, Document, DictField, Mapping, DateTimeField
 from pydantic import BaseModel
 
 from CouponCategory import BotAllowedCouponSources, CouponSource
@@ -256,7 +256,6 @@ class Coupon(Document):
 
 class UserFavoritesInfo:
     """ Helper class for users favorites. """
-
     def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None, favoritesUnavailable: Union[List[Coupon], None] = None):
         # Do not allow null values when arrays are expected. This makes it easier to work with this.
         if favoritesAvailable is None:
@@ -297,11 +296,11 @@ class User(Document):
     )
     botBlockedCounter = IntegerField(default=0)
     favoriteCoupons = DictField(default={})
-    # paybackCards = DictField(DictField(Mapping.build(
-    #     paybackCardNumber=TextField(),
-    #     addedDate=DateTimeField()
-    # )))
-    paybackCards = DictField(default={})
+    paybackCard = DictField(
+        Mapping.build(
+            paybackCardNumber=TextField(),
+            addedDate=DateTimeField()
+        ))
 
     def isFavoriteCoupon(self, coupon: Coupon):
         """ Checks if given coupon is users' favorite """
@@ -330,25 +329,22 @@ class User(Document):
         else:
             return False
 
-    def getPrimaryPaybackCardNumber(self) -> Union[str, None]:
-        """ Returns number of first Payback card in list. """
-        if len(self.paybackCards) > 0:
-            return list(self.paybackCards.keys())[0]
-        else:
-            return None
+    def getPaybackCardNumber(self) -> Union[str, None]:
+        return self.paybackCard.paybackCardNumber
 
-    def getPrimaryPaybackCardImage(self) -> bytes:
-        # writer.set_options(options={'background': 'blue'})
-        ean = EuropeanArticleNumber13(ean='240' + self.getPrimaryPaybackCardNumber(), writer=ImageWriter())
+    def getPaybackCardImage(self) -> bytes:
+        ean = EuropeanArticleNumber13(ean='240' + self.getPaybackCardNumber(), writer=ImageWriter())
         file = BytesIO()
         ean.write(file, options={'foreground': 'black'})
         return file.getvalue()
 
     def addPaybackCard(self, paybackCardNumber: str):
-        self.paybackCards[paybackCardNumber] = {'paybackCardNumber': paybackCardNumber, 'addedDate': str(datetime.now())}
+        self.paybackCard.paybackCardNumber = paybackCardNumber
+        self.paybackCard.addedDate = datetime.now()
 
-    def deletePrimaryPaybackCard(self):
-        del self.paybackCards[self.getPrimaryPaybackCardNumber()]
+    def deletePaybackCard(self):
+        dummyUser = User()
+        self.paybackCard = dummyUser.paybackCard
 
     def getUserFavoritesInfo(self, couponsFromDB: Union[dict, Document]) -> UserFavoritesInfo:
         """
@@ -373,6 +369,10 @@ class User(Document):
             availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
             unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
             return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
+
+    def resetSettings(self):
+        dummyUser = User()
+        self.settings = dummyUser.settings
 
 
 class InfoEntry(Document):
