@@ -385,7 +385,7 @@ class BKBot:
         try:
             coupons = None
             menuText = None
-            user = User.load(self.couchdb[DATABASES.TELEGRAM_USERS], str(update.effective_user.id))
+            user = self.getUser(userID=update.effective_user.id, addIfNew=True)
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
@@ -527,7 +527,8 @@ class BKBot:
 
     def botDisplayEasterEgg(self, update: Update, context: CallbackContext):
         query = update.callback_query
-        query.answer()
+        if query is not None:
+            query.answer()
         text = "🥚<b>Glückwunsch! Du hast ein Easter Egg gefunden!</b>"
         text += "\nKlicke <a href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">HIER</a>, um es anzusehen ;)"
         text += "\nDrücke /start, um das Menü neu zu laden."
@@ -536,16 +537,18 @@ class BKBot:
 
     def botDisplayCouponsWithImagesFavorites(self, update: Update, context: CallbackContext):
         try:
-            userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(user=User.load(self.crawler.getUsersDB(), str(update.effective_user.id)))
+            userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(user=self.getUser(userID=update.effective_user.id, addIfNew=True))
         except BetterBotException as botError:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_DISPLAY_COUPON
-        query = update.callback_query
-        query.answer()
         self.displayCouponsWithImagesAndBackButton(update, context, userFavorites.couponsAvailable, topMsgText='<b>Alle Favoriten mit Bildern:</b>',
                                                    bottomMsgText=favoritesInfoText)
-        # Delete last message containing bot menu
-        context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
+        query = update.callback_query
+        if query is not None:
+            # Only do this if this was called in context of bot menu
+            query.answer()
+            # Delete last message containing bot menu
+            context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
         return CallbackVars.MENU_DISPLAY_COUPON
 
     def displayCouponsWithImagesAndBackButton(self, update: Update, context: CallbackContext, coupons: list, topMsgText: str, bottomMsgText: str = "Zurück zum Hauptmenü?"):
@@ -562,9 +565,9 @@ class BKBot:
         for coupon in coupons:
             if showCouponIndexText:
                 additionalText = 'Coupon ' + str(index + 1) + ' / ' + str(len(coupons))
+                self.displayCouponWithImage(update=update, context=context, coupon=coupon, user=user, additionalText=additionalText)
             else:
-                additionalText = None
-            self.displayCouponWithImage(update, context, coupon, user, additionalText)
+                self.displayCouponWithImage(update=update, context=context, coupon=coupon, user=user, additionalText=None)
             index += 1
 
     def botDisplayOffers(self, update: Update, context: CallbackContext):
@@ -599,7 +602,7 @@ class BKBot:
         menuText = '<b>Nix dabei?</b>'
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN),
                                               InlineKeyboardButton(SYMBOLS.ARROW_RIGHT + " Zu den Gutscheinen", callback_data="?a=dcs&m=" + CouponDisplayMode.ALL + "&cs=")], []])
-        update.effective_message.reply_text(menuText, parse_mode='HTML', reply_markup=reply_markup)
+        self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode='HTML', reply_markup=reply_markup)
         return CallbackVars.MENU_OFFERS
 
     def botDisplayFeedbackCodes(self, update: Update, context: CallbackContext):
@@ -619,7 +622,7 @@ class BKBot:
         return CallbackVars.MENU_FEEDBACK_CODES
 
     def botDisplayMenuSettings(self, update: Update, context: CallbackContext):
-        user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True)
         return self.displaySettings(update, context, user)
 
     def displaySettings(self, update: Update, context: CallbackContext, user: User):
@@ -757,7 +760,7 @@ class BKBot:
         uniqueCouponID = re.search(PATTERN.PLU_TOGGLE_FAV, update.callback_query.data).group(1)
         query = update.callback_query
         userDB = self.crawler.getUsersDB()
-        user = User.load(userDB, str(update.effective_user.id))
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
         query.answer()
 
         if uniqueCouponID in user.favoriteCoupons:
@@ -861,7 +864,7 @@ class BKBot:
         settingKey = update.callback_query.data
         userDB = self.crawler.getUsersDB()
         dummyUser = User()
-        user = User.load(userDB, str(update.effective_user.id))
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
         if user.settings.get(settingKey, dummyUser.settings[settingKey]):
             user.settings[settingKey] = False
         else:
@@ -872,7 +875,7 @@ class BKBot:
     def botResetSettings(self, update: Update, context: CallbackContext):
         """ Resets users' settings to default """
         userDB = self.crawler.getUsersDB()
-        user = User.load(userDB, str(update.effective_user.id))
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
         dummyUser = User()
         user.settings = dummyUser.settings
         # Update DB
@@ -883,7 +886,7 @@ class BKBot:
     def botDeleteUnavailableFavoriteCoupons(self, update: Update, context: CallbackContext):
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
         userDB = self.crawler.getUsersDB()
-        user = User.load(userDB, str(update.effective_user.id))
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
         self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
 
@@ -901,7 +904,7 @@ class BKBot:
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
         elif userInput.isdecimal() and len(userInput) == 10:
             userDB = self.crawler.getUsersDB()
-            user = User.load(userDB, str(update.effective_user.id))
+            user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
             text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.'
@@ -916,7 +919,7 @@ class BKBot:
         """ Deletes Payback card from users account if his answer is matching his Payback card number. """
         # Validate input
         userDB = self.crawler.getUsersDB()
-        user = User.load(userDB, str(update.effective_user.id))
+        user = self.getUserFromDB(userDB, userID=update.effective_user.id, addIfNew=False)
         userInput = None if update.message is None else update.message.text
         if userInput is None:
             self.editOrSendMessage(update, text='Antworte mit deiner Payback Kartennummer <b>' + user.getPrimaryPaybackCardNumber() + '</b>, um diese zu löschen.',

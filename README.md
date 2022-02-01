@@ -141,7 +141,6 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
-* Neue Bot Commands hinzufügen (geht erst, wenn jede Methode sichergeht, dass der User in der DB ist)
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
 * Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden)
@@ -158,13 +157,6 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 # Daten für den BotFather (Telegram Bot Konfiguration)
 
 ### Bot Commands Liste
-```
-start - Hauptmenü
-angebote - Angebote
-tschau - 🚫 Meinen Account` löschen`
- ```
-
-### Bot Commands Liste (TODO)
 ```
 start - Hauptmenü
 coupons - Alle Coupons
