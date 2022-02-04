@@ -27,9 +27,10 @@
 	  "plu": null,
       "title": "10Fach auf jede Bestellung",
       "source": 8,
-      "imageURL": "file://media/extra_coupons_pics/2021_12_26_99141_10Fach.jpg",
-      "expire_date": "2021-12-26",
-      "isNewUntilDate": "2021-12-13"
+      "imageURL": "file://media/extra_coupons_pics/2022_02_27_Payback_99141.jpg",
+      "expire_date": "2022-02-27",
+      "isNewUntilDate": "2022-02-05",
+      "description":  "Danke an: mydealz.de/deals/payback-10fach-punkte-bei-burger-king-gultig-bis-zum-27022022-1943146"
     },
     {
       "uniqueID": "99110",
@@ -55,10 +56,10 @@
 	  "plu": "99140",
       "title": "10Fach auf jede Bestellung",
       "source": 8,
-      "imageURL": "file://media/extra_coupons_pics/2022_01_30_Payback_99140.jpg",
-      "expire_date": "2022-01-30",
-      "isNewUntilDate": "2022-01-16",
-	  "description": "Danke an: mydealz.de/gutscheine/5fach-payback-punkte-bei-burger-king-1932607"
+      "imageURL": "file://media/extra_coupons_pics/2022_02_27_Payback_99140.jpg",
+      "expire_date": "2022-02-27",
+      "isNewUntilDate": "2022-02-05",
+	  "description": "Danke an: mydealz.de/deals/payback-10fach-punkte-bei-burger-king-gultig-bis-zum-27022022-1943146"
     },
     {
       "uniqueID": "99144",
