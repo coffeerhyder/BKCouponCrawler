@@ -335,9 +335,14 @@ class BKBot:
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = 'Hallo ' + update.effective_user.first_name + ', <b>Bock auf Fastfood?</b>'
         menuText += '\n' + getBotImpressum()
-        if self.crawler.cachedMissingPaperCouponsText is not None:
-            menuText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Bot fehlende Papiercoupons: ' + bkbot.crawler.cachedMissingPaperCouponsText + '</b>'
-        self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
+        missingPaperCouponsText = bkbot.crawler.getMissingPaperCouponsText()
+        if missingPaperCouponsText is not None:
+            menuText += '\n<b>'
+            menuText += SYMBOLS.WARNING + 'Derzeit im Bot fehlende Papiercoupons: ' + missingPaperCouponsText
+            if self.getPublicChannelName() is not None:
+                menuText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ im ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + ' verlinkt.'
+            menuText += '</b>'
+        self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
