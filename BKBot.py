@@ -27,6 +27,7 @@ from UtilsOffers import offerGetImagePath
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 # Enable this to show BETA setting to users --> Only enable this if there are beta features available
+# 2022-02-19: Keep this enabled as a dummy although there are no BETA features as disabling it would possibly render the "Reset settings to default" function useless
 DISPLAY_BETA_SETTING = True
 
 """ This is a helper for basic user on/off settings """
@@ -52,6 +53,10 @@ USER_SETTINGS_ON_OFF = {
         "description": "Payback Coupons/Karte im Hauptmenü zeigen",
         "default": True
     },
+    "displayFeedbackCodeGenerator": {
+        "description": "Feedback Code Generator im Hauptmenü zeigen",
+        "default": True
+    },
     "highlightFavoriteCouponsInButtonTexts": {
         "description": "Favoriten in Buttons mit " + SYMBOLS.STAR + " markieren",
         "default": True
@@ -67,7 +72,7 @@ USER_SETTINGS_ON_OFF = {
 }
 if DISPLAY_BETA_SETTING:
     USER_SETTINGS_ON_OFF["enableBetaFeatures"] = {
-        "description": "Beta Features aktivieren",
+        "description": "Beta Features aktivieren (derzeit keine verf.)",
         "default": False
     }
 
@@ -329,8 +334,8 @@ class BKBot:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         allButtons.append(
             [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS), InlineKeyboardButton('KING Finder', url='https://www.burgerking.de/kingfinder')])
-        if user.settings.enableBetaFeatures:
-            allButtons.append([InlineKeyboardButton('BETA: Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
+        if user.settings.displayFeedbackCodeGenerator:
+            allButtons.append([InlineKeyboardButton('Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = 'Hallo ' + update.effective_user.first_name + ', <b>Bock auf Fastfood?</b>'
@@ -613,14 +618,14 @@ class BKBot:
     def botDisplayFeedbackCodes(self, update: Update, context: CallbackContext):
         """ 2021-07-15: New- and unfinished feature """
         numberOfFeedbackCodesToGenerate = 3
-        text = SYMBOLS.WARNING + "<b>Achtung! BETA Feature und unklar, ob diese 'random' Codes so funktionieren!</b>" + SYMBOLS.WARNING
-        text += "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
+        text = "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
         for index in range(numberOfFeedbackCodesToGenerate):
             text += "\n" + generateFeedbackCode()
-        text += "\nSchreibe einen Code deiner Wahl auf die Rückseine (d)eines BK Kassenbons, um den (gratis) Artikel zu erhalten."
-        text += "\nFalls du keinen Kassenbon hast und kein Schamgefühl kennst, hier ein Trick:"
-        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ ;)"
-        text += "\nDie Konditionen der Feedback Codes variieren.\nAktuell gibt es: Gratis Eiswaffel oder Kaffee(klein) [Stand 14.04.2021]"
+        text += "\nSchreibe einen Code deiner Wahl auf die Rückseine eines BK Kassenbons, um den gratis Artikel zu erhalten."
+        text += "\nFalls weder Kassenbon noch Schamgefühl vorhanden sind, hier ein Trick:"
+        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ und lasse dir den Kassenbon geben."
+        text += "\nDie Konditionen der Feedback Codes variieren."
+        text += "\nDerzeit gibt es: Gratis Eiswaffel oder Kaffee(klein) [Stand: 14.04.2021]"
         text += "\nDanke an <a href=\"https://edik.ch/posts/hack-the-burger-king.html\">Edik</a>!"
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
         self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)

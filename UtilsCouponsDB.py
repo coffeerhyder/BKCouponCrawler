@@ -286,6 +286,7 @@ class User(Document):
             displayQR=BooleanField(default=False),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
             displayCouponCategoryPayback=BooleanField(default=True),
+            displayFeedbackCodeGenerator=BooleanField(default=True),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),

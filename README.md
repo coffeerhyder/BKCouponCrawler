@@ -102,7 +102,7 @@ maintenancemode | Wartungsmodus - zeigt im Bot und Channel eine entsprechende Me
 3. Folgendes hinzufügen:  
 ```  
 # Bot nach Reboot starten. Die Wartezeit wird benötigt, damit CouchDB genug Zeit hat zu starten.  
-@reboot sleep 10 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
+@reboot sleep 45 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
 # Updates nachts automatisch ausführen
 00 03 * * * root /usr/bin/apt update -q -y >> /var/log/apt/automaticupdates.log
 30 03 * * * root /usr/bin/apt upgrade -q -y >> /var/log/apt/automaticupdates.log
