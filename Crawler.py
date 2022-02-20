@@ -43,7 +43,8 @@ class BKCrawler:
         self.crawlOnlyBotCompatibleCoupons = True
         self.storeCouponAPIDataAsJson = False
         self.exportCSVs = False
-        self.cachedMissingPaperCouponsText = None
+        self.missingPaperCouponPLUs = []
+        self.hasUndefinedMissingPaperCoupons = False
         # Create required DBs
         if DATABASES.INFO_DB not in self.couchdb:
             logging.info("Creating missing DB: " + DATABASES.INFO_DB)
@@ -93,7 +94,7 @@ class BKCrawler:
         # Make sure that our cache gets filled on init
         couponDB = self.getCouponDB()
         self.updateCache(couponDB)
-        self.updateCachedMissingPaperCouponsText(couponDB)
+        self.updateCachedMissingPaperCouponsInfo(couponDB)
 
     def setKeepHistory(self, keepHistory: bool):
         """ Enable this if you want the crawler to maintain a history of past coupons/offers and update it on every crawl process. """
@@ -576,10 +577,7 @@ class BKCrawler:
                     if len(missingPaperPLUs) > 0:
                         logging.info("Paper coupons NOT OK: " + paperChar + " | Found items: " + str(len(paperCoupons)) + " | Possibly missing PLUs: " + str(missingPaperPLUs))
                         for missingPaperPLU in missingPaperPLUs:
-                            if self.cachedMissingPaperCouponsText is None:
-                                self.cachedMissingPaperCouponsText = missingPaperPLU
-                            else:
-                                self.cachedMissingPaperCouponsText += ', ' + missingPaperPLU
+                            self.missingPaperCouponPLUs.append(missingPaperPLU)
                 else:
                     # Looks like we found all paper coupons :)
                     logging.info("Paper coupons OK: " + paperChar + " [" + str(len(paperCoupons)) + "]")
@@ -642,7 +640,7 @@ class BKCrawler:
         logging.info('Pushing ' + str(len(dbUpdates)) + ' coupon DB updates')
         couponDB.update(dbUpdates)
         logging.info("Number of crawled coupons: " + str(len(couponsToAddToDB)))
-        self.updateCachedMissingPaperCouponsText(couponDB)
+        self.updateCachedMissingPaperCouponsInfo(couponDB)
         # Update history if needed
         if self.keepHistory:
             timestampHistoryDBUpdateStart = datetime.now().timestamp()
@@ -961,21 +959,34 @@ class BKCrawler:
         # Overwrite old cache
         self.cachedAvailableCouponCategories = newCachedAvailableCouponCategories
 
-    def updateCachedMissingPaperCouponsText(self, couponDB: Database):
+    def updateCachedMissingPaperCouponsInfo(self, couponDB: Database):
         paperCouponMapping = getCouponMappingForCrawler()
         self.cachedMissingPaperCouponsText = None
-        missingPLUs = []
+        missingPaperPLUs = []
         for mappingCoupon in paperCouponMapping.values():
             if mappingCoupon.id not in couponDB:
-                missingPLUs.append(mappingCoupon.plu)
-        missingPLUs.sort()
-        for missingPLU in missingPLUs:
+                missingPaperPLUs.append(mappingCoupon.plu)
+        missingPaperPLUs.sort()
+        self.missingPaperCouponPLUs = missingPaperPLUs
+        for missingPLU in missingPaperPLUs:
             if self.cachedMissingPaperCouponsText is None:
                 self.cachedMissingPaperCouponsText = missingPLU
             else:
                 self.cachedMissingPaperCouponsText += ', ' + missingPLU
         if self.cachedMissingPaperCouponsText is not None:
             logging.info("Missing paper coupons: " + self.cachedMissingPaperCouponsText)
+
+    def getMissingPaperCouponsText(self) -> Union[str, None]:
+        if len(self.missingPaperCouponPLUs) > 0:
+            cachedMissingPaperCouponsText = ''
+            for missingPLU in self.missingPaperCouponPLUs:
+                if len(cachedMissingPaperCouponsText) == 0:
+                    cachedMissingPaperCouponsText = missingPLU
+                else:
+                    cachedMissingPaperCouponsText += ', ' + missingPLU
+            return cachedMissingPaperCouponsText
+        else:
+            return None
 
     def getCouponDB(self):
         return self.couchdb[DATABASES.COUPONS]

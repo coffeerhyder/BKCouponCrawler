@@ -310,8 +310,12 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += '\nDie Funktionalität von Bot/Channel kann derzeit nicht gewährleistet werden!'
         infoText += '\nFalls vorhanden, bitte die angepinnten Infos im Channel beachten.'
         infoText += '</b>'
-    if bkbot.crawler.cachedMissingPaperCouponsText is not None:
-        infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + bkbot.crawler.cachedMissingPaperCouponsText + '</b>'
+    missingPaperCouponsText = bkbot.crawler.getMissingPaperCouponsText()
+    if missingPaperCouponsText is not None:
+        infoText += '\n<b>'
+        infoText += SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + missingPaperCouponsText
+        infoText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.'
+        infoText += '</b>'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"

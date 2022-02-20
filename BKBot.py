@@ -20,56 +20,13 @@ import logging
 from Helper import *
 from Crawler import BKCrawler
 
-from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo
+from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
+    USER_SETTINGS_ON_OFF
 from CouponCategory import CouponCategory, BotAllowedCouponSources, CouponSource
 from UtilsOffers import offerGetImagePath
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
-# Enable this to show BETA setting to users --> Only enable this if there are beta features available
-DISPLAY_BETA_SETTING = True
-
-""" This is a helper for basic user on/off settings """
-USER_SETTINGS_ON_OFF = {
-    # TODO: Obtain these Keys and default values from "User" Mapping class and remove this mess!
-    "notifyWhenFavoritesAreBack": {
-        "description": "Favoriten Benachrichtigungen",
-        "default": False
-    },
-    "notifyWhenNewCouponsAreAvailable": {
-        "description": "Benachrichtigung bei neuen Coupons",
-        "default": False
-    },
-    "displayQR": {
-        "description": "QR Codes zeigen",
-        "default": False
-    },
-    "displayHiddenAppCouponsWithinGenericCategories": {
-        "description": "Versteckte App Coupons in Kategorien zeigen*¹",
-        "default": False
-    },
-    "displayCouponCategoryPayback": {
-        "description": "Payback Coupons/Karte im Hauptmenü zeigen",
-        "default": True
-    },
-    "highlightFavoriteCouponsInButtonTexts": {
-        "description": "Favoriten in Buttons mit " + SYMBOLS.STAR + " markieren",
-        "default": True
-    },
-    "highlightNewCouponsInCouponButtonTexts": {
-        "description": "Neue Coupons in Buttons mit " + SYMBOLS.NEW + " markieren",
-        "default": True
-    },
-    "autoDeleteExpiredFavorites": {
-        "description": "Abgelaufene Favoriten automatisch löschen",
-        "default": False
-    }
-}
-if DISPLAY_BETA_SETTING:
-    USER_SETTINGS_ON_OFF["enableBetaFeatures"] = {
-        "description": "Beta Features aktivieren",
-        "default": False
-    }
 
 
 class CouponDisplayMode:
@@ -329,15 +286,20 @@ class BKBot:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         allButtons.append(
             [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS), InlineKeyboardButton('KING Finder', url='https://www.burgerking.de/kingfinder')])
-        if user.settings.enableBetaFeatures:
-            allButtons.append([InlineKeyboardButton('BETA: Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
+        if user.settings.displayFeedbackCodeGenerator:
+            allButtons.append([InlineKeyboardButton('Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = 'Hallo ' + update.effective_user.first_name + ', <b>Bock auf Fastfood?</b>'
         menuText += '\n' + getBotImpressum()
-        if self.crawler.cachedMissingPaperCouponsText is not None:
-            menuText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Bot fehlende Papiercoupons: ' + bkbot.crawler.cachedMissingPaperCouponsText + '</b>'
-        self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
+        missingPaperCouponsText = bkbot.crawler.getMissingPaperCouponsText()
+        if missingPaperCouponsText is not None:
+            menuText += '\n<b>'
+            menuText += SYMBOLS.WARNING + 'Derzeit im Bot fehlende Papiercoupons: ' + missingPaperCouponsText
+            if self.getPublicChannelName() is not None:
+                menuText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ im ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + ' verlinkt.'
+            menuText += '</b>'
+        self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
@@ -608,14 +570,14 @@ class BKBot:
     def botDisplayFeedbackCodes(self, update: Update, context: CallbackContext):
         """ 2021-07-15: New- and unfinished feature """
         numberOfFeedbackCodesToGenerate = 3
-        text = SYMBOLS.WARNING + "<b>Achtung! BETA Feature und unklar, ob diese 'random' Codes so funktionieren!</b>" + SYMBOLS.WARNING
-        text += "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
+        text = "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
         for index in range(numberOfFeedbackCodesToGenerate):
             text += "\n" + generateFeedbackCode()
-        text += "\nSchreibe einen Code deiner Wahl auf die Rückseine (d)eines BK Kassenbons, um den (gratis) Artikel zu erhalten."
-        text += "\nFalls du keinen Kassenbon hast und kein Schamgefühl kennst, hier ein Trick:"
-        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ ;)"
-        text += "\nDie Konditionen der Feedback Codes variieren.\nAktuell gibt es: Gratis Eiswaffel oder Kaffee(klein) [Stand 14.04.2021]"
+        text += "\nSchreibe einen Code deiner Wahl auf die Rückseine eines BK Kassenbons, um den gratis Artikel zu erhalten."
+        text += "\nFalls weder Kassenbon noch Schamgefühl vorhanden sind, hier ein Trick:"
+        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ und lasse dir den Kassenbon geben."
+        text += "\nDie Konditionen der Feedback Codes variieren."
+        text += "\nDerzeit gibt es: Gratis Eiswaffel oder Kaffee(klein) [Stand: 14.04.2021]"
         text += "\nDanke an <a href=\"https://edik.ch/posts/hack-the-burger-king.html\">Edik</a>!"
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
         self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
@@ -651,9 +613,8 @@ class BKBot:
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
-        # Add 'reset settings' button (only if user has changed settings to non-default)
-        if user.settings.__dict__ != dummyUser.settings.__dict__:
-            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + "bleiben)" + SYMBOLS.WARNING,
+        if not user.hasDefaultSettings():
+            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + " & PB Karte bleiben)" + SYMBOLS.WARNING,
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
