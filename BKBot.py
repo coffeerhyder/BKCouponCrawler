@@ -20,61 +20,13 @@ import logging
 from Helper import *
 from Crawler import BKCrawler
 
-from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo
+from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
+    USER_SETTINGS_ON_OFF
 from CouponCategory import CouponCategory, BotAllowedCouponSources, CouponSource
 from UtilsOffers import offerGetImagePath
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
-# Enable this to show BETA setting to users --> Only enable this if there are beta features available
-# 2022-02-19: Keep this enabled as a dummy although there are no BETA features as disabling it would possibly render the "Reset settings to default" function useless
-DISPLAY_BETA_SETTING = True
-
-""" This is a helper for basic user on/off settings """
-USER_SETTINGS_ON_OFF = {
-    # TODO: Obtain these Keys and default values from "User" Mapping class and remove this mess!
-    "notifyWhenFavoritesAreBack": {
-        "description": "Favoriten Benachrichtigungen",
-        "default": False
-    },
-    "notifyWhenNewCouponsAreAvailable": {
-        "description": "Benachrichtigung bei neuen Coupons",
-        "default": False
-    },
-    "displayQR": {
-        "description": "QR Codes zeigen",
-        "default": False
-    },
-    "displayHiddenAppCouponsWithinGenericCategories": {
-        "description": "Versteckte App Coupons in Kategorien zeigen*¹",
-        "default": False
-    },
-    "displayCouponCategoryPayback": {
-        "description": "Payback Coupons/Karte im Hauptmenü zeigen",
-        "default": True
-    },
-    "displayFeedbackCodeGenerator": {
-        "description": "Feedback Code Generator im Hauptmenü zeigen",
-        "default": True
-    },
-    "highlightFavoriteCouponsInButtonTexts": {
-        "description": "Favoriten in Buttons mit " + SYMBOLS.STAR + " markieren",
-        "default": True
-    },
-    "highlightNewCouponsInCouponButtonTexts": {
-        "description": "Neue Coupons in Buttons mit " + SYMBOLS.NEW + " markieren",
-        "default": True
-    },
-    "autoDeleteExpiredFavorites": {
-        "description": "Abgelaufene Favoriten automatisch löschen",
-        "default": False
-    }
-}
-if DISPLAY_BETA_SETTING:
-    USER_SETTINGS_ON_OFF["enableBetaFeatures"] = {
-        "description": "Beta Features aktivieren (derzeit keine verf.)",
-        "default": False
-    }
 
 
 class CouponDisplayMode:
@@ -662,7 +614,10 @@ class BKBot:
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
         # Add 'reset settings' button (only if user has changed settings to non-default)
-        if user.settings.__dict__ != dummyUser.settings.__dict__:
+        # if user.settings.__dict__ != dummyUser.settings.__dict__:
+        #     keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + "bleiben)" + SYMBOLS.WARNING,
+        #                                           callback_data=CallbackVars.MENU_SETTINGS_RESET)])
+        if not user.hasDefaultSettings():
             keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + "bleiben)" + SYMBOLS.WARNING,
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         if len(user.favoriteCoupons) > 0:

@@ -303,6 +303,17 @@ class User(Document):
             addedDate=DateTimeField()
         ))
 
+    def hasDefaultSettings(self) -> bool:
+        for settingKey, settingValue in self["settings"].items():
+            settingInfo = USER_SETTINGS_ON_OFF.get(settingKey)
+            if settingInfo is None:
+                # Ignore keys that aren't covered in our settings map
+                continue
+            elif settingValue != settingInfo['default']:
+                return False
+
+        return True
+
     def isFavoriteCoupon(self, coupon: Coupon):
         """ Checks if given coupon is users' favorite """
         return self.isFavoriteCouponID(coupon.id)
@@ -496,3 +507,55 @@ def getCouponTitleMapping(coupons: dict) -> dict:
     for coupon in coupons.values():
         couponTitleMappingTmp.setdefault(coupon.getNormalizedTitle(), []).append(coupon)
     return couponTitleMappingTmp
+
+
+USER_SETTINGS_ON_OFF = {
+    # TODO: Obtain these Keys and default values from "User" Mapping class and remove this mess!
+    "notifyWhenFavoritesAreBack": {
+        "description": "Favoriten Benachrichtigungen",
+        "default": False
+    },
+    "notifyWhenNewCouponsAreAvailable": {
+        "description": "Benachrichtigung bei neuen Coupons",
+        "default": False
+    },
+    "displayQR": {
+        "description": "QR Codes zeigen",
+        "default": False
+    },
+    "displayHiddenAppCouponsWithinGenericCategories": {
+        "description": "Versteckte App Coupons in Kategorien zeigen*¹",
+        "default": False
+    },
+    "displayCouponCategoryPayback": {
+        "description": "Payback Coupons/Karte im Hauptmenü zeigen",
+        "default": True
+    },
+    "displayFeedbackCodeGenerator": {
+        "description": "Feedback Code Generator im Hauptmenü zeigen",
+        "default": True
+    },
+    "highlightFavoriteCouponsInButtonTexts": {
+        "description": "Favoriten in Buttons mit " + SYMBOLS.STAR + " markieren",
+        "default": True
+    },
+    "highlightNewCouponsInCouponButtonTexts": {
+        "description": "Neue Coupons in Buttons mit " + SYMBOLS.NEW + " markieren",
+        "default": True
+    },
+    "autoDeleteExpiredFavorites": {
+        "description": "Abgelaufene Favoriten automatisch löschen",
+        "default": False
+    }
+}
+
+# Enable this to show BETA setting to users --> Only enable this if there are beta features available
+# 2022-02-19: Keep this enabled as a dummy although there are no BETA features as disabling it would possibly render the "Reset settings to default" function useless
+DISPLAY_BETA_SETTING = False
+
+""" This is a helper for basic user on/off settings """
+if DISPLAY_BETA_SETTING:
+    USER_SETTINGS_ON_OFF["enableBetaFeatures"] = {
+        "description": "Beta Features aktivieren (derzeit keine verf.)",
+        "default": False
+    }
