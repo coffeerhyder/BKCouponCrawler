@@ -556,6 +556,6 @@ DISPLAY_BETA_SETTING = False
 """ This is a helper for basic user on/off settings """
 if DISPLAY_BETA_SETTING:
     USER_SETTINGS_ON_OFF["enableBetaFeatures"] = {
-        "description": "Beta Features aktivieren (derzeit keine verf.)",
+        "description": "Beta Features aktivieren",
         "default": False
     }
