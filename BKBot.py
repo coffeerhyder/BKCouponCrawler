@@ -613,10 +613,6 @@ class BKBot:
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
-        # Add 'reset settings' button (only if user has changed settings to non-default)
-        # if user.settings.__dict__ != dummyUser.settings.__dict__:
-        #     keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + "bleiben)" + SYMBOLS.WARNING,
-        #                                           callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         if not user.hasDefaultSettings():
             keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + "bleiben)" + SYMBOLS.WARNING,
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
