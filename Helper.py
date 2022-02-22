@@ -109,9 +109,14 @@ def shortenProductNames(couponTitle: str) -> str:
     if drinkUnitRegEx:
         couponTitle = couponTitle.replace(drinkUnitRegEx.group(0), drinkUnitRegEx.group(1))
     # Normalize 'nugget unit e.g. "6er KING Nuggets" -> "6 KING Nuggets"
-    nuggetUnitRegEx = re.compile(r'(?i)(\d{1,2})er\s*?').search(couponTitle)
+    nuggetUnitRegEx = re.compile(r'(?i)(\d{1,2})er\s*').search(couponTitle)
     if nuggetUnitRegEx:
         couponTitle = couponTitle.replace(nuggetUnitRegEx.group(0), nuggetUnitRegEx.group(1))
+    # E.g. 2 x Crispy Chicken --> 2 Crispy Chicken
+    burgerUnitRegEx = re.compile(r'(\d+)[Xx] [A-Za-z]+').search(couponTitle)
+    if burgerUnitRegEx:
+        # TODO: add replaceAll for some of these RegEx results
+        couponTitle = couponTitle.replace(burgerUnitRegEx.group(0), burgerUnitRegEx.group(1))
     # "Chicken Nuggets" -> "Nuggets" (because everyone knows what's ment by that and it's shorter!)
     chickenNuggetsFix = re.compile(r'(?i)Chicken\s*Nuggets').search(couponTitle)
     if chickenNuggetsFix:
@@ -121,6 +126,10 @@ def shortenProductNames(couponTitle: str) -> str:
         # Keep first letter of "burger" as it is (lower-/uppercase) sometimes used as part of one word e.g. "Cheeseburger"
         b = burgerFix.group(1)
         couponTitle = replaceCaseInsensitive(burgerFix.group(0), b + 'rgr', couponTitle)
+
+    removeOR = re.compile(r'( oder)').search(couponTitle)
+    if removeOR:
+        couponTitle = couponTitle.replace(removeOR.group(0), ',')
 
     # Assume that all users know that "Cheddar" is cheese so let's remove this double entry
     couponTitle = replaceRegex(re.compile(r'(?i)Cheddar\s*Cheese'), 'Cheddar', couponTitle)
