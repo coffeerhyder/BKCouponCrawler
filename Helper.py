@@ -112,11 +112,10 @@ def shortenProductNames(couponTitle: str) -> str:
     nuggetUnitRegEx = re.compile(r'(?i)(\d{1,2})er\s*').search(couponTitle)
     if nuggetUnitRegEx:
         couponTitle = couponTitle.replace(nuggetUnitRegEx.group(0), nuggetUnitRegEx.group(1))
-    # E.g. 2 x Crispy Chicken --> 2 Crispy Chicken
-    burgerUnitRegEx = re.compile(r'(\d+)[Xx] [A-Za-z]+').search(couponTitle)
-    if burgerUnitRegEx:
-        # TODO: add replaceAll for some of these RegEx results
-        couponTitle = couponTitle.replace(burgerUnitRegEx.group(0), burgerUnitRegEx.group(1))
+    # E.g. "2x Crispy Chicken" --> 2 Crispy Chicken
+    for match in re.finditer(r'((\d+)[Xx] )([A-Za-z]+)', couponTitle):
+        newAmountStr = match.group(2) + " " + match.group(3)
+        couponTitle = couponTitle.replace(match.group(0), newAmountStr)
     # "Chicken Nuggets" -> "Nuggets" (because everyone knows what's ment by that and it's shorter!)
     chickenNuggetsFix = re.compile(r'(?i)Chicken\s*Nuggets').search(couponTitle)
     if chickenNuggetsFix:
