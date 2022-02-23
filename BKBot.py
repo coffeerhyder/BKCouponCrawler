@@ -1261,7 +1261,7 @@ class BKBot:
             user.store(userDB)
         if 'paybackCard' not in user:
             # 2022-02-01: Workaround for WTF bug; only affects existing users
-            logging.info('Doing Payback DB workaround for user:' + str(userID))
+            logging.info('Doing Payback DB workaround for user: ' + str(userID))
             user['paybackCard'] = {
                 'paybackCardNumber': None,
                 'addedDate': None
