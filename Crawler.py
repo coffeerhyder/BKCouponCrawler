@@ -220,6 +220,18 @@ class BKCrawler:
             crawledCouponsDict[uniqueCouponID] = newCoupon
         logging.info('Coupons in app: ' + str(len(appCoupons)))
         logging.info("Total coupons1 crawl time: " + getFormattedPassedTime(timestampCrawlStart))
+        # TODO: Remove this
+        # couponDB = self.getCouponDB()
+        # # Cleanup DB: Remove all App coupons that do not exist in API anymore
+        # deleteCouponDocs = []
+        # for uniqueCouponID in couponDB:
+        #     coupon = Coupon.load(couponDB, uniqueCouponID)
+        #     if uniqueCouponID not in crawledCouponsDict:
+        #         deleteCouponDocs.append(coupon)
+        # if len(deleteCouponDocs) > 0:
+        #     logging.info("Removing obsolete App coupons: " + str(len(deleteCouponDocs)))
+        #     couponDB.purge(deleteCouponDocs)
+
 
     def crawlCoupons2(self, crawledCouponsDict: dict):
         """ Crawls coupons from secondary sources and adds additional information to the data crawled via app API.
@@ -382,9 +394,6 @@ class BKCrawler:
                         logging.warning("Detected API price difference for coupon " + existantCoupon.id + " | App: " + str(existantCoupon.price) + " | API2: " + str(price))
                     if priceCompare > 0:
                         existantCoupon.priceCompare = priceCompare
-                    # Add additional expire date data
-                    existantCoupon.timestampExpire = expirationDate.timestamp()
-                    existantCoupon.dateFormattedExpire = formatDateGerman(expirationDate)
                 else:
                     # Add/Update non-App coupons
                     newCoupon = Coupon(id=uniqueCouponID, source=CouponSource.UNKNOWN, uniqueID=uniqueCouponID, plu=plu, title=title, titleShortened=shortenProductNames(title),
@@ -649,15 +658,17 @@ class BKCrawler:
             for itemID, coupon in couponsToAddToDB.items():
                 self.updateHistoryEntry(dbHistoryCoupons, itemID, coupon)
             logging.info("Time it took to update coupons history DB: " + getFormattedPassedTime(timestampHistoryDBUpdateStart))
-        # Cleanup DB: Remove all non-App coupons that do not exist in API anymore
+        # Cleanup DB
         deleteCouponDocs = {}
         for uniqueCouponID in couponDB:
-            coupon = Coupon.load(couponDB, uniqueCouponID)
-            if uniqueCouponID not in crawledCouponsDict:
-                deleteCouponDocs[uniqueCouponID] = coupon
-            elif self.crawlOnlyBotCompatibleCoupons and not coupon.isValidForBot():
-                # This will only happen if operator set crawlOnlyBotCompatibleCoupons to False first and then to True.
-                deleteCouponDocs[uniqueCouponID] = coupon
+            dbCoupon = Coupon.load(couponDB, uniqueCouponID)
+            crawledCoupon = crawledCouponsDict.get(uniqueCouponID)
+            if crawledCoupon is None:
+                # Coupon is in DB but not in crawled coupons -> Remove from DB
+                deleteCouponDocs[uniqueCouponID] = dbCoupon
+            elif self.crawlOnlyBotCompatibleCoupons and not crawledCoupon.isValidForBot():
+                # This will usually only happen if operator set crawlOnlyBotCompatibleCoupons to False first and then to True.
+                deleteCouponDocs[uniqueCouponID] = dbCoupon
         if len(deleteCouponDocs) > 0:
             couponDB.purge(deleteCouponDocs.values())
         # Save timestamp of last complete run in DB

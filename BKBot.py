@@ -854,11 +854,12 @@ class BKBot:
     def botAddPaybackCard(self, update: Update, context: CallbackContext):
         userInput = None if update.message is None else update.message.text
         if userInput is not None and len(userInput) == 13:
-            # Maybe user entered barcode instead of Payback number --> Correct input
+            # Maybe user entered full EAN barcode --> We only want to save the Payback cardnumber as the first 3 digits are always the same anyways!
             userInput = userInput[3:13]
         if userInput is None:
-            text = 'Antworte mit deiner Payback Kartennummer, um diese hinzuzufügen.'
-            text += '\nDeine Kartennummer wird ausschließlich gespeichert, um sie dir in diesem Chat als EAN13 Code zu zeigen.'
+            text = 'Antworte mit deiner Payback Kartennummer (EAN, 13-stellig), um diese hinzuzufügen.'
+            text += '\nEs reichen auch die letzten 10 Stellen der EAN oder deine 10-stellige Payback Kundennummer.'
+            text += '\nDiese Daten werden ausschließlich gespeichert, um dir deine Payback Karte im Bot anzeigen zu können.'
             text += '\nDu kannst deine Karte in den Einstellungen jederzeit aus dem Bot löschen.'
             self.editOrSendMessage(update, text=text, parse_mode='HTML',
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
