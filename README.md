@@ -222,8 +222,13 @@ FAQ BetterKing Bot und Channel
 
 Wo finde ich die aktuellen Papiercoupons als Scan?
 Sofern es welche gibt, hier:
-mydealz.de/gutscheine/neue-burger-king-gutscheine-gultig-bis-12112021-1861962
-Gültig bis: 12.11.2021
+mydealz.de/deals/bundesweit-neue-burger-king-papier-couponsgutscheine-bis-04032022-1928924
+Gültig bis: 04.03.2022
+
+Warum fehlen manchmal Papiercoupons?
+Seit dem 03.12.2021 sind Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlen manchmal welche.
+Eine Liste der fehlenden Coupons findest du in der Coupon-Übersicht im Channel.
+Generell gilt: Sind weniger als 46 Papiercoupons aufgeführt, fehlen welche -> Schaut in das verlinkte Papiercoupon PDF Dokument.
 
 Welche Daten speichert der Bot?
 Deine Benutzer-ID und deine Einstellungen.
