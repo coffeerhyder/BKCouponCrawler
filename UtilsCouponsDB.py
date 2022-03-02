@@ -296,6 +296,7 @@ class User(Document):
         )
     )
     botBlockedCounter = IntegerField(default=0)
+    easterEggCounter = IntegerField(default=0)
     favoriteCoupons = DictField(default={})
     paybackCard = DictField(
         Mapping.build(
@@ -313,6 +314,12 @@ class User(Document):
                 return False
 
         return True
+
+    def hasFoundEasterEgg(self) -> bool:
+        if self.easterEggCounter > 0:
+            return True
+        else:
+            return False
 
     def isFavoriteCoupon(self, coupon: Coupon):
         """ Checks if given coupon is users' favorite """
