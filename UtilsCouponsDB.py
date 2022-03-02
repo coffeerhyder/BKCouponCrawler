@@ -218,10 +218,7 @@ class Coupon(Document):
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
         couponText += self.title + '\n'
-        if self.plu is not None:
-            couponText += '<b>' + self.plu + '</b>' + ' | ' + self.id
-        else:
-            couponText += '<b>' + self.id + '</b>'
+        couponText += self.getPLUInformationFormatted()
         couponText = self.appendPriceInfoText(couponText)
         """ Expire date should be always given but we can't be 100% sure! """
         expireDateFormatted = self.getExpireDateFormatted()
@@ -230,6 +227,13 @@ class Coupon(Document):
         if self.description is not None:
             couponText += "\n" + self.description
         return couponText
+
+    def getPLUInformationFormatted(self) -> str:
+        """ Returns e.g. <b>123</b> | 67407 """
+        if self.plu is not None and self.plu != self.id:
+            return '<b>' + self.plu + '</b>' + ' | ' + self.id
+        else:
+            return '<b>' + self.id + '</b>'
 
     def appendPriceInfoText(self, couponText: str) -> str:
         priceFormatted = self.getPriceFormatted()
