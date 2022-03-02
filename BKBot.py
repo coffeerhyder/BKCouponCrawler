@@ -201,15 +201,8 @@ class BKBot:
         dispatcher.add_handler(conv_handler)
         dispatcher.add_handler(conv_handler2)
         dispatcher.add_handler(conv_handler3)
-        """
-        2021-01-12: I've decided to drop these commands for now as our menu "back" button won't work like this.
-        It would need a lot of refactoring to make the menus and commands work at the same time!
-        """
-        # dispatcher.add_handler(CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND))
+        dispatcher.add_handler(CommandHandler('stats', self.botDisplayStats))
         # dispatcher.add_handler(CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND))
-        # dispatcher.add_handler(CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND))
-        # dispatcher.add_handler(CommandHandler('angebote', self.botDisplayOffers))
-        # dispatcher.add_handler(CommandHandler('einstellungen', self.botDisplayMenuSettings))
         dispatcher.add_error_handler(self.botErrorCallback)
         # dispatcher.add_handler(MessageHandler(Filters.command, self.botUnknownCommand))
 
@@ -285,7 +278,9 @@ class BKBot:
             else:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         allButtons.append(
-            [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS), InlineKeyboardButton('KING Finder', url='https://www.burgerking.de/kingfinder')])
+            [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS)])
+        allButtons.append(
+            [InlineKeyboardButton('Spar Kings', url=URLs.BK_SPAR_KINGS), InlineKeyboardButton('KING Finder', url=URLs.BK_KING_FINDER)])
         if user.settings.displayFeedbackCodeGenerator:
             allButtons.append([InlineKeyboardButton('Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
@@ -336,6 +331,31 @@ class BKBot:
     def botDisplayFavoritesCOMMAND(self, update: Update, context: CallbackContext):
         """ Wrapper and this is only to be used for commands. """
         return self.displayCoupons(update, context, CouponCallbackVars.FAVORITES)
+
+    def botDisplayStats(self, update: Update, context: CallbackContext):
+        """ Wrapper and this is only to be used for commands. """
+        couponDB = self.getBotCoupons()
+        userDB = self.crawler.getUsersDB()
+        activeOffers = self.crawler.getOffersActive()
+        numberofUsersWhoFoundEasterEgg = 0
+        numberofFavorites = 0
+        for userID in userDB:
+            userTmp = User.load(userDB, userID)
+            if userTmp.hasFoundEasterEgg():
+                numberofUsersWhoFoundEasterEgg += 1
+            numberofFavorites += len(userTmp.favoriteCoupons)
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        text = '<b>Hallo Nerd</b>'
+        text += '\n<pre>'
+        text += 'Anzahl User im Bot: ' + str(len(userDB))
+        text += '\nAnzahl insgesamt von Usern gesetzte Favoriten: ' + str(numberofFavorites)
+        text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(numberofUsersWhoFoundEasterEgg)
+        text += '\nAnzahl Aufrufe Easter-Egg von dir: ' + str(user.easterEggCounter)
+        text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
+        text += '\nAnzahl gültige Angebote: ' + str(len(activeOffers))
+        text += '</pre>'
+        self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode="html", disable_web_page_preview=True)
+        return ConversationHandler.END
 
     def displayCoupons(self, update: Update, context: CallbackContext, callbackVar: str):
         """ Displays all coupons in a pre selected mode """
@@ -491,6 +511,11 @@ class BKBot:
         query = update.callback_query
         if query is not None:
             query.answer()
+        userDB = self.crawler.getUsersDB()
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        user.easterEggCounter += 1
+        user.store(db=userDB)
+
         text = "🥚<b>Glückwunsch! Du hast ein Easter Egg gefunden!</b>"
         text += "\nKlicke <a href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">HIER</a>, um es anzusehen ;)"
         text += "\nDrücke /start, um das Menü neu zu laden."
@@ -610,11 +635,11 @@ class BKBot:
         else:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
-        menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"https://www.burgerking.de/kingfinder\">KINGFINDER</a>."
+        menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
         if not user.hasDefaultSettings():
-            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + " & PB Karte bleiben)" + SYMBOLS.WARNING,
+            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + " & PB Karte bleiben)",
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.

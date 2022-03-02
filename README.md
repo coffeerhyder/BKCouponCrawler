@@ -143,7 +143,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 # TODOs
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
-* Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden)
+* Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden) -> 02.03.2022: Wird auch von der Webseite verwendet: https://www.burgerking.de/rewards/offers
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
 * User, die den Bot geblockt haben keine Benachrichtigungen mehr versuchen zu schicken (könnte passieren, wenn ein User Favoriten speichert. Benachrichtigungen aktiviert und dannach den Bot blockiert, TG Exception Unauthorized)
@@ -165,6 +165,7 @@ favoriten - ⭐Favoriten⭐
 angebote - Angebote
 payback - 🅿️ayback Karte
 einstellungen - 🔧Einstellungen
+stats - Statistiken für Nerds
 tschau - 🚫 Meinen Account löschen
  ```
 
@@ -222,8 +223,13 @@ FAQ BetterKing Bot und Channel
 
 Wo finde ich die aktuellen Papiercoupons als Scan?
 Sofern es welche gibt, hier:
-mydealz.de/gutscheine/neue-burger-king-gutscheine-gultig-bis-12112021-1861962
-Gültig bis: 12.11.2021
+mydealz.de/deals/bundesweit-neue-burger-king-papier-couponsgutscheine-bis-04032022-1928924
+Gültig bis: 04.03.2022
+
+Warum fehlen manchmal Papiercoupons?
+Seit dem 03.12.2021 sind Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlen manchmal welche.
+Eine Liste der fehlenden Coupons findest du in der Coupon-Übersicht im Channel.
+Generell gilt: Sind weniger als 46 Papiercoupons aufgeführt, fehlen welche -> Schaut in das verlinkte Papiercoupon PDF Dokument.
 
 Welche Daten speichert der Bot?
 Deine Benutzer-ID und deine Einstellungen.

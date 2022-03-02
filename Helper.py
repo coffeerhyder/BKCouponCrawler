@@ -29,6 +29,12 @@ class HISTORYDB:
     COUPONS_HISTORY_DOC = 'history'
 
 
+class URLs:
+    ELEMENT = 'https://app.element.io/#/room/#BetterKingDE:matrix.org'
+    BK_SPAR_KINGS = 'https://www.burgerking.de/sparkings'
+    BK_KING_FINDER = 'https://www.burgerking.de/store-locator'
+
+
 def loadConfig(fallback: str = None):
     try:
         return loadJson(BotProperty.configPath)

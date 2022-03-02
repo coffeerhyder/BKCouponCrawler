@@ -8,7 +8,7 @@ from telegram import InputMediaPhoto
 from telegram.error import BadRequest, Unauthorized
 
 from BotUtils import getBotImpressum
-from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime
+from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs
 
 from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter, sortCouponsByPrice, getCouponTitleMapping
 from CouponCategory import BotAllowedCouponSources
@@ -316,6 +316,11 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + missingPaperCouponsText
         infoText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.'
         infoText += '</b>'
+    # Add 'useful links' text
+    infoText += '\n<b>------</b>'
+    infoText += '\n<b>Nützliche Links</b>:'
+    infoText += '\n•<a href=\"' + URLs.BK_SPAR_KINGS + '\">Spar Kings</a>'
+    infoText += '\n•<a href=\"' + URLs.BK_KING_FINDER + '\">KING Finder</a>'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"
@@ -324,7 +329,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += "\n... oder verwende <a href=\"https://t.me/" + bkbot.botName + "\">den Bot</a>."
     infoText += "\n<b>Der Bot kann außerdem deine Favoriten speichern, Coupons filtern und einiges mehr ;)</b>"
     infoText += "\nMöchtest du diesen Channel mit jemandem teilen, der kein Telegram verwendet?"
-    infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a> oder <a href=\"https://app.element.io/#/room/#BetterKingDE:matrix.org\">Element per Matrix Bridge</a>."
+    infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a> oder <a href=\"" + URLs.ELEMENT + "\">Element per Matrix Bridge</a>."
     infoText += "\n<b>Guten Hunger!</b>"
     infoText += "\n" + getBotImpressum()
     """ 
