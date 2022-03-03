@@ -339,17 +339,21 @@ class BKBot:
         activeOffers = self.crawler.getOffersActive()
         numberofUsersWhoFoundEasterEgg = 0
         numberofFavorites = 0
+        numberofUsersWhoBlockedBot = 0
         for userID in userDB:
             userTmp = User.load(userDB, userID)
             if userTmp.hasFoundEasterEgg():
                 numberofUsersWhoFoundEasterEgg += 1
             numberofFavorites += len(userTmp.favoriteCoupons)
+            if userTmp.hasProbablyBlockedBot():
+                numberofUsersWhoBlockedBot += 1
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
         text = '<b>Hallo Nerd</b>'
         text += '\n<pre>'
         text += 'Anzahl User im Bot: ' + str(len(userDB))
         text += '\nAnzahl insgesamt von Usern gesetzte Favoriten: ' + str(numberofFavorites)
         text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(numberofUsersWhoFoundEasterEgg)
+        text += '\nAnzahl User, die den Bot geblockt haben: ' + str(numberofUsersWhoBlockedBot)
         text += '\nAnzahl Aufrufe Easter-Egg von dir: ' + str(user.easterEggCounter)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(activeOffers))

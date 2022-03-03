@@ -308,6 +308,12 @@ class User(Document):
             addedDate=DateTimeField()
         ))
 
+    def hasProbablyBlockedBot(self) -> bool:
+        if self.botBlockedCounter > 0:
+            return True
+        else:
+            return False
+
     def hasDefaultSettings(self) -> bool:
         for settingKey, settingValue in self["settings"].items():
             settingInfo = USER_SETTINGS_ON_OFF.get(settingKey)
