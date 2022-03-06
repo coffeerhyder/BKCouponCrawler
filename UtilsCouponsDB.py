@@ -29,6 +29,7 @@ class Coupon(Document):
     dateFormattedExpireInternal = TextField()
     dateFormattedExpire = TextField()
     imageURL = TextField()
+    paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
     source = IntegerField()
     containsFriesOrCoke = BooleanField()
@@ -48,6 +49,9 @@ class Coupon(Document):
 
     def getNormalizedTitle(self):
         return normalizeString(self.title)
+
+    def getTitle(self):
+        return self.title
 
     def isValid(self):
         expireDatetime = self.getExpireDatetime()

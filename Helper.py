@@ -33,6 +33,7 @@ class URLs:
     ELEMENT = 'https://app.element.io/#/room/#BetterKingDE:matrix.org'
     BK_SPAR_KINGS = 'https://www.burgerking.de/sparkings'
     BK_KING_FINDER = 'https://www.burgerking.de/store-locator'
+    NGB_FORUM_THREAD = 'https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/'
 
 
 def loadConfig(fallback: str = None):

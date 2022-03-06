@@ -25,6 +25,7 @@
     {
       "uniqueID": "99141",
 	  "plu": null,
+      "paybackMultiplicator": 10,
       "title": "10Fach auf jede Bestellung",
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2022_02_27_Payback_99141.jpg",
@@ -35,15 +36,17 @@
     {
       "uniqueID": "99110",
 	  "plu": "965",
+      "paybackMultiplicator": 5,
       "title": "5Fach auf jede Bestellung",
       "source": 8,
-      "imageURL": "file://media/extra_coupons_pics/2022_03_04_PayBack_99110_965.jpg",
-      "expire_date": "2022-03-04",
-      "isNewUntilDate": "2022-01-08"
+      "imageURL": "file://media/extra_coupons_pics/2022_04_22_Payback_99110_965.png",
+      "expire_date": "2022-04-22",
+      "isNewUntilDate": "2022-03-07"
     },
     {
       "uniqueID": "99139",
 	  "plu": "99139",
+      "paybackMultiplicator": 8,
       "title": "8Fach auf jede Bestellung",
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2022_01_30_Payback_99139.jpg",
@@ -54,6 +57,7 @@
     {
       "uniqueID": "99140",
 	  "plu": "99140",
+      "paybackMultiplicator": 10,
       "title": "10Fach auf jede Bestellung",
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2022_03_27_Payback_99140.jpg",
@@ -64,6 +68,7 @@
     {
       "uniqueID": "99144",
 	  "plu": "99144",
+      "paybackMultiplicator": 10,
       "title": "10Fach auf jede Bestellung",
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2022_01_30_Payback_99144.jpg",
@@ -74,6 +79,7 @@
     {
       "uniqueID": "99143",
 	  "plu": "99143",
+      "paybackMultiplicator": 15,
       "title": "15Fach auf jede Bestellung",
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2022_03_27_Payback_99143.jpg",

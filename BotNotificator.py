@@ -321,6 +321,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n<b>Nützliche Links</b>:'
     infoText += '\n•<a href=\"' + URLs.BK_SPAR_KINGS + '\">Spar Kings</a>'
     infoText += '\n•<a href=\"' + URLs.BK_KING_FINDER + '\">KING Finder</a>'
+    infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to Forum Thread</a>'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"
