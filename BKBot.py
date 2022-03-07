@@ -279,8 +279,9 @@ class BKBot:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         allButtons.append(
             [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS)])
-        allButtons.append(
-            [InlineKeyboardButton('Spar Kings', url=URLs.BK_SPAR_KINGS), InlineKeyboardButton('KING Finder', url=URLs.BK_KING_FINDER)])
+        if user.settings.displayBKWebsiteURLs:
+            allButtons.append(
+                [InlineKeyboardButton('Spar Kings', url=URLs.BK_SPAR_KINGS), InlineKeyboardButton('KING Finder', url=URLs.BK_KING_FINDER)])
         if user.settings.displayFeedbackCodeGenerator:
             allButtons.append([InlineKeyboardButton('Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
@@ -783,7 +784,7 @@ class BKBot:
     def generateCouponShortTextWithHyperlinkToChannelPost(self, coupon: Coupon, messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         text = "<b>" + coupon.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
-            messageID) + "\">" + coupon.titleShortened + "</a>"
+            messageID) + "\">" + coupon.getTitleShortened() + "</a>"
         priceFormatted = coupon.getPriceFormatted()
         if priceFormatted is not None:
             text += " | " + priceFormatted

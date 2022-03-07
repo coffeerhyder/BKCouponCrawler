@@ -849,7 +849,7 @@ class BKCrawler:
             return
         for uniqueCouponID in couponDB:
             coupon = Coupon.load(couponDB, uniqueCouponID)
-            fullCouponTitle = coupon.title
+            fullCouponTitle = coupon.getTitle()
             """ Check if coupon contains multiple products """
             if ' + ' in fullCouponTitle:
                 """ Assume that we got multiple products """
@@ -924,7 +924,7 @@ class BKCrawler:
             writer.writeheader()
             for couponID in couponDB:
                 coupon = Coupon.load(couponDB, couponID)
-                writer.writerow({'PRODUCT': coupon.title, 'MENU': coupon.containsFriesOrCoke,
+                writer.writerow({'PRODUCT': coupon.getTitle(), 'MENU': coupon.containsFriesOrCoke,
                                  'PLU': (coupon.plu if coupon.plu is not None else "N/A"), 'PLU2': coupon.id,
                                  'TYPE': coupon.source,
                                  'PRICE': coupon.get(Coupon.price.name, -1), 'PRICE_COMPARE': coupon.get(Coupon.priceCompare.name, -1),
@@ -945,7 +945,7 @@ class BKCrawler:
                 coupon = Coupon.load(couponDB, couponID)
                 if coupon.source != CouponSource.PAPER:
                     continue
-                writer.writerow({'Produkt': coupon.title, 'Menü': coupon.containsFriesOrCoke,
+                writer.writerow({'Produkt': coupon.getTitle(), 'Menü': coupon.containsFriesOrCoke,
                                  'PLU': coupon.plu, 'PLU2': coupon.id,
                                  'Preis': coupon.price, 'OPreis': coupon.get(Coupon.priceCompare.name, -1),
                                  'Ablaufdatum': coupon.getExpireDateFormatted()
