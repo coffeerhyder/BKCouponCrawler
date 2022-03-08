@@ -13,7 +13,6 @@ from pydantic import BaseModel
 from CouponCategory import BotAllowedCouponSources, CouponSource
 from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString
 
-
 class Coupon(Document):
     plu = TextField()
     uniqueID = TextField()
@@ -29,6 +28,7 @@ class Coupon(Document):
     dateFormattedExpireInternal = TextField()
     dateFormattedExpire = TextField()
     imageURL = TextField()
+    paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
     source = IntegerField()
     containsFriesOrCoke = BooleanField()
@@ -47,7 +47,13 @@ class Coupon(Document):
             return self.id
 
     def getNormalizedTitle(self):
-        return normalizeString(self.title)
+        return normalizeString(self.getTitle())
+
+    def getTitle(self):
+        return self.title
+
+    def getTitleShortened(self):
+        return self.titleShortened
 
     def isValid(self):
         expireDatetime = self.getExpireDatetime()
@@ -124,6 +130,10 @@ class Coupon(Document):
             return '-' + f'{(1 - (self.price / self.priceCompare)) * 100:2.0f}'.replace('.', ',') + '%'
         elif self.staticReducedPercent is not None:  # Sometimes we don't have a compare-price but the reduce amount is pre-given via App-API.
             return '-' + f'{self.staticReducedPercent:2.0f}' + '%'
+        elif self.paybackMultiplicator is not None:
+            # 0.5 points per euro (= base discount of 0.5% without multiplicator)
+            paybackReducedPercent = (0.5 * self.paybackMultiplicator)
+            return '-' + f'{paybackReducedPercent:2.1f}' + '%'
         else:
             return fallback
 
@@ -137,7 +147,7 @@ class Coupon(Document):
          This might be useful in the future to e.g. find coupons that contain exactly the same products and cost the same price as others.
           Do NOT use this to compare multiple Coupon objects! Use couponDBGetUniqueIdentifier instead!
           """
-        return self.title.lower() + str(self.price)
+        return self.getTitle().lower() + str(self.price)
 
     def getImagePath(self) -> str:
         if self.imageURL.startswith('file://'):
@@ -162,7 +172,7 @@ class Coupon(Document):
         couponText = ''
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
-        couponText += self.getPLUOrUniqueID() + " | " + self.titleShortened
+        couponText += self.getPLUOrUniqueID() + " | " + self.getTitleShortened()
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -171,7 +181,7 @@ class Coupon(Document):
         couponText = ''
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
-        couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.titleShortened
+        couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.getTitleShortened()
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -181,7 +191,7 @@ class Coupon(Document):
             messageID) + "\">"
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
-        couponText += self.titleShortened + "</a>"
+        couponText += self.getTitleShortened() + "</a>"
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -191,7 +201,7 @@ class Coupon(Document):
         couponText = ''
         if self.isNewCoupon():
             couponText += SYMBOLS.NEW
-        couponText += self.title
+        couponText += self.getTitle()
         couponText += "\n<b>" + self.getPLUOrUniqueID() + "</b>"
         couponText = self.appendPriceInfoText(couponText)
         return couponText
@@ -203,7 +213,7 @@ class Coupon(Document):
             messageID) + "\">"
         if self.isNewCoupon():
             couponText += SYMBOLS.NEW
-        couponText += self.title
+        couponText += self.getTitle()
         couponText += "</a>"
         couponText += "\n<b>" + self.getPLUOrUniqueID() + "</b>"
         couponText = self.appendPriceInfoText(couponText)
@@ -217,11 +227,8 @@ class Coupon(Document):
         couponText = ''
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
-        couponText += self.title + '\n'
-        if self.plu is not None:
-            couponText += '<b>' + self.plu + '</b>' + ' | ' + self.id
-        else:
-            couponText += '<b>' + self.id + '</b>'
+        couponText += self.getTitle() + '\n'
+        couponText += self.getPLUInformationFormatted()
         couponText = self.appendPriceInfoText(couponText)
         """ Expire date should be always given but we can't be 100% sure! """
         expireDateFormatted = self.getExpireDateFormatted()
@@ -230,6 +237,13 @@ class Coupon(Document):
         if self.description is not None:
             couponText += "\n" + self.description
         return couponText
+
+    def getPLUInformationFormatted(self) -> str:
+        """ Returns e.g. <b>123</b> | 67407 """
+        if self.plu is not None and self.plu != self.id:
+            return '<b>' + self.plu + '</b>' + ' | ' + self.id
+        else:
+            return '<b>' + self.id + '</b>'
 
     def appendPriceInfoText(self, couponText: str) -> str:
         priceFormatted = self.getPriceFormatted()
@@ -273,7 +287,7 @@ class UserFavoritesInfo:
             for coupon in self.couponsUnavailable:
                 if len(unavailableFavoritesText) > 0:
                     unavailableFavoritesText += '\n'
-                unavailableFavoritesText += coupon.id + ' | ' + coupon.titleShortened
+                unavailableFavoritesText += coupon.id + ' | ' + coupon.getTitleShortened()
                 priceInfoText = coupon.getPriceInfoText()
                 if priceInfoText is not None:
                     unavailableFavoritesText += ' | ' + priceInfoText
@@ -284,9 +298,10 @@ class User(Document):
     settings = DictField(
         Mapping.build(
             displayQR=BooleanField(default=False),
-            displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
+            displayBKWebsiteURLs=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
+            displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
@@ -303,6 +318,12 @@ class User(Document):
             paybackCardNumber=TextField(),
             addedDate=DateTimeField()
         ))
+
+    def hasProbablyBlockedBot(self) -> bool:
+        if self.botBlockedCounter > 0:
+            return True
+        else:
+            return False
 
     def hasDefaultSettings(self) -> bool:
         for settingKey, settingValue in self["settings"].items():
@@ -540,6 +561,10 @@ USER_SETTINGS_ON_OFF = {
     },
     "displayFeedbackCodeGenerator": {
         "description": "Feedback Code Generator im Hauptmenü zeigen",
+        "default": True
+    },
+    "displayBKWebsiteURLs": {
+        "description": "BK Verlinkungen im Hauptmenü zeigen?",
         "default": True
     },
     "highlightFavoriteCouponsInButtonTexts": {

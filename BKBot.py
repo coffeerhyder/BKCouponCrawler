@@ -279,8 +279,9 @@ class BKBot:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         allButtons.append(
             [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS)])
-        allButtons.append(
-            [InlineKeyboardButton('Spar Kings', url=URLs.BK_SPAR_KINGS), InlineKeyboardButton('KING Finder', url=URLs.BK_KING_FINDER)])
+        if user.settings.displayBKWebsiteURLs:
+            allButtons.append(
+                [InlineKeyboardButton('Spar Kings', url=URLs.BK_SPAR_KINGS), InlineKeyboardButton('KING Finder', url=URLs.BK_KING_FINDER)])
         if user.settings.displayFeedbackCodeGenerator:
             allButtons.append([InlineKeyboardButton('Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
@@ -339,17 +340,21 @@ class BKBot:
         activeOffers = self.crawler.getOffersActive()
         numberofUsersWhoFoundEasterEgg = 0
         numberofFavorites = 0
+        numberofUsersWhoBlockedBot = 0
         for userID in userDB:
             userTmp = User.load(userDB, userID)
             if userTmp.hasFoundEasterEgg():
                 numberofUsersWhoFoundEasterEgg += 1
             numberofFavorites += len(userTmp.favoriteCoupons)
+            if userTmp.hasProbablyBlockedBot():
+                numberofUsersWhoBlockedBot += 1
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
         text = '<b>Hallo Nerd</b>'
         text += '\n<pre>'
         text += 'Anzahl User im Bot: ' + str(len(userDB))
         text += '\nAnzahl insgesamt von Usern gesetzte Favoriten: ' + str(numberofFavorites)
         text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(numberofUsersWhoFoundEasterEgg)
+        text += '\nAnzahl User, die den Bot geblockt haben: ' + str(numberofUsersWhoBlockedBot)
         text += '\nAnzahl Aufrufe Easter-Egg von dir: ' + str(user.easterEggCounter)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(activeOffers))
@@ -779,7 +784,7 @@ class BKBot:
     def generateCouponShortTextWithHyperlinkToChannelPost(self, coupon: Coupon, messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         text = "<b>" + coupon.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
-            messageID) + "\">" + coupon.titleShortened + "</a>"
+            messageID) + "\">" + coupon.getTitleShortened() + "</a>"
         priceFormatted = coupon.getPriceFormatted()
         if priceFormatted is not None:
             text += " | " + priceFormatted
