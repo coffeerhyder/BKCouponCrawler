@@ -607,7 +607,7 @@ class BKBot:
         text = "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
         for index in range(numberOfFeedbackCodesToGenerate):
             text += "\n" + generateFeedbackCode()
-        text += "\nSchreibe einen Code deiner Wahl auf die Rückseine eines BK Kassenbons, um den gratis Artikel zu erhalten."
+        text += "\nSchreibe einen Code deiner Wahl auf die Rückseite eines BK Kassenbons, um den gratis Artikel zu erhalten."
         text += "\nFalls weder Kassenbon noch Schamgefühl vorhanden sind, hier ein Trick:"
         text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ und lasse dir den Kassenbon geben."
         text += "\nDie Konditionen der Feedback Codes variieren."
