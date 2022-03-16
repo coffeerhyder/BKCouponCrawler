@@ -141,6 +141,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
+* Start-Script prüfen
 * Handling mit Datumsangaben verbessern
 * Bessere Produktnamen für Payback Coupons
 * isNew: Markierung von Coupons als "neu" und "ist wirklich neu" separieren?

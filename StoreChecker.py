@@ -3,7 +3,7 @@ from json import loads
 
 from hyper import HTTP20Connection
 
-from Crawler import HEADERS
+from Crawler import HEADERS_OLD
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
@@ -11,7 +11,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 """ Helper tools to find storeIDs of stores via which we can obtain a list of coupons via API. """
 conn = HTTP20Connection('api.burgerking.de')
 """ Returns List of stores """
-conn.request("GET", '/api/o2uvrPdUY57J5WwYs6NtzZ2Knk7TnAUY/v2/de/de/stores/', headers=HEADERS)
+conn.request("GET", '/api/o2uvrPdUY57J5WwYs6NtzZ2Knk7TnAUY/v2/de/de/stores/', headers=HEADERS_OLD)
 stores = loads(conn.get_response().read())
 
 storeIDsToCheck = []
@@ -44,7 +44,7 @@ for storeID in storeIDsToCheck:
         pass
     logging.info("Checking coupons of store " + str(index + 1) + " / " + str(len(storeIDsToCheck)) + " | " + str(storeID))
     conn = HTTP20Connection('mo.burgerking-app.eu')
-    conn.request("GET", '/api/v2/stores/' + str(storeID) + '/menu', headers=HEADERS)
+    conn.request("GET", '/api/v2/stores/' + str(storeID) + '/menu', headers=HEADERS_OLD)
     apiResponse = loads(conn.get_response().read())
     """ E.g. response for storeIDs without mobileOrdering: {"errors":[{"code":19,"message":"Record not found.","details":{"TillsterStore":null}}]} """
     coupons = apiResponse.get("coupons")
