@@ -18,7 +18,7 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 # [Zur Matrix Bridge](https://app.element.io/#/room/#BetterKingDE:matrix.org)
 
 # Installation
-1. ``git clone https://github.com/BetterKingBot/BKCouponCrawler.git``
+1. ``git clone https://github.com/coffeerhyder/BKCouponCrawler.git``
 2. ``apt install python3-pip``
 3. ``pip3 install -r requirements.txt``
 4. [CouchDB](https://linuxize.com/post/how-to-install-couchdb-on-ubuntu-20-04/) installieren und einrichten.  
@@ -192,7 +192,7 @@ Features:
 - Favoriten speichern & optionale Benachrichtigung bei Wiederverfügbarkeit
 - Kein Tracking
 - Offline verwendbar (sofern Bilder vorher geladen wurden)
-- Open source: github.com/BetterKingBot/BKCouponCrawler
+- Open source: github.com/coffeerhyder/BKCouponCrawler
 Made with ❤ and 🍻 during 😷
 ```
 
@@ -202,7 +202,7 @@ Burger King Coupons auf Telegram
 Made with ❤ and 🍻 during 😷
 Zum Bot: @BetterKingBot
 Kontakt: bkfeedback@pm.me
-Source: github.com/BetterKingBot/BKCouponCrawler
+Source: github.com/coffeerhyder/BKCouponCrawler
 ```
 
 ### Channel angepinnter Post mit Papiercoupons Datei & Verlinkung
@@ -246,7 +246,7 @@ Es gibt mehrere Möglichkeiten:
 - Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
 
 Wo finde ich den Quellcode?
-Hier: github.com/BetterKingBot/BKCouponCrawler
+Hier: github.com/coffeerhyder/BKCouponCrawler
 
 Wie kann ich Fehler melden oder Feedback einreichen?
 Per Mail: bkfeedback@pm.me
