@@ -18,7 +18,7 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 # [Zur Matrix Bridge](https://app.element.io/#/room/#BetterKingDE:matrix.org)
 
 # Installation
-1. ``git clone https://github.com/BetterKingBot/BKCouponCrawler.git``
+1. ``git clone https://github.com/coffeerhyder/BKCouponCrawler.git``
 2. ``apt install python3-pip``
 3. ``pip3 install -r requirements.txt``
 4. [CouchDB](https://linuxize.com/post/how-to-install-couchdb-on-ubuntu-20-04/) installieren und einrichten.  
@@ -141,6 +141,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
+* Start-Script prüfen
 * Handling mit Datumsangaben verbessern
 * Bessere Produktnamen für Payback Coupons
 * isNew: Markierung von Coupons als "neu" und "ist wirklich neu" separieren?
@@ -149,10 +150,9 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 * Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden) -> 02.03.2022: Wird auch von der Webseite verwendet: https://www.burgerking.de/rewards/offers
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
-* User, die den Bot geblockt haben keine Benachrichtigungen mehr versuchen zu schicken (könnte passieren, wenn ein User Favoriten speichert. Benachrichtigungen aktiviert und dannach den Bot blockiert, TG Exception Unauthorized)
-* Herausfinden, ob "Store-spezifische Coupons" offline vor Ort doch in allen Stores gehen oder die Akzeptanz gleich der der App ist
+* ~~Herausfinden, ob "Store-spezifische Coupons" offline vor Ort doch in allen Stores gehen oder die Akzeptanz gleich der der App ist (alte DB/API)~~
 * App DB per Proxy in der originalen BK App modifizieren?
-* App Coupons testen, die gerade nicht in der App sind aber noch gültig sein müssten
+* ~~App Coupons testen, die gerade nicht in der App sind aber noch gültig sein müssten (alte DB/API)~~
 
 # Feature Ideen
 * Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen sonst werden es über die Zeit immer mehr
@@ -192,7 +192,7 @@ Features:
 - Favoriten speichern & optionale Benachrichtigung bei Wiederverfügbarkeit
 - Kein Tracking
 - Offline verwendbar (sofern Bilder vorher geladen wurden)
-- Open source: github.com/BetterKingBot/BKCouponCrawler
+- Open source: github.com/coffeerhyder/BKCouponCrawler
 Made with ❤ and 🍻 during 😷
 ```
 
@@ -202,7 +202,7 @@ Burger King Coupons auf Telegram
 Made with ❤ and 🍻 during 😷
 Zum Bot: @BetterKingBot
 Kontakt: bkfeedback@pm.me
-Source: github.com/BetterKingBot/BKCouponCrawler
+Source: github.com/coffeerhyder/BKCouponCrawler
 ```
 
 ### Channel angepinnter Post mit Papiercoupons Datei & Verlinkung
@@ -246,7 +246,7 @@ Es gibt mehrere Möglichkeiten:
 - Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
 
 Wo finde ich den Quellcode?
-Hier: github.com/BetterKingBot/BKCouponCrawler
+Hier: github.com/coffeerhyder/BKCouponCrawler
 
 Wie kann ich Fehler melden oder Feedback einreichen?
 Per Mail: bkfeedback@pm.me

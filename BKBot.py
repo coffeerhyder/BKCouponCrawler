@@ -341,6 +341,7 @@ class BKBot:
         numberofUsersWhoFoundEasterEgg = 0
         numberofFavorites = 0
         numberofUsersWhoBlockedBot = 0
+        numberofUsersWhoAddedPaybackCard = 0
         for userID in userDB:
             userTmp = User.load(userDB, userID)
             if userTmp.hasFoundEasterEgg():
@@ -348,6 +349,8 @@ class BKBot:
             numberofFavorites += len(userTmp.favoriteCoupons)
             if userTmp.hasProbablyBlockedBot():
                 numberofUsersWhoBlockedBot += 1
+            if userTmp.getPaybackCardNumber() is not None:
+                numberofUsersWhoAddedPaybackCard += 1
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
         text = '<b>Hallo Nerd</b>'
         text += '\n<pre>'
@@ -355,6 +358,7 @@ class BKBot:
         text += '\nAnzahl insgesamt von Usern gesetzte Favoriten: ' + str(numberofFavorites)
         text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(numberofUsersWhoFoundEasterEgg)
         text += '\nAnzahl User, die den Bot geblockt haben: ' + str(numberofUsersWhoBlockedBot)
+        text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(numberofUsersWhoAddedPaybackCard)
         text += '\nAnzahl Aufrufe Easter-Egg von dir: ' + str(user.easterEggCounter)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(activeOffers))
@@ -603,7 +607,7 @@ class BKBot:
         text = "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
         for index in range(numberOfFeedbackCodesToGenerate):
             text += "\n" + generateFeedbackCode()
-        text += "\nSchreibe einen Code deiner Wahl auf die Rückseine eines BK Kassenbons, um den gratis Artikel zu erhalten."
+        text += "\nSchreibe einen Code deiner Wahl auf die Rückseite eines BK Kassenbons, um den gratis Artikel zu erhalten."
         text += "\nFalls weder Kassenbon noch Schamgefühl vorhanden sind, hier ein Trick:"
         text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ und lasse dir den Kassenbon geben."
         text += "\nDie Konditionen der Feedback Codes variieren."
