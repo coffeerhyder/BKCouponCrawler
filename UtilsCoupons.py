@@ -49,6 +49,8 @@ def couponGetTitleFull(coupon: dict) -> str:
         fixPreferSublineAsTitle2 = re.search(r'(?i)^Mach\'s\s*groß\s*zum\s*King\s*Menü$', title)
         # 2021-08-03
         fixPreferSublineAsTitle3 = re.search(r'(?i)^mit Käse$', title)
+        # 2022-04-23
+        fixPreferSublineAsTitle4 = re.search(r'(?i)^Im King Menü$', title)
         fixPlantBaseRubbish = re.search(r'(?i)^\*Pflanzlich basierte Geflügelalternative$', subline)
         if fixPreferSublineAsTitle:
             addedOrSwappedProducts = fixPreferSublineAsTitle.group(1)
@@ -58,6 +60,8 @@ def couponGetTitleFull(coupon: dict) -> str:
         elif fixPreferSublineAsTitle2:
             couponTitleFull = subline
         elif fixPreferSublineAsTitle3:
+            couponTitleFull = subline
+        elif fixPreferSublineAsTitle4:
             couponTitleFull = subline
         elif re.search(r'(?i)^\s*Im\s*großen\s*King\s*Men[uü]\s*$', title):  # 2021-04-13: More title corrections... (in this case, all info we need is in subline)
             couponTitleFull = subline
