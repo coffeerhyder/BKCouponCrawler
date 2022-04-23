@@ -541,11 +541,15 @@ class BKCrawler:
             # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
             pluCharMap = {}
             for uniqueCouponID, coupon in crawledCouponsDict.items():
+                # Skip coupons without plu
+                if coupon.plu is None:
+                    continue
                 # Make sure that we got a valid "paper PLU"
+                # TODO: Refactor this so we can get first letter of coupon PLU via e.g. Coupon.getFirstLetterOfPLU
                 pluRegEx = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
                 if pluRegEx:
                     pluCharMap.setdefault(pluRegEx.group(1).upper(), []).append(coupon)
-            # Remove all results that cannot be paper coupoons by length
+            # Remove all results that cannot be paper coupons by length
             for pluIdentifier, coupons in pluCharMap.copy().items():
                 if len(coupons) != 46 and len(coupons) != 47:
                     del pluCharMap[pluIdentifier]

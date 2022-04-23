@@ -11,7 +11,8 @@ from couchdb.mapping import TextField, FloatField, ListField, IntegerField, Bool
 from pydantic import BaseModel
 
 from CouponCategory import BotAllowedCouponSources, CouponSource
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, shortenProductNames
+
 
 class Coupon(Document):
     plu = TextField()
@@ -53,7 +54,9 @@ class Coupon(Document):
         return self.title
 
     def getTitleShortened(self):
+        # TODO: Make use of this everywhere
         return self.titleShortened
+        # return shortenProductNames(self.title)
 
     def isValid(self):
         expireDatetime = self.getExpireDatetime()
