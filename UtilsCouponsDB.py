@@ -300,7 +300,7 @@ class UserFavoritesInfo:
 class User(Document):
     settings = DictField(
         Mapping.build(
-            displayQR=BooleanField(default=False),
+            displayQR=BooleanField(default=True),
             displayBKWebsiteURLs=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
@@ -552,7 +552,7 @@ USER_SETTINGS_ON_OFF = {
     },
     "displayQR": {
         "description": "QR Codes zeigen",
-        "default": False
+        "default": True
     },
     "displayHiddenAppCouponsWithinGenericCategories": {
         "description": "Versteckte App Coupons in Kategorien zeigen*¹",

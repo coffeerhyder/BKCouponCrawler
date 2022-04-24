@@ -14,7 +14,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 def main():
     activePaperCouponInfo = getActivePaperCouponInfo()
     if len(activePaperCouponInfo) == 0:
-        logging.info("Failed to find any paper coupon candidates --> Cannot add additional information")
+        # logging.info("Failed to find any currently valid paper coupon candidates --> Cannot add additional information")
         return
     paperCouponConfig = loadPaperCouponConfigFile()
     for paperIdentifier in activePaperCouponInfo.keys():
