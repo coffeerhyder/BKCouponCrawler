@@ -5,8 +5,7 @@ from typing import Union
 
 from Helper import getDatetimeFromString, getDatetimeFromString2, getCurrentDate
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
+from BaseUtils import logging
 
 """ Class to work with json objects returned in array "coupons" of App API request. """
 

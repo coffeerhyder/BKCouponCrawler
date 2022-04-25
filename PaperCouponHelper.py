@@ -5,8 +5,7 @@ from datetime import datetime
 import BotUtils
 from Helper import saveJson, getTimezone, loadJson
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
+from BaseUtils import logging
 
 """ Helper to complete config file with data from 'paper_coupon_helper_ids.txt'. """
 

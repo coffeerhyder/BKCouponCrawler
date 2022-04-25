@@ -5,8 +5,7 @@ from hyper import HTTP20Connection
 
 from Crawler import HEADERS_OLD
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
+from BaseUtils import logging
 
 """ Helper tools to find storeIDs of stores via which we can obtain a list of coupons via API. """
 conn = HTTP20Connection('api.burgerking.de')

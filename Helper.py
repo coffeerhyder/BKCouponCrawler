@@ -189,8 +189,12 @@ def convertCouponAndOfferDateToGermanFormat(date: str) -> str:
     return formatDateGerman(getDatetimeFromString(date))
 
 
-def formatDateGerman(date: datetime) -> str:
-    """ Returns date in format: 13.10.2020 21:36 Uhr """
+def formatDateGerman(date: Union[datetime, float]) -> str:
+    """ Accepts timestamp as float or datetime instance.
+    Returns date in format: 13.10.2020 21:36 Uhr """
+    if isinstance(date, float):
+        # We want datetime
+        date = datetime.fromtimestamp(date, getTimezone())
     return date.strftime('%d.%m.%Y %H:%M Uhr')
 
 
@@ -341,3 +345,20 @@ def isValidImageFile(path: str) -> bool:
         return True
     except:
         return False
+
+
+# All CouponSources which will be used in our bot (will be displayed in bot menu as categories)
+class CouponSource:
+    UNKNOWN = -1
+    APP = 0
+    # APP_VALID_AFTER_DELETION = 1  # Deprecated!
+    # APP_SAME_CHAR_AS_CURRENT_APP_COUPONS = 2 # Deprecated!
+    PAPER = 3
+    PAPER_UNSAFE = 4
+    ONLINE_ONLY = 5
+    ONLINE_ONLY_STORE_SPECIFIC = 6  # Placeholder - not used
+    SPECIAL = 7
+    PAYBACK = 8
+
+
+BotAllowedCouponSources = [CouponSource.APP, CouponSource.PAPER, CouponSource.SPECIAL, CouponSource.PAYBACK]

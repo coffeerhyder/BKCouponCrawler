@@ -1,19 +1,9 @@
-from typing import Union
+from datetime import datetime
+from typing import Union, List
 
-from Helper import SYMBOLS
-
-
-class CouponSource:
-    UNKNOWN = -1
-    APP = 0
-    # APP_VALID_AFTER_DELETION = 1  # Deprecated!
-    # APP_SAME_CHAR_AS_CURRENT_APP_COUPONS = 2 # Deprecated!
-    PAPER = 3
-    PAPER_UNSAFE = 4
-    ONLINE_ONLY = 5
-    ONLINE_ONLY_STORE_SPECIFIC = 6  # Placeholder - not used
-    SPECIAL = 7
-    PAYBACK = 8
+from Helper import SYMBOLS, formatDateGerman, BotAllowedCouponSources, CouponSource
+from UtilsCouponsDB import Coupon
+from BaseUtils import *
 
 
 class CouponCategory:
@@ -21,6 +11,8 @@ class CouponCategory:
     def __init__(self, couponSrc: Union[CouponSource, int]):
         self.couponSource = couponSrc
         self.displayDescription = False  # Display description for this category in bot menu?
+        self.expireDatetimeLowest = None
+        self.expireDatetimeHighest = None
         self.numberofCouponsTotal = 0
         self.numberofCouponsHidden = 0
         self.numberofCouponsEatable = 0
@@ -94,6 +86,66 @@ class CouponCategory:
         else:
             return False
 
+    def getCategoryInfoText(self, withMenu: bool, includeHiddenCouponsInCount: bool) -> str:
+        if withMenu:
+            couponCount = self.numberofCouponsTotal
+            text = '<b>{couponCount} {couponCategoryName} verfügbar:</b>'
+        else:
+            couponCount = self.numberofCouponsTotal - self.numberofCouponsWithFriesOrCoke
+            text = '<b>{couponCount} {couponCategoryName} ohne Menü verfügbar:</b>'
+        if not includeHiddenCouponsInCount:
+            couponCount -= self.numberofCouponsHidden
+        text = text.format(couponCount=couponCount, couponCategoryName=self.namePluralWithoutSymbol)
+        text += '\n' + self.getExpireDateInfoText()
+        return text
 
-# All CouponSources which will be used in our bot (will be displayed in bot menu as categories)
-BotAllowedCouponSources = [CouponSource.APP, CouponSource.PAPER, CouponSource.SPECIAL, CouponSource.PAYBACK]
+    def getExpireDateInfoText(self) -> str:
+        if self.expireDatetimeLowest is None and self.expireDatetimeHighest is None:
+            return "Gültig bis: Unbekannt"
+        elif self.expireDatetimeLowest == self.expireDatetimeHighest:
+            return "Gültig bis: " + formatDateGerman(self.expireDatetimeLowest)
+        else:
+            return "Gültig bis mind. " + formatDateGerman(self.expireDatetimeLowest) + " max. " + formatDateGerman(self.expireDatetimeHighest)
+
+    def updateExpireDatetime(self, date: datetime):
+        """ Use this to find highest/lowest expire-date """
+        if self.expireDatetimeLowest is None and self.expireDatetimeHighest is None:
+            self.expireDatetimeLowest = date
+            self.expireDatetimeHighest = date
+        else:
+            if date < self.expireDatetimeLowest:
+                self.expireDatetimeLowest = date
+            elif date > self.expireDatetimeHighest:
+                self.expireDatetimeHighest = date
+        return None
+
+    def updateWithCouponInfo(self, couponOrCouponList: Union[Coupon, List[Coupon]]):
+        """ Updates category with information of given Coupon(s). """
+        if isinstance(couponOrCouponList, Coupon):
+            couponList = [couponOrCouponList]
+        else:
+            couponList = couponOrCouponList
+        for coupon in couponList:
+            if coupon.isValid():
+                self.setNumberofCouponsTotal(self.numberofCouponsTotal + 1)
+                if coupon.isHidden:
+                    self.setNumberofCouponsHidden(self.numberofCouponsHidden + 1)
+                if coupon.isEatable():
+                    self.setNumberofCouponsEatable(self.numberofCouponsEatable + 1)
+                if coupon.isNewCoupon():
+                    self.setNumberofCouponsNew(self.numberofCouponsNew + 1)
+                if coupon.isContainsFriesOrCoke():
+                    self.setNumberofCouponsWithFriesOrCoke(self.numberofCouponsWithFriesOrCoke + 1)
+                self.updateExpireDatetime(coupon.getExpireDatetime())
+        return None
+
+
+def getCouponCategory(coupons: list) -> CouponCategory:
+    """ Returns CouponCategory for given list of coupons. Assumes that this list only contains coupons of one category."""
+    mainCouponSource = coupons[0].source
+    category = CouponCategory(couponSrc=mainCouponSource)
+    for coupon in coupons:
+        # if coupon.source != mainCouponSource:
+        #    logging.warning("Given list of coupons contains multiple categories! Result will be wrong!!")
+        category.updateWithCouponInfo(coupon)
+    return category

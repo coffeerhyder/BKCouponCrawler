@@ -301,9 +301,9 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * Seit ca. September 2021 scheint die Vorbestellen Funktion bei allen BK Filialen entfernt worden zu sein. Kennt man die FilialIDs, die Vorbestellungen akzeptierten, kann man noch immer Coupons über den Endpoint abfragen.
 
 ### Danke an
-* [bkoder Projekt](https://github.com/3dik/bkoder)
-* [Blog Artikel 'Hack the Burger King'](https://edik.ch/posts/hack-the-burger-king.html)
-* [MyDealz BK PLU Sammlung](https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614)
+* https://github.com/3dik/bkoder
+* https://edik.ch/posts/hack-the-burger-king.html
+* https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
 * https://limits.tginfo.me/de-DE
 
 ### Kleine Linksammlung
@@ -315,7 +315,8 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * https://github.com/reteps/burger-king-api-wrapper
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
 * https://bk.eris.cc/ --> https://gist.github.com/printfuck
-* https://t.me/freecokebot
+* https://t.me/gimmecockbot (https://t.me/freecokebot)
+* https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot

@@ -15,18 +15,16 @@ from telegram.utils.types import ODVInput, FileInput
 
 from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel
 from BotUtils import *
-import logging
+from BaseUtils import *
 
 from Helper import *
 from Crawler import BKCrawler
 
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
     USER_SETTINGS_ON_OFF
-from CouponCategory import CouponCategory, BotAllowedCouponSources, CouponSource
+from CouponCategory import CouponCategory, getCouponCategory
+from Helper import BotAllowedCouponSources, CouponSource
 from UtilsOffers import offerGetImagePath
-
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
 
 class CouponDisplayMode:
@@ -256,7 +254,7 @@ class BKBot:
         allButtons.append([InlineKeyboardButton('Alle Coupons ohne Menü', callback_data=CouponCallbackVars.ALL_COUPONS_WITHOUT_MENU)])
         for couponSrc in BotAllowedCouponSources:
             # Only add buttons for coupon categories for which at least one coupon is available
-            couponCategory = self.crawler.cachedAvailableCouponCategories.get(couponSrc)
+            couponCategory = self.crawler.getCachedCouponCategory(couponSrc)
             if couponCategory is None:
                 continue
             elif couponSrc == CouponSource.PAYBACK and not user.settings.displayCouponCategoryPayback:
@@ -384,30 +382,39 @@ class BKBot:
                 # Display all coupons
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories))
+                couponCategoryDummy = getCouponCategory(coupons)
                 menuText = '<b>' + str(len(coupons)) + ' Coupons verfügbar:</b>'
+                menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                 # Display all coupons without menu
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
+                couponCategoryDummy = getCouponCategory(coupons)
                 menuText = '<b>' + str(len(coupons)) + ' Coupons ohne Menü verfügbar:</b>'
+                menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             elif mode == CouponDisplayMode.CATEGORY:
                 # Display all coupons of a particular category
                 couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=None,
                                                                isHidden=displayHiddenCouponsWithinOtherCategories))
-                menuText = '<b>' + str(len(coupons)) + ' ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' verfügbar:</b>'
+                couponCategory = getCouponCategory(coupons)
+                menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.CATEGORY_WITHOUT_MENU:
                 # Display all coupons of a particular category without menu
                 couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
-                menuText = '<b>' + str(len(coupons)) + ' ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' ohne Menü verfügbar:</b>'
+                couponCategory = getCouponCategory(coupons)
+                menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                 # Display all hidden App coupons (ONLY)
                 couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[CouponSource.APP], containsFriesAndCoke=None, isHidden=True))
+                couponCategoryDummy = getCouponCategory(coupons)
                 menuText = '<b>' + str(len(coupons)) + ' versteckte ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' verfügbar:</b>'
+                menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             elif mode == CouponDisplayMode.FAVORITES:
+                # TODO: Add expire-date for this "category" too
                 userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user)
                 coupons = userFavorites.couponsAvailable
                 highlightFavorites = False
@@ -1125,7 +1132,7 @@ class BKBot:
                         """ Add a separator so it is easier for the user to distinguish between coupons with- and without menu. 
                         This only works as "simple" as that because we pre-sorted these coupons!
                         """
-                        if not coupon.containsFriesOrCoke:
+                        if not coupon.isContainsFriesOrCoke():
                             listContainsAtLeastOneItemWithoutMenu = True
                         elif not hasAddedSeparatorAfterCouponsWithoutMenu and listContainsAtLeastOneItemWithoutMenu:
                             couponOverviewText += '\n<b>' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + couponCategory.namePluralWithoutSymbol + ' mit Menü' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + '</b>'

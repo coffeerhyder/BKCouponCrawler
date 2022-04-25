@@ -8,10 +8,9 @@ from telegram import InputMediaPhoto
 from telegram.error import BadRequest, Unauthorized
 
 from BotUtils import getBotImpressum
-from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs
+from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponSources
 
 from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter, sortCouponsByPrice, getCouponTitleMapping
-from CouponCategory import BotAllowedCouponSources
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
