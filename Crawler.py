@@ -15,7 +15,7 @@ import PaperCouponHelper
 from BotUtils import Config
 from Helper import *
 from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, \
-    isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, BotAllowedCouponSources, CouponSource
+    isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, BotAllowedCouponSources, CouponSource, Paths
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
@@ -478,7 +478,7 @@ class BKCrawler:
          This will only add VALID coupons to DB! """
         # First prepare extra coupons config because manual steps are involved to make this work
         PaperCouponHelper.main()
-        extraCouponData = loadJson(BotProperty.extraCouponConfigPath)
+        extraCouponData = loadJson(Paths.extraCouponConfigPath)
         extraCouponsJson = extraCouponData["extra_coupons"]
         extraCouponsToAdd = self.getValidExtraCoupons()
         for coupon in extraCouponsToAdd.values():
@@ -503,7 +503,7 @@ class BKCrawler:
 
     def getValidExtraCoupons(self) -> dict:
         PaperCouponHelper.main()
-        extraCouponData = loadJson(BotProperty.extraCouponConfigPath)
+        extraCouponData = loadJson(Paths.extraCouponConfigPath)
         extraCouponsJson = extraCouponData["extra_coupons"]
         validExtraCoupons = {}
         for extraCouponJson in extraCouponsJson:

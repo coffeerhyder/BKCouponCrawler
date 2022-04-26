@@ -272,7 +272,7 @@ class BKBot:
         allButtons.append(keyboardCouponsFavorites)
         if user.settings.displayCouponCategoryPayback:
             if user.getPaybackCardNumber() is None:
-                allButtons.append([InlineKeyboardButton(SYMBOLS.NEW + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
+                allButtons.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
             else:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         allButtons.append(
@@ -446,7 +446,7 @@ class BKBot:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' / ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
             couponCategoryDummy = getCouponCategory(userFavoritesInfo.couponsAvailable)
             totalPrice = couponCategoryDummy.getTotalPrice()
-            if totalPrice > 0:
+            if couponCategoryDummy.getNumberofCouponsEatableWithPrice() > 0:
                 menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalPrice)
                 if couponCategoryDummy.getNumberofCouponsEatableWithoutPrice() > 0:
                     menuText += "*\n* außer " + str(couponCategoryDummy.getNumberofCouponsEatableWithoutPrice()) + " Coupons, deren Preis nicht bekannt ist."
@@ -643,7 +643,7 @@ class BKBot:
                 else:
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         if user.getPaybackCardNumber() is None:
-            keyboard.append([InlineKeyboardButton(SYMBOLS.NEW + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
+            keyboard.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
         else:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"

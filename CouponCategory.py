@@ -16,7 +16,7 @@ class CouponCategory:
         self.numberofCouponsTotal = 0
         self.numberofCouponsHidden = 0
         self.numberofCouponsEatable = 0
-        self.numberofCouponsEatableWithoutPrice = 0
+        self.numberofCouponsEatableWithPrice = 0
         self.numberofCouponsNew = 0
         self.numberofCouponsWithFriesOrCoke = 0
         self.totalPrice = 0
@@ -69,8 +69,11 @@ class CouponCategory:
     def getTotalPrice(self) -> float:
         return self.totalPrice
 
+    def getNumberofCouponsEatableWithPrice(self) -> int:
+        return self.numberofCouponsEatableWithPrice
+
     def getNumberofCouponsEatableWithoutPrice(self) -> int:
-        return self.numberofCouponsEatableWithoutPrice
+        return self.numberofCouponsEatable - self.numberofCouponsEatableWithPrice
 
     def setNumberofCouponsTotal(self, newNumber: int):
         self.numberofCouponsTotal = newNumber
@@ -81,8 +84,8 @@ class CouponCategory:
     def setNumberofCouponsEatable(self, newNumber: int):
         self.numberofCouponsEatable = newNumber
 
-    def setNumberofCouponsEatableWithoutPrice(self, newNumber: int):
-        self.numberofCouponsEatableWithoutPrice = newNumber
+    def setNumberofCouponsEatableWithPrice(self, newNumber: int):
+        self.numberofCouponsEatableWithPrice = newNumber
 
     def setNumberofCouponsNew(self, newNumber: int):
         self.numberofCouponsNew = newNumber
@@ -119,7 +122,7 @@ class CouponCategory:
         elif self.expireDatetimeLowest == self.expireDatetimeHighest:
             return "Gültig bis " + formatDateGerman(self.expireDatetimeLowest)
         else:
-            return "Gültig bis mind. " + formatDateGerman(self.expireDatetimeLowest) + " max. " + formatDateGerman(self.expireDatetimeHighest)
+            return "Gültig bis min " + formatDateGerman(self.expireDatetimeLowest) + " max " + formatDateGerman(self.expireDatetimeHighest)
 
     def updateWithCouponInfo(self, couponOrCouponList: Union[Coupon, List[Coupon]]):
         """ Updates category with information of given Coupon(s). """
@@ -148,21 +151,17 @@ class CouponCategory:
                         self.expireDatetimeLowest = date
                     elif date > self.expireDatetimeHighest:
                         self.expireDatetimeHighest = date
-                price = coupon.getPrice()
-                if price is not None:
-                    self.setTotalPrice(self.getTotalPrice() + price)
-                elif coupon.isEatable():
-                    self.numberofCouponsEatableWithoutPrice += 1
+                if coupon.getPrice() is not None:
+                    self.setTotalPrice(self.getTotalPrice() + coupon.getPrice())
+                    self.setNumberofCouponsEatableWithPrice(self.getNumberofCouponsEatableWithPrice() + 1)
         return None
 
 
 def getCouponCategory(coupons: list) -> CouponCategory:
-    """ Returns CouponCategory for given list of coupons. Assumes that this list only contains coupons of one
+    """ Returns CouponCategory for given list of coupons.Assumes that this list only contains coupons of one
     category. """
     mainCouponSource = coupons[0].source
     category = CouponCategory(couponSrc=mainCouponSource)
     for coupon in coupons:
-        # if coupon.source != mainCouponSource:
-        #    logging.warning("Given list of coupons contains multiple categories! Result will be wrong!!")
         category.updateWithCouponInfo(coupon)
     return category

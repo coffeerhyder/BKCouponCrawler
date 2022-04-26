@@ -9,8 +9,6 @@ import pytz
 import simplejson as json
 from PIL import Image
 
-from BotUtils import BotProperty
-
 
 class DATABASES:
     """ Names of all databases used in this project. """
@@ -38,9 +36,9 @@ class URLs:
 
 def loadConfig(fallback: str = None):
     try:
-        return loadJson(BotProperty.configPath)
+        return loadJson(Paths.configPath)
     except:
-        print('Failed to load ' + BotProperty.configPath)
+        print('Failed to load ' + Paths.configPath)
         return fallback
 
 
@@ -235,6 +233,7 @@ class SYMBOLS:
     CONFIRM = '✅'
     DENY = '🚫'
     DENY2 = '❌'
+    FLAG_UA = '🇺🇦'
     THUMBS_UP = '👍'
     THUMBS_DOWN = '👎'
     ARROW_RIGHT = '➡'
@@ -257,6 +256,7 @@ class SYMBOLS:
     GHOST = '👻'
     GIFT = '🎁'
     PARK = '🅿️'
+    CIRLCE_BLUE = '🔵'
 
 
 def getFilenameFromURL(url: str) -> str:
@@ -360,3 +360,9 @@ class CouponSource:
 
 
 BotAllowedCouponSources = [CouponSource.APP, CouponSource.PAPER, CouponSource.SPECIAL, CouponSource.PAYBACK]
+
+
+class Paths:
+    configPath = 'config.json'
+    paperCouponExtraDataPath = 'config_paper_coupons.json'
+    extraCouponConfigPath = 'config_extra_coupons.json'

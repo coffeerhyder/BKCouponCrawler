@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 
 import BotUtils
+import Helper
 from Helper import saveJson, getTimezone, loadJson
 
 from BaseUtils import logging
@@ -73,7 +74,7 @@ def main():
 
     # paperCouponConfig[paperChar]['mapping'] = mapping
     # Update our config file accordingly
-    saveJson(BotUtils.BotProperty.paperCouponExtraDataPath, paperCouponConfig)
+    saveJson(Helper.Paths.paperCouponExtraDataPath, paperCouponConfig)
 
 
 if __name__ == "__main__":
@@ -93,4 +94,4 @@ def getActivePaperCouponInfo() -> dict:
 
 
 def loadPaperCouponConfigFile() -> dict:
-    return loadJson(BotUtils.BotProperty.paperCouponExtraDataPath)
+    return loadJson(Helper.Paths.paperCouponExtraDataPath)
