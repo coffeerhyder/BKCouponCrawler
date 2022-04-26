@@ -414,7 +414,6 @@ class BKBot:
                 menuText = '<b>' + str(len(coupons)) + ' versteckte ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' verfügbar:</b>'
                 menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             elif mode == CouponDisplayMode.FAVORITES:
-                # TODO: Add expire-date for this "category" too
                 userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user)
                 coupons = userFavorites.couponsAvailable
                 highlightFavorites = False
@@ -445,17 +444,14 @@ class BKBot:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
             else:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' / ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
-            numberofEatableCouponsWithoutPrice = 0
-            totalPrice = 0
-            for coupon in userFavoritesInfo.couponsAvailable:
-                if coupon.price is not None:
-                    totalPrice += coupon.price
-                elif coupon.isEatable():
-                    numberofEatableCouponsWithoutPrice += 1
+            couponCategoryDummy = getCouponCategory(userFavoritesInfo.couponsAvailable)
+            totalPrice = couponCategoryDummy.getTotalPrice()
             if totalPrice > 0:
                 menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalPrice)
-                if numberofEatableCouponsWithoutPrice > 0:
-                    menuText += "*\n* exklusive " + str(numberofEatableCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
+                if couponCategoryDummy.getNumberofCouponsEatableWithoutPrice() > 0:
+                    menuText += "*\n* außer " + str(couponCategoryDummy.getNumberofCouponsEatableWithoutPrice()) + " Coupons, deren Preis nicht bekannt ist."
+            menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
+
             if len(userFavoritesInfo.couponsUnavailable) > 0:
                 menuText += '\n' + SYMBOLS.WARNING + str(len(userFavoritesInfo.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
                 menuText += '\n' + userFavoritesInfo.getUnavailableFavoritesText()

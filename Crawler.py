@@ -547,14 +547,10 @@ class BKCrawler:
             # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
             pluCharMap = {}
             for uniqueCouponID, coupon in crawledCouponsDict.items():
-                # Skip coupons without plu
-                if coupon.plu is None:
-                    continue
-                # Make sure that we got a valid "paper PLU"
-                # TODO: Refactor this so we can get first letter of coupon PLU via e.g. Coupon.getFirstLetterOfPLU
-                pluRegEx = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
-                if pluRegEx:
-                    pluCharMap.setdefault(pluRegEx.group(1).upper(), []).append(coupon)
+                # Check if we got a valid "paper PLU"
+                firstLetterOfPLU = coupon.getFirstLetterOfPLU()
+                if firstLetterOfPLU is not None:
+                    pluCharMap.setdefault(firstLetterOfPLU, []).append(coupon)
             # Remove all results that cannot be paper coupons by length
             for pluIdentifier, coupons in pluCharMap.copy().items():
                 if len(coupons) != 46 and len(coupons) != 47:
@@ -661,7 +657,7 @@ class BKCrawler:
                 originalPrice = None
                 for coupon in couponsContainingSameProducts:
                     if originalPrice is None:
-                        originalPrice = coupon.priceCompare
+                        originalPrice = coupon.getPriceCompare()
                 if originalPrice is not None:
                     for coupon in couponsContainingSameProducts:
                         if coupon.priceCompare is None:
@@ -1030,7 +1026,7 @@ class BKCrawler:
                     continue
                 writer.writerow({'Produkt': coupon.getTitle(), 'Menü': coupon.isContainsFriesOrCoke(),
                                  'PLU': coupon.plu, 'PLU2': coupon.id,
-                                 'Preis': coupon.price, 'OPreis': coupon.get(Coupon.priceCompare.name, -1),
+                                 'Preis': coupon.getPrice(), 'OPreis': coupon.get(Coupon.priceCompare.name, -1),
                                  'Ablaufdatum': coupon.getExpireDateFormatted()
                                  })
 

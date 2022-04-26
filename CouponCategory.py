@@ -16,8 +16,10 @@ class CouponCategory:
         self.numberofCouponsTotal = 0
         self.numberofCouponsHidden = 0
         self.numberofCouponsEatable = 0
+        self.numberofCouponsEatableWithoutPrice = 0
         self.numberofCouponsNew = 0
         self.numberofCouponsWithFriesOrCoke = 0
+        self.totalPrice = 0
         if couponSrc == CouponSource.APP:
             self.nameSingular = "App Coupon"
             self.namePlural = "App Coupons"
@@ -64,6 +66,12 @@ class CouponCategory:
         else:
             return False
 
+    def getTotalPrice(self) -> float:
+        return self.totalPrice
+
+    def getNumberofCouponsEatableWithoutPrice(self) -> int:
+        return self.numberofCouponsEatableWithoutPrice
+
     def setNumberofCouponsTotal(self, newNumber: int):
         self.numberofCouponsTotal = newNumber
 
@@ -73,11 +81,17 @@ class CouponCategory:
     def setNumberofCouponsEatable(self, newNumber: int):
         self.numberofCouponsEatable = newNumber
 
+    def setNumberofCouponsEatableWithoutPrice(self, newNumber: int):
+        self.numberofCouponsEatableWithoutPrice = newNumber
+
     def setNumberofCouponsNew(self, newNumber: int):
         self.numberofCouponsNew = newNumber
 
     def setNumberofCouponsWithFriesOrCoke(self, newNumber: int):
         self.numberofCouponsWithFriesOrCoke = newNumber
+
+    def setTotalPrice(self, newPrice: float):
+        self.totalPrice = newPrice
 
     def isEatable(self) -> bool:
         """ Typically all coupon categories except Payback coupons will return True here as they do contain at least one item that is considered 'eatable'. """
@@ -100,24 +114,12 @@ class CouponCategory:
         return text
 
     def getExpireDateInfoText(self) -> str:
-        if self.expireDatetimeLowest is None and self.expireDatetimeHighest is None:
-            return "Gültig bis: Unbekannt"
+        if self.expireDatetimeLowest is None or self.expireDatetimeHighest is None:
+            return "Gültig bis ??"
         elif self.expireDatetimeLowest == self.expireDatetimeHighest:
-            return "Gültig bis: " + formatDateGerman(self.expireDatetimeLowest)
+            return "Gültig bis " + formatDateGerman(self.expireDatetimeLowest)
         else:
             return "Gültig bis mind. " + formatDateGerman(self.expireDatetimeLowest) + " max. " + formatDateGerman(self.expireDatetimeHighest)
-
-    def updateExpireDatetime(self, date: datetime):
-        """ Use this to find highest/lowest expire-date """
-        if self.expireDatetimeLowest is None and self.expireDatetimeHighest is None:
-            self.expireDatetimeLowest = date
-            self.expireDatetimeHighest = date
-        else:
-            if date < self.expireDatetimeLowest:
-                self.expireDatetimeLowest = date
-            elif date > self.expireDatetimeHighest:
-                self.expireDatetimeHighest = date
-        return None
 
     def updateWithCouponInfo(self, couponOrCouponList: Union[Coupon, List[Coupon]]):
         """ Updates category with information of given Coupon(s). """
@@ -136,12 +138,27 @@ class CouponCategory:
                     self.setNumberofCouponsNew(self.numberofCouponsNew + 1)
                 if coupon.isContainsFriesOrCoke():
                     self.setNumberofCouponsWithFriesOrCoke(self.numberofCouponsWithFriesOrCoke + 1)
-                self.updateExpireDatetime(coupon.getExpireDatetime())
+                # Update expire-date info
+                date = coupon.getExpireDatetime()
+                if self.expireDatetimeLowest is None and self.expireDatetimeHighest is None:
+                    self.expireDatetimeLowest = date
+                    self.expireDatetimeHighest = date
+                else:
+                    if date < self.expireDatetimeLowest:
+                        self.expireDatetimeLowest = date
+                    elif date > self.expireDatetimeHighest:
+                        self.expireDatetimeHighest = date
+                price = coupon.getPrice()
+                if price is not None:
+                    self.setTotalPrice(self.getTotalPrice() + price)
+                elif coupon.isEatable():
+                    self.numberofCouponsEatableWithoutPrice += 1
         return None
 
 
 def getCouponCategory(coupons: list) -> CouponCategory:
-    """ Returns CouponCategory for given list of coupons. Assumes that this list only contains coupons of one category."""
+    """ Returns CouponCategory for given list of coupons. Assumes that this list only contains coupons of one
+    category. """
     mainCouponSource = coupons[0].source
     category = CouponCategory(couponSrc=mainCouponSource)
     for coupon in coupons:

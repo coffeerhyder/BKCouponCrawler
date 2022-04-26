@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from datetime import datetime
 from enum import Enum
 from io import BytesIO
@@ -48,6 +49,16 @@ class Coupon(Document):
         else:
             return self.id
 
+    def getFirstLetterOfPLU(self) -> Union[str, None]:
+        """ Returns first letter of PLU if PLU is given and starts with a single letter followed by numbers-only. """
+        if self.plu is None:
+            return None
+        # Paper coupons usually only contain one char followed by a 1-2 digit number.
+        pluRegEx = re.compile(r'(?i)^([A-Z])\d+$').search(self.plu)
+        if not pluRegEx:
+            return None
+        return pluRegEx.group(1).upper()
+
     def getNormalizedTitle(self):
         return normalizeString(self.getTitle())
 
@@ -82,6 +93,14 @@ class Coupon(Document):
             return True
         else:
             return False
+
+    def getPrice(self) -> Union[float, None]:
+        # TODO: Make use of this
+        return self.price
+
+    def getPriceCompare(self) -> Union[float, None]:
+        # TODO: Make use of this
+        return self.priceCompare
 
     def isEatable(self) -> bool:
         """ If the product(s) this coupon provide(s) is/are not eatable and e.g. just probide a discount like Payback coupons, this will return False, else True. """
@@ -139,16 +158,18 @@ class Coupon(Document):
             return fallback
 
     def getPriceCompareFormatted(self, fallback=None) -> Union[str, None]:
-        if self.priceCompare is not None:
-            return getFormattedPrice(self.priceCompare)
+        priceCompare = self.getPriceCompare()
+        if priceCompare is not None:
+            return getFormattedPrice(priceCompare)
         else:
             return fallback
 
     def getReducedPercentageFormatted(self, fallback=None) -> Union[str, None]:
         """ Returns price reduction in percent if bothb the original price and the reduced/coupon-price are available.
          E.g. "-39%" """
-        if self.price is not None and self.priceCompare is not None:
-            return '-' + f'{(1 - (self.price / self.priceCompare)) * 100:2.0f}'.replace('.', ',') + '%'
+        priceCompare = self.getPriceCompare()
+        if self.price is not None and priceCompare is not None:
+            return '-' + f'{(1 - (self.price / priceCompare)) * 100:2.0f}'.replace('.', ',') + '%'
         elif self.staticReducedPercent is not None:  # Sometimes we don't have a compare-price but the reduce amount is pre-given via App-API.
             return '-' + f'{self.staticReducedPercent:2.0f}' + '%'
         elif self.paybackMultiplicator is not None:
