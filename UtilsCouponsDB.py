@@ -12,8 +12,8 @@ from couchdb.mapping import TextField, FloatField, ListField, IntegerField, Bool
     DateTimeField
 from pydantic import BaseModel
 
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, shortenProductNames, \
-    formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponSources, CouponSource
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponSources, CouponSource, \
+    formatPrice
 
 
 class Coupon(Document):
@@ -153,14 +153,14 @@ class Coupon(Document):
 
     def getPriceFormatted(self, fallback=None) -> Union[str, None]:
         if self.price is not None:
-            return getFormattedPrice(self.price)
+            return formatPrice(self.price)
         else:
             return fallback
 
     def getPriceCompareFormatted(self, fallback=None) -> Union[str, None]:
         priceCompare = self.getPriceCompare()
         if priceCompare is not None:
-            return getFormattedPrice(priceCompare)
+            return formatPrice(priceCompare)
         else:
             return fallback
 
@@ -539,10 +539,6 @@ def getImageBasePath() -> str:
     return "crawler/images/couponsproductive"
 
 
-def getFormattedPrice(price: float) -> str:
-    return f'{(price / 100):2.2f}'.replace('.', ',') + '€'
-
-
 def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
     """ Returns the total summed price of a list of coupons. """
     totalSum = 0
@@ -553,15 +549,17 @@ def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
 
 
 def getCouponsSeparatedByType(coupons: dict) -> dict:
+    """ Returns dict containing lists of coupons by type """
     couponsSeparatedByType = {}
     for couponSource in BotAllowedCouponSources:
         couponsTmp = list(filter(lambda x: x[Coupon.source.name] == couponSource, list(coupons.values())))
-        couponsSeparatedByType[couponSource] = couponsTmp
+        if couponsTmp is not None and len(couponsTmp) > 0:
+            couponsSeparatedByType[couponSource] = couponsTmp
     return couponsSeparatedByType
 
 
 def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:
-    # Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list.
+    """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
     return sorted(couponList,
                   key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
 

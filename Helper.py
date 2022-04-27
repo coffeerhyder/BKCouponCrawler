@@ -2,6 +2,7 @@ import os
 import random
 import re
 from datetime import datetime, timedelta
+from enum import Enum
 from re import Pattern
 from typing import Union
 
@@ -346,7 +347,7 @@ def isValidImageFile(path: str) -> bool:
 
 
 # All CouponSources which will be used in our bot (will be displayed in bot menu as categories)
-class CouponSource:
+class CouponSource():
     UNKNOWN = -1
     APP = 0
     # APP_VALID_AFTER_DELETION = 1  # Deprecated!
@@ -366,3 +367,7 @@ class Paths:
     configPath = 'config.json'
     paperCouponExtraDataPath = 'config_paper_coupons.json'
     extraCouponConfigPath = 'config_extra_coupons.json'
+
+
+def formatPrice(price: float) -> str:
+    return f'{(price / 100):2.2f}'.replace('.', ',') + '€'

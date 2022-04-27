@@ -142,18 +142,17 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 
 # TODOs
 * Start-Script prüfen
-* /stats Command fixen
+* /stats Command fixen --> "Payback Workaround" entfernen/verbessern
 * Handling mit Datumsangaben verbessern
-* Bessere Produktnamen für Payback Coupons
-* isNew: Markierung von Coupons als "neu" und "ist wirklich neu" separieren?
+* Produktnamen-Handling für Payback Coupons generischer gestalten
+* isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
 * Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden) -> 02.03.2022: Wird auch von der Webseite verwendet: https://www.burgerking.de/rewards/offers
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
-* ~~Herausfinden, ob "Store-spezifische Coupons" offline vor Ort doch in allen Stores gehen oder die Akzeptanz gleich der der App ist (alte DB/API)~~
 * App DB per Proxy in der originalen BK App modifizieren?
-* ~~App Coupons testen, die gerade nicht in der App sind aber noch gültig sein müssten (alte DB/API)~~
+* Herausfinden, ob es Store-spezifische Coupons gibt
 
 # Feature Ideen
 * Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen sonst werden es über die Zeit immer mehr

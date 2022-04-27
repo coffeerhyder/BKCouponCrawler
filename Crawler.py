@@ -1037,7 +1037,8 @@ class BKCrawler:
         for couponID in couponDB:
             coupon = Coupon.load(couponDB, couponID)
             if coupon.isValid():
-                category = newCachedAvailableCouponCategories.setdefault(coupon.source, CouponCategory(couponSrc=coupon.source))
+                category = newCachedAvailableCouponCategories.setdefault(coupon.source, CouponCategory(
+                    parameter=coupon.source))
                 category.updateWithCouponInfo(coupon)
         # Overwrite old cache
         self.cachedAvailableCouponCategories = newCachedAvailableCouponCategories
