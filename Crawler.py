@@ -14,17 +14,16 @@ from json import loads
 import PaperCouponHelper
 from BotUtils import Config
 from Helper import *
-from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, isCouponShortPLUWithAtLeastOneLetter, isValidImageFile
+from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, \
+    isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, BotAllowedCouponSources, CouponSource, Paths
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponGetStartTimestamp
 from UtilsCouponsDB import getImageBasePath, \
-    Coupon, User, InfoEntry, CouponSortMode, sortCouponsByPrice, CouponFilter, getCouponTitleMapping
-from CouponCategory import CouponSource, BotAllowedCouponSources, CouponCategory
+    Coupon, InfoEntry, CouponSortMode, sortCouponsByPrice, CouponFilter, getCouponTitleMapping
+from CouponCategory import CouponCategory
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
 HEADERS_OLD = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36",
            "Origin": "https://www.burgerking.de",
@@ -58,14 +57,13 @@ class BKCrawler:
         self.storeCouponAPIDataAsJson = False
         self.exportCSVs = False
         self.missingPaperCouponPLUs = []
-        self.hasUndefinedMissingPaperCoupons = False
         # Create required DBs
         if DATABASES.INFO_DB not in self.couchdb:
             logging.info("Creating missing DB: " + DATABASES.INFO_DB)
             infoDB = self.couchdb.create(DATABASES.INFO_DB)
         else:
             infoDB = self.couchdb[DATABASES.INFO_DB]
-        # Special case: We not only need to make sure that this DB exists but also need to add this special doc
+        # Special case: Not only do we need to make sure that this DB exists but also need to add this special doc
         if DATABASES.INFO_DB not in infoDB:
             infoDoc = InfoEntry(id=DATABASES.INFO_DB)
             infoDoc.store(self.couchdb[DATABASES.INFO_DB])
@@ -103,7 +101,7 @@ class BKCrawler:
         if not os.path.exists(getPathImagesProducts()):
             logging.info("Creating missing filepath: " + getPathImagesProducts())
             os.makedirs(getPathImagesProducts())
-        # Do this here so manually added coupons will get added without extra crawl process
+        # Do this here so manually added coupons will get added on application start without extra crawl process
         self.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=True)
         # Make sure that our cache gets filled on init
         couponDB = self.getCouponDB()
@@ -185,20 +183,21 @@ class BKCrawler:
         pass
 
     def crawlAndProcessData(self):
-        """ One function that does it all! Launch this every time you run the crawler. """
-        # Use last state so we can compare them against the new data
-        timestampStart = datetime.now().timestamp()
-        self.migrateDBs()
-        self.crawl()
-        if self.exportCSVs:
-            self.couponCsvExport()
-            self.couponCsvExport2()
-        self.downloadProductiveCouponDBImagesAndCreateQRCodes()
-        # self.checkProductiveCouponsDBImagesIntegrity()
-        # self.checkProductiveOffersDBImagesIntegrity()
-        self.checkProductiveCouponDBForAnomalies()
-        self.updateCache(self.getCouponDB())
-        logging.info("Total crawl duration: " + getFormattedPassedTime(timestampStart))
+        """ One function that does it all! Execute this every time you run the crawler. """
+        try:
+            timestampStart = datetime.now().timestamp()
+            self.migrateDBs()
+            self.crawl()
+            if self.exportCSVs:
+                self.couponCsvExport()
+                self.couponCsvExport2()
+            self.downloadProductiveCouponDBImagesAndCreateQRCodes()
+            # self.checkProductiveCouponsDBImagesIntegrity()
+            # self.checkProductiveOffersDBImagesIntegrity()
+            self.checkProductiveCouponDBForAnomalies()
+            logging.info("Total crawl duration: " + getFormattedPassedTime(timestampStart))
+        finally:
+            self.updateCache(self.getCouponDB())
 
     def crawlCoupons1New(self, crawledCouponsDict: dict):
         """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
@@ -260,7 +259,7 @@ class BKCrawler:
             timestampStart = couponGetStartTimestamp(coupon)
             if timestampStart > -1:
                 newCoupon.timestampStart = timestampStart
-                newCoupon.dateFormattedStart = formatDateGerman(datetime.fromtimestamp(timestampStart, getTimezone()))
+                newCoupon.dateFormattedStart = formatDateGerman(datetime.fromtimestamp(timestampStart))
             newCoupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(titleFull)
             newCoupon.imageURL = couponOrOfferGetImageURL(coupon)
             # price_text could be either e.g. "50%" or "2,99€" -> We want to find the price otherwise that is worthless for us!
@@ -475,28 +474,15 @@ class BKCrawler:
         logging.info("API Crawling 2 done | Total coupons2 crawl time: " + getFormattedPassedTime(timestampStart))
 
     def addExtraCoupons(self, crawledCouponsDict: dict, immediatelyAddToDB: bool):
-        """ Adds extra coupons which have been manually put in config_extra_coupons.json.
-         Make sure to execute this AFTER DB cleanup so this can set IS_NEW flags without them being removed immediately afterwards!
+        """ Adds extra coupons which have been manually added to config_extra_coupons.json.
          This will only add VALID coupons to DB! """
         # First prepare extra coupons config because manual steps are involved to make this work
         PaperCouponHelper.main()
-        extraCouponData = loadJson(BotProperty.extraCouponConfigPath)
+        extraCouponData = loadJson(Paths.extraCouponConfigPath)
         extraCouponsJson = extraCouponData["extra_coupons"]
-        extraCouponsToAdd = {}
-        for extraCouponJson in extraCouponsJson:
-            coupon = Coupon.wrap(extraCouponJson)
-            coupon.id = coupon.uniqueID  # Set custom uniqueID otherwise couchDB will create one later -> This is not what we want to happen!!
-            coupon.title = sanitizeCouponTitle(coupon.title)
-            coupon.titleShortened = shortenProductNames(coupon.title)
-            coupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(coupon.title)
-            expiredateStr = extraCouponJson["expire_date"] + " 23:59:59"
-            expiredate = datetime.strptime(expiredateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
-            coupon.timestampExpire = expiredate.timestamp()
-            coupon.dateFormattedExpire = formatDateGerman(expiredate)
-            # Only add coupon if it is valid
-            if coupon.isValid():
-                extraCouponsToAdd[coupon.uniqueID] = coupon
-                crawledCouponsDict[coupon.uniqueID] = coupon
+        extraCouponsToAdd = self.getValidExtraCoupons()
+        for coupon in extraCouponsToAdd.values():
+            crawledCouponsDict[coupon.uniqueID] = coupon
         if immediatelyAddToDB and len(extraCouponsToAdd) > 0:
             # Add items to DB
             couponDB = self.getCouponDB()
@@ -514,6 +500,26 @@ class BKCrawler:
                 logging.info("Pushed " + str(len(dbUpdates)) + " extra coupons DB updates")
                 # Important!
                 self.downloadProductiveCouponDBImagesAndCreateQRCodes()
+
+    def getValidExtraCoupons(self) -> dict:
+        PaperCouponHelper.main()
+        extraCouponData = loadJson(Paths.extraCouponConfigPath)
+        extraCouponsJson = extraCouponData["extra_coupons"]
+        validExtraCoupons = {}
+        for extraCouponJson in extraCouponsJson:
+            coupon = Coupon.wrap(extraCouponJson)
+            coupon.id = coupon.uniqueID  # Set custom uniqueID otherwise couchDB will create one later -> This is not what we want to happen!!
+            coupon.title = sanitizeCouponTitle(coupon.title)
+            coupon.titleShortened = shortenProductNames(coupon.title)
+            coupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(coupon.title)
+            expiredateStr = extraCouponJson["expire_date"] + " 23:59:59"
+            expiredate = datetime.strptime(expiredateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
+            coupon.timestampExpire = expiredate.timestamp()
+            coupon.dateFormattedExpire = formatDateGerman(expiredate)
+            # Only add coupon if it is valid
+            if coupon.isValid():
+                validExtraCoupons[coupon.uniqueID] = coupon
+        return validExtraCoupons
 
     def processCrawledCoupons(self, crawledCouponsDict: dict):
         """ Process crawled coupons: Apply necessary corrections and update DB. """
@@ -541,14 +547,10 @@ class BKCrawler:
             # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
             pluCharMap = {}
             for uniqueCouponID, coupon in crawledCouponsDict.items():
-                # Skip coupons without plu
-                if coupon.plu is None:
-                    continue
-                # Make sure that we got a valid "paper PLU"
-                # TODO: Refactor this so we can get first letter of coupon PLU via e.g. Coupon.getFirstLetterOfPLU
-                pluRegEx = REGEX_PLU_ONLY_ONE_LETTER.search(coupon.plu)
-                if pluRegEx:
-                    pluCharMap.setdefault(pluRegEx.group(1).upper(), []).append(coupon)
+                # Check if we got a valid "paper PLU"
+                firstLetterOfPLU = coupon.getFirstLetterOfPLU()
+                if firstLetterOfPLU is not None:
+                    pluCharMap.setdefault(firstLetterOfPLU, []).append(coupon)
             # Remove all results that cannot be paper coupons by length
             for pluIdentifier, coupons in pluCharMap.copy().items():
                 if len(coupons) != 46 and len(coupons) != 47:
@@ -576,7 +578,7 @@ class BKCrawler:
             # Store possible paper coupon short-PLU numbers without chars e.g. {"B": [1, 2, 3], "C": [1, 2, 3] }
             foundPaperCouponMap = {}
             if len(pluCharMap) == 0:
-                logging.info("Failed to find any paper coupon candidates")
+                logging.info("Failed to find any currently valid paper coupon candidates")
             else:
                 # Logging
                 couponCharsLogtext = ''
@@ -655,7 +657,7 @@ class BKCrawler:
                 originalPrice = None
                 for coupon in couponsContainingSameProducts:
                     if originalPrice is None:
-                        originalPrice = coupon.priceCompare
+                        originalPrice = coupon.getPriceCompare()
                 if originalPrice is not None:
                     for coupon in couponsContainingSameProducts:
                         if coupon.priceCompare is None:
@@ -669,6 +671,8 @@ class BKCrawler:
         else:
             # Add all crawled coupons to DB
             couponsToAddToDB = crawledCouponsDict
+        infoDatabase = self.couchdb[DATABASES.INFO_DB]
+        infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         couponDB = self.getCouponDB()
         numberofCouponsNew = 0
         numberofCouponsUpdated = 0
@@ -677,26 +681,50 @@ class BKCrawler:
         # Now collect all resulting DB updates, set isNew flags and update DB
         newCouponIDs = []
         updatedCouponIDs = []
+        """ Only flag coupons as new if either some coupons have been in our DB before or this is the first run ever.
+        Prevents flagging all coupons as new if e.g. DB has been dumped before during debugging.
+        """
+        validExtraCoupons = self.getValidExtraCoupons()
+        dbContainsOnlyExtraCoupons = False
+        if len(validExtraCoupons) > 0:
+            dbContainsOnlyExtraCoupons = True
+            for couponID in couponDB:
+                if couponID not in validExtraCoupons:
+                    dbContainsOnlyExtraCoupons = False
+                    break
+        flagNewCouponsAsNew = None
+        if infoDBDoc.timestampLastCrawl == -1:
+            # First start: Allow to flag new coupons as new
+            flagNewCouponsAsNew = True
+        elif len(couponDB) > 0 and not dbContainsOnlyExtraCoupons:
+            # Allow to flag new coupons as new (new = has not been in DB before)
+            flagNewCouponsAsNew = True
+        else:
+            """ DB is empty or contains only extraCoupons which will get added on application launch
+            --> Flag only existing expired coupons as new """
+            flagNewCouponsAsNew = False
+            logging.info("Not flagging new coupons as new in this run!!")
         for crawledCoupon in couponsToAddToDB.values():
-            existantCoupon = Coupon.load(couponDB, crawledCoupon.id)
+            existentCoupon = Coupon.load(couponDB, crawledCoupon.id)
             # Update DB
-            if existantCoupon is not None:
+            if existentCoupon is not None:
                 # Update existing coupon
-                if hasChanged(existantCoupon, crawledCoupon):
+                if hasChanged(existentCoupon, crawledCoupon):
                     # Set isNew flag if necessary
-                    if not existantCoupon.isValid() and crawledCoupon.isValid():
+                    if not existentCoupon.isValid() and crawledCoupon.isValid():
                         crawledCoupon.isNew = True
                         numberofCouponsFlaggedAsNew += 1
                     # Important: We need the "_rev" value to be able to update/overwrite existing documents!
-                    crawledCoupon["_rev"] = existantCoupon.rev
+                    crawledCoupon["_rev"] = existentCoupon.rev
                     dbUpdates.append(crawledCoupon)
                     updatedCouponIDs.append(crawledCoupon.id)
                     numberofCouponsUpdated += 1
             else:
                 # Add new coupon to DB
                 numberofCouponsNew += 1
-                numberofCouponsFlaggedAsNew += 1
-                crawledCoupon.isNew = True
+                if flagNewCouponsAsNew:
+                    numberofCouponsFlaggedAsNew += 1
+                    crawledCoupon.isNew = True
                 dbUpdates.append(crawledCoupon)
                 newCouponIDs.append(crawledCoupon.id)
         logging.info('Pushing ' + str(len(dbUpdates)) + ' coupon DB updates')
@@ -724,9 +752,7 @@ class BKCrawler:
                 deleteCouponDocs[uniqueCouponID] = dbCoupon
         if len(deleteCouponDocs) > 0:
             couponDB.purge(deleteCouponDocs.values())
-        # Save timestamp of last complete run in DB
-        infoDatabase = self.couchdb[DATABASES.INFO_DB]
-        infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
+        # Update timestamp of last complete run in DB
         infoDBDoc.timestampLastCrawl = datetime.now().timestamp()
         infoDBDoc.store(infoDatabase)
         logging.info("Coupons new IDs: " + str(numberofCouponsNew))
@@ -977,13 +1003,13 @@ class BKCrawler:
             writer.writeheader()
             for couponID in couponDB:
                 coupon = Coupon.load(couponDB, couponID)
-                writer.writerow({'PRODUCT': coupon.getTitle(), 'MENU': coupon.containsFriesOrCoke,
+                writer.writerow({'PRODUCT': coupon.getTitle(), 'MENU': coupon.isContainsFriesOrCoke(),
                                  'PLU': (coupon.plu if coupon.plu is not None else "N/A"), 'PLU2': coupon.id,
                                  'TYPE': coupon.source,
                                  'PRICE': coupon.get(Coupon.price.name, -1), 'PRICE_COMPARE': coupon.get(Coupon.priceCompare.name, -1),
-                                 'START': (coupon.dateFormattedStart if coupon.dateFormattedStart is not None else "N/A"),
+                                 'START': coupon.getStartDateFormatted('N/A'),
                                  'EXP': (coupon.dateFormattedExpireInternal if coupon.dateFormattedExpireInternal is not None else "N/A"),
-                                 'EXP2': (coupon.dateFormattedExpire if coupon.dateFormattedExpire is not None else "N/A"),
+                                 'EXP2': (coupon.dateFormattedExpire if coupon.dateFormattedExpire is not None else 'N/A'),
                                  'EXP_PRODUCTIVE': coupon.getExpireDateFormatted()
                                  })
 
@@ -998,30 +1024,27 @@ class BKCrawler:
                 coupon = Coupon.load(couponDB, couponID)
                 if coupon.source != CouponSource.PAPER:
                     continue
-                writer.writerow({'Produkt': coupon.getTitle(), 'Menü': coupon.containsFriesOrCoke,
+                writer.writerow({'Produkt': coupon.getTitle(), 'Menü': coupon.isContainsFriesOrCoke(),
                                  'PLU': coupon.plu, 'PLU2': coupon.id,
-                                 'Preis': coupon.price, 'OPreis': coupon.get(Coupon.priceCompare.name, -1),
+                                 'Preis': coupon.getPrice(), 'OPreis': coupon.get(Coupon.priceCompare.name, -1),
                                  'Ablaufdatum': coupon.getExpireDateFormatted()
                                  })
 
     def updateCache(self, couponDB: Database):
-        """ Updates cache containing all existant coupon sources e.g. used be the Telegram bot to display them inside main menu without having to do any DB requests. """
+        """ Updates cache containing all existent coupon sources e.g. used be the Telegram bot to display them inside
+        main menu without having to do any DB requests. """
         newCachedAvailableCouponCategories = {}
         for couponID in couponDB:
             coupon = Coupon.load(couponDB, couponID)
             if coupon.isValid():
-                category = newCachedAvailableCouponCategories.setdefault(coupon.source, CouponCategory(couponSrc=coupon.source))
-                category.setNumberofCouponsTotal(category.numberofCouponsTotal + 1)
-                if coupon.isHidden:
-                    category.setNumberofCouponsHidden(category.numberofCouponsHidden + 1)
-                if coupon.isEatable():
-                    category.setNumberofCouponsEatable(category.numberofCouponsEatable + 1)
-                if coupon.isNewCoupon():
-                    category.setNumberofCouponsNew(category.numberofCouponsNew + 1)
-                if coupon.containsFriesOrCoke:
-                    category.setNumberofCouponsWithFriesOrCoke(category.numberofCouponsWithFriesOrCoke + 1)
+                category = newCachedAvailableCouponCategories.setdefault(coupon.source, CouponCategory(
+                    parameter=coupon.source))
+                category.updateWithCouponInfo(coupon)
         # Overwrite old cache
         self.cachedAvailableCouponCategories = newCachedAvailableCouponCategories
+
+    def getCachedCouponCategory(self, couponSrc: Union[CouponSource, int]):
+        return self.cachedAvailableCouponCategories.get(couponSrc)
 
     def updateCachedMissingPaperCouponsInfo(self, couponDB: Database):
         paperCouponMapping = getCouponMappingForCrawler()
@@ -1086,7 +1109,7 @@ class BKCrawler:
             elif filters.allowedCouponSources is not None and coupon.source not in filters.allowedCouponSources:
                 # Skip non-allowed coupon-types
                 continue
-            elif filters.containsFriesAndCoke is not None and coupon.containsFriesOrCoke != filters.containsFriesAndCoke:
+            elif filters.containsFriesAndCoke is not None and coupon.isContainsFriesOrCoke() != filters.containsFriesAndCoke:
                 # Skip items if they do not have the expected "containsFriesOrCoke" state
                 continue
             elif filters.isNew is not None and coupon.isNewCoupon() != filters.isNew:
@@ -1121,7 +1144,7 @@ class BKCrawler:
                 for coupon in filteredCouponsList:
                     if coupon.source not in allContainedCouponSources:
                         allContainedCouponSources.append(coupon.source)
-                    if coupon.containsFriesOrCoke:
+                    if coupon.isContainsFriesOrCoke():
                         couponsWithFriesOrCoke.append(coupon)
                     else:
                         couponsWithoutFriesOrCoke.append(coupon)
@@ -1144,7 +1167,7 @@ class BKCrawler:
                 couponsWithoutFriesOrCoke = []
                 couponsWithFriesOrCoke = []
                 for coupon in filteredCouponsList:
-                    if coupon.containsFriesOrCoke:
+                    if coupon.isContainsFriesOrCoke():
                         couponsWithFriesOrCoke.append(coupon)
                     else:
                         couponsWithoutFriesOrCoke.append(coupon)
@@ -1255,7 +1278,7 @@ def getCouponMappingForCrawler() -> dict:
             expireTimestamp = paperData['expire_timestamp']
             for uniquePaperCouponID, plu in mappingTmp.items():
                 paperCouponMapping[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, source=CouponSource.PAPER, plu=plu, timestampExpire=expireTimestamp,
-                                                                 dateFormattedExpire=formatDateGerman(datetime.fromtimestamp(expireTimestamp)))
+                                                                 dateFormattedExpire=formatDateGerman(expireTimestamp))
     return paperCouponMapping
 
 

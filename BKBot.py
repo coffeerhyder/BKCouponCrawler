@@ -15,18 +15,16 @@ from telegram.utils.types import ODVInput, FileInput
 
 from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel
 from BotUtils import *
-import logging
+from BaseUtils import *
 
 from Helper import *
 from Crawler import BKCrawler
 
-from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, getFormattedPrice, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
+from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
     USER_SETTINGS_ON_OFF
-from CouponCategory import CouponCategory, BotAllowedCouponSources, CouponSource
+from CouponCategory import CouponCategory, getCouponCategory
+from Helper import BotAllowedCouponSources, CouponSource, formatPrice
 from UtilsOffers import offerGetImagePath
-
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
 
 class CouponDisplayMode:
@@ -256,7 +254,7 @@ class BKBot:
         allButtons.append([InlineKeyboardButton('Alle Coupons ohne Menü', callback_data=CouponCallbackVars.ALL_COUPONS_WITHOUT_MENU)])
         for couponSrc in BotAllowedCouponSources:
             # Only add buttons for coupon categories for which at least one coupon is available
-            couponCategory = self.crawler.cachedAvailableCouponCategories.get(couponSrc)
+            couponCategory = self.crawler.getCachedCouponCategory(couponSrc)
             if couponCategory is None:
                 continue
             elif couponSrc == CouponSource.PAYBACK and not user.settings.displayCouponCategoryPayback:
@@ -274,7 +272,7 @@ class BKBot:
         allButtons.append(keyboardCouponsFavorites)
         if user.settings.displayCouponCategoryPayback:
             if user.getPaybackCardNumber() is None:
-                allButtons.append([InlineKeyboardButton(SYMBOLS.NEW + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
+                allButtons.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
             else:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         allButtons.append(
@@ -384,29 +382,35 @@ class BKBot:
                 # Display all coupons
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories))
-                menuText = '<b>' + str(len(coupons)) + ' Coupons verfügbar:</b>'
+                couponCategoryDummy = CouponCategory(coupons)
+                menuText = '<b>[' + str(len(coupons)) + ' Stück] Alle Coupons</b>'
+                menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                 # Display all coupons without menu
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
-                menuText = '<b>' + str(len(coupons)) + ' Coupons ohne Menü verfügbar:</b>'
+                couponCategoryDummy = CouponCategory(coupons)
+                menuText = '<b>[' + str(len(coupons)) + ' Stück] Alle Coupons ohne Menü</b>'
+                menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             elif mode == CouponDisplayMode.CATEGORY:
                 # Display all coupons of a particular category
                 couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=None,
                                                                isHidden=displayHiddenCouponsWithinOtherCategories))
-                menuText = '<b>' + str(len(coupons)) + ' ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' verfügbar:</b>'
+                couponCategory = CouponCategory(coupons)
+                menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.CATEGORY_WITHOUT_MENU:
                 # Display all coupons of a particular category without menu
                 couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
-                menuText = '<b>' + str(len(coupons)) + ' ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' ohne Menü verfügbar:</b>'
+                couponCategory = CouponCategory(coupons)
+                menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                 # Display all hidden App coupons (ONLY)
-                couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[CouponSource.APP], containsFriesAndCoke=None, isHidden=True))
-                menuText = '<b>' + str(len(coupons)) + ' versteckte ' + CouponCategory(couponSrc).namePluralWithoutSymbol + ' verfügbar:</b>'
+                couponCategoryDummy = CouponCategory(coupons)
+                menuText = couponCategoryDummy.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
             elif mode == CouponDisplayMode.FAVORITES:
                 userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user)
                 coupons = userFavorites.couponsAvailable
@@ -427,7 +431,7 @@ class BKBot:
             userFavoritesInfo = user.getUserFavoritesInfo(coupons)
             if len(userFavoritesInfo.couponsAvailable) == 0:
                 # Edge case
-                errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' favorisierten Coupons verfügbar:</b>'
+                errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar:</b>'
                 errorMessage += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
                 if user.isAllowSendFavoritesNotification():
                     errorMessage += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
@@ -438,17 +442,12 @@ class BKBot:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
             else:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' / ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
-            numberofEatableCouponsWithoutPrice = 0
-            totalPrice = 0
-            for coupon in userFavoritesInfo.couponsAvailable:
-                if coupon.price is not None:
-                    totalPrice += coupon.price
-                elif coupon.isEatable():
-                    numberofEatableCouponsWithoutPrice += 1
-            if totalPrice > 0:
-                menuText += "\n<b>Gesamtwert:</b> " + getFormattedPrice(totalPrice)
-                if numberofEatableCouponsWithoutPrice > 0:
-                    menuText += "*\n* exklusive " + str(numberofEatableCouponsWithoutPrice) + " Coupons, deren Preis nicht bekannt ist."
+            couponCategoryDummy = getCouponCategory(userFavoritesInfo.couponsAvailable)
+            menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
+            priceInfo = couponCategoryDummy.getPriceInfoText()
+            if priceInfo is not None:
+                menuText += "\n" + priceInfo
+
             if len(userFavoritesInfo.couponsUnavailable) > 0:
                 menuText += '\n' + SYMBOLS.WARNING + str(len(userFavoritesInfo.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
                 menuText += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
@@ -640,7 +639,7 @@ class BKBot:
                 else:
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         if user.getPaybackCardNumber() is None:
-            keyboard.append([InlineKeyboardButton(SYMBOLS.NEW + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
+            keyboard.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
         else:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
@@ -1100,79 +1099,78 @@ class BKBot:
                 # Update DB
                 infoDBDoc.store(infoDB)
         """ Re-send coupon overview(s), spread this information on multiple pages if needed. """
-        for couponSourceIndex in range(len(BotAllowedCouponSources)):
-            couponSource = BotAllowedCouponSources[couponSourceIndex]
-            couponCategory = CouponCategory(couponSource)
-            logging.info("Working on coupon overview " + str(couponSourceIndex + 1) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.nameSingular)
+        counter = 1
+        for couponSource, coupons in couponsSeparatedByType.items():
+            couponCategory = CouponCategory(coupons)
+            logging.info("Working on coupon overview " + str(counter) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.namePluralWithoutSymbol)
             hasAddedSeparatorAfterCouponsWithoutMenu = False
             listContainsAtLeastOneItemWithoutMenu = False
-            if couponSource in couponsSeparatedByType:
-                coupons = couponsSeparatedByType[couponSource]
-                # Depends on the max entities per post limit of Telegram and we're not only using hyperlinks but also the "<b>" tag so we do not have 50 hyperlinks left but 49.
-                maxCouponsPerPage = 49
-                maxPage = math.ceil(len(coupons) / maxCouponsPerPage)
-                for page in range(1, maxPage + 1):
-                    logging.info("Sending category page: " + str(page) + "/" + str(maxPage))
-                    couponOverviewText = "<b>[" + str(len(coupons)) + " Stück] " + couponCategory.nameSingular + " Übersicht"
-                    if couponCategory.displayDescription:
-                        couponOverviewText += "\n" + couponCategory.description
-                    if maxPage > 1:
-                        couponOverviewText += " Teil " + str(page) + " / " + str(maxPage)
-                    couponOverviewText += "</b>"
-                    startIndex = page * maxCouponsPerPage - maxCouponsPerPage
-                    for couponIndex in range(startIndex, startIndex + maxCouponsPerPage):
-                        coupon = coupons[couponIndex]
-                        """ Add a separator so it is easier for the user to distinguish between coupons with- and without menu. 
-                        This only works as "simple" as that because we pre-sorted these coupons!
-                        """
-                        if not coupon.containsFriesOrCoke:
-                            listContainsAtLeastOneItemWithoutMenu = True
-                        elif not hasAddedSeparatorAfterCouponsWithoutMenu and listContainsAtLeastOneItemWithoutMenu:
-                            couponOverviewText += '\n<b>' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + couponCategory.namePluralWithoutSymbol + ' mit Menü' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + '</b>'
-                            hasAddedSeparatorAfterCouponsWithoutMenu = True
-                        """ Generates e.g. "Y15 | 2Whopper+M🍟+0,4LCola | 8,99€"
-                        Returns the same with hyperlink if a chat_id is given for this coupon e.g.:
-                        "Y15 | 2Whopper+M🍟+0,4LCola (https://t.me/betterkingpublic/1054) | 8,99€"
-                        """
-                        if coupon.id in channelDB:
-                            channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
-                            messageID = channelCoupon.getMessageIDForChatHyperlink()
-                            if messageID is not None:
-                                if useLongCouponTitles:
-                                    couponText = coupon.generateCouponLongTextFormattedWithHyperlinkToChannelPost(self.getPublicChannelName(), messageID)
-                                else:
-                                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=True,
-                                                                                                                   publicChannelName=self.getPublicChannelName(),
-                                                                                                                   messageID=messageID)
+            # Depends on the max entities per post limit of Telegram and we're not only using hyperlinks but also the "<b>" tag so we do not have 50 hyperlinks left but 49.
+            maxCouponsPerPage = 49
+            maxPage = math.ceil(len(coupons) / maxCouponsPerPage)
+            for page in range(1, maxPage + 1):
+                logging.info("Sending category page: " + str(page) + "/" + str(maxPage))
+                couponOverviewText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
+                if maxPage > 1:
+                    couponOverviewText += "<b>Teil " + str(page) + " / " + str(maxPage) + "</b>"
+                couponOverviewText += '\n---'
+                # Calculate in which range the coupons of our current page are
+                startIndex = page * maxCouponsPerPage - maxCouponsPerPage
+                for couponIndex in range(startIndex, startIndex + maxCouponsPerPage):
+                    coupon = coupons[couponIndex]
+                    """ Add a separator so it is easier for the user to distinguish between coupons with- and without menu. 
+                    This only works as "simple" as that because we pre-sorted these coupons!
+                    """
+                    if not coupon.isContainsFriesOrCoke():
+                        listContainsAtLeastOneItemWithoutMenu = True
+                    elif not hasAddedSeparatorAfterCouponsWithoutMenu and listContainsAtLeastOneItemWithoutMenu:
+                        couponOverviewText += '\n<b>' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + couponCategory.namePluralWithoutSymbol + ' mit Menü' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + '</b>'
+                        hasAddedSeparatorAfterCouponsWithoutMenu = True
+                    """ Generates e.g. "Y15 | 2Whopper+M🍟+0,4LCola | 8,99€"
+                    Returns the same with hyperlink if a chat_id is given for this coupon e.g.:
+                    "Y15 | 2Whopper+M🍟+0,4LCola (https://t.me/betterkingpublic/1054) | 8,99€"
+                    """
+                    if coupon.id in channelDB:
+                        channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
+                        messageID = channelCoupon.getMessageIDForChatHyperlink()
+                        if messageID is not None:
+                            if useLongCouponTitles:
+                                couponText = coupon.generateCouponLongTextFormattedWithHyperlinkToChannelPost(self.getPublicChannelName(), messageID)
                             else:
-                                # This should never happen but we'll allow it to
-                                logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
-                                if useLongCouponTitles:
-                                    couponText = coupon.generateCouponLongTextFormatted()
-                                else:
-                                    couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=True)
+                                couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=True,
+                                                                                                               publicChannelName=self.getPublicChannelName(),
+                                                                                                               messageID=messageID)
                         else:
                             # This should never happen but we'll allow it to
-                            logging.warning("Can't hyperlink coupon because it is not in channelDB: " + coupon.id)
+                            logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)
                             if useLongCouponTitles:
                                 couponText = coupon.generateCouponLongTextFormatted()
                             else:
                                 couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=True)
+                    else:
+                        # This should never happen but we'll allow it to
+                        logging.warning("Can't hyperlink coupon because it is not in channelDB: " + coupon.id)
+                        if useLongCouponTitles:
+                            couponText = coupon.generateCouponLongTextFormatted()
+                        else:
+                            couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=True)
 
-                        couponOverviewText += '\n' + couponText
-                        # Exit loop after last coupon info has been added
-                        if couponIndex == len(coupons) - 1:
-                            break
-                    # Send new post containing current page
-                    msg = self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
-                                           disable_notification=True)
-                    if infoDBDoc is not None:
-                        # Update DB
-                        infoDBDoc.addCouponCategoryMessageID(couponSource, msg.message_id)
-                        infoDBDoc.lastMaintenanceModeState = self.maintenanceMode
-                        infoDBDoc.store(infoDB)
+                    couponOverviewText += '\n' + couponText
+                    # Exit loop after last coupon info has been added
+                    if couponIndex == len(coupons) - 1:
+                        break
+                # Send new post containing current page
+                msg = self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
+                                       disable_notification=True)
+                if infoDBDoc is not None:
+                    # Update DB
+                    infoDBDoc.addCouponCategoryMessageID(couponSource, msg.message_id)
+                    infoDBDoc.lastMaintenanceModeState = self.maintenanceMode
+                    infoDBDoc.store(infoDB)
             else:
                 logging.info("Nothing to do: No coupons of this type available :)")
+
+        counter += 1
 
         return
 

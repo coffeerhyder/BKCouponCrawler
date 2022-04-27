@@ -142,18 +142,17 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 
 # TODOs
 * Start-Script prüfen
-* /stats Command fixen
+* /stats Command fixen --> "Payback Workaround" entfernen/verbessern
 * Handling mit Datumsangaben verbessern
-* Bessere Produktnamen für Payback Coupons
-* isNew: Markierung von Coupons als "neu" und "ist wirklich neu" separieren?
+* Produktnamen-Handling für Payback Coupons generischer gestalten
+* isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
 * Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden) -> 02.03.2022: Wird auch von der Webseite verwendet: https://www.burgerking.de/rewards/offers
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
-* ~~Herausfinden, ob "Store-spezifische Coupons" offline vor Ort doch in allen Stores gehen oder die Akzeptanz gleich der der App ist (alte DB/API)~~
 * App DB per Proxy in der originalen BK App modifizieren?
-* ~~App Coupons testen, die gerade nicht in der App sind aber noch gültig sein müssten (alte DB/API)~~
+* Herausfinden, ob es Store-spezifische Coupons gibt
 
 # Feature Ideen
 * Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen sonst werden es über die Zeit immer mehr
@@ -301,9 +300,9 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * Seit ca. September 2021 scheint die Vorbestellen Funktion bei allen BK Filialen entfernt worden zu sein. Kennt man die FilialIDs, die Vorbestellungen akzeptierten, kann man noch immer Coupons über den Endpoint abfragen.
 
 ### Danke an
-* [bkoder Projekt](https://github.com/3dik/bkoder)
-* [Blog Artikel 'Hack the Burger King'](https://edik.ch/posts/hack-the-burger-king.html)
-* [MyDealz BK PLU Sammlung](https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614)
+* https://github.com/3dik/bkoder
+* https://edik.ch/posts/hack-the-burger-king.html
+* https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
 * https://limits.tginfo.me/de-DE
 
 ### Kleine Linksammlung
@@ -315,7 +314,8 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * https://github.com/reteps/burger-king-api-wrapper
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
 * https://bk.eris.cc/ --> https://gist.github.com/printfuck
-* https://t.me/freecokebot
+* https://t.me/gimmecockbot (https://t.me/freecokebot)
+* https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot

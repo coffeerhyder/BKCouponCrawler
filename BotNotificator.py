@@ -8,10 +8,9 @@ from telegram import InputMediaPhoto
 from telegram.error import BadRequest, Unauthorized
 
 from BotUtils import getBotImpressum
-from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs
+from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponSources
 
 from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter, sortCouponsByPrice, getCouponTitleMapping
-from CouponCategory import BotAllowedCouponSources
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
@@ -77,7 +76,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
             if len(userNewFavoriteCoupons) > 0:
 
                 usertext += "<b>" + SYMBOLS.STAR + str(
-                    len(userNewFavoriteCoupons)) + " deiner favorisierten Coupons sind wieder verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(userNewFavoriteCoupons, 49)
+                    len(userNewFavoriteCoupons)) + " deiner Favoriten sind wieder verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(userNewFavoriteCoupons, 49)
                 numberofFavoriteNotifications += 1
                 # The '<b>' entity is also one entity so let's substract this so we know how many are remaining
                 remainingEntities -= 1

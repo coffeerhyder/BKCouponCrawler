@@ -3,10 +3,10 @@ import os
 from datetime import datetime
 
 import BotUtils
+import Helper
 from Helper import saveJson, getTimezone, loadJson
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.WARNING)
+from BaseUtils import logging
 
 """ Helper to complete config file with data from 'paper_coupon_helper_ids.txt'. """
 
@@ -14,7 +14,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 def main():
     activePaperCouponInfo = getActivePaperCouponInfo()
     if len(activePaperCouponInfo) == 0:
-        logging.info("Failed to find any paper coupon candidates --> Cannot add additional information")
+        # logging.info("Failed to find any currently valid paper coupon candidates --> Cannot add additional information")
         return
     paperCouponConfig = loadPaperCouponConfigFile()
     for paperIdentifier in activePaperCouponInfo.keys():
@@ -74,7 +74,7 @@ def main():
 
     # paperCouponConfig[paperChar]['mapping'] = mapping
     # Update our config file accordingly
-    saveJson(BotUtils.BotProperty.paperCouponExtraDataPath, paperCouponConfig)
+    saveJson(Helper.Paths.paperCouponExtraDataPath, paperCouponConfig)
 
 
 if __name__ == "__main__":
@@ -94,4 +94,4 @@ def getActivePaperCouponInfo() -> dict:
 
 
 def loadPaperCouponConfigFile() -> dict:
-    return loadJson(BotUtils.BotProperty.paperCouponExtraDataPath)
+    return loadJson(Helper.Paths.paperCouponExtraDataPath)

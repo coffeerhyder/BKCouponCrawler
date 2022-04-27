@@ -1,19 +1,17 @@
 from telegram import InlineKeyboardMarkup
 
-VERSION = '1.6.6'
+from Helper import SYMBOLS
+
+VERSION = '1.6.7'
 
 
 def getBotImpressum() -> str:
     text = "BKBot v." + VERSION
-    text += "\n<i>Made with ❤ and 🍻 during 😷"
+    # 2022-04-26: Add some love for Ukraine (RE stupid war RU vs UA 2022)
+    text += " | " + SYMBOLS.FLAG_UA + SYMBOLS.HEART
+    text += "\n<i>Made with " + SYMBOLS.HEART + " and " + SYMBOLS.BEER + " during " + SYMBOLS.CORONA
     text += "\nKontakt: bkfeedback@pm.me</i>"
     return text
-
-
-class BotProperty:
-    configPath = 'config.json'
-    paperCouponExtraDataPath = 'config_paper_coupons.json'
-    extraCouponConfigPath = 'config_extra_coupons.json'
 
 
 class Config:

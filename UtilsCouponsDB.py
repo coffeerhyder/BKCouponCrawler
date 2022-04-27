@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from datetime import datetime
 from enum import Enum
 from io import BytesIO
@@ -7,11 +8,12 @@ from typing import Union, List, Optional
 
 from barcode.ean import EuropeanArticleNumber13
 from barcode.writer import ImageWriter
-from couchdb.mapping import TextField, FloatField, ListField, IntegerField, BooleanField, Document, DictField, Mapping, DateTimeField
+from couchdb.mapping import TextField, FloatField, ListField, IntegerField, BooleanField, Document, DictField, Mapping, \
+    DateTimeField
 from pydantic import BaseModel
 
-from CouponCategory import BotAllowedCouponSources, CouponSource
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, shortenProductNames
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponSources, CouponSource, \
+    formatPrice
 
 
 class Coupon(Document):
@@ -47,6 +49,16 @@ class Coupon(Document):
         else:
             return self.id
 
+    def getFirstLetterOfPLU(self) -> Union[str, None]:
+        """ Returns first letter of PLU if PLU is given and starts with a single letter followed by numbers-only. """
+        if self.plu is None:
+            return None
+        # Paper coupons usually only contain one char followed by a 1-2 digit number.
+        pluRegEx = re.compile(r'(?i)^([A-Z])\d+$').search(self.plu)
+        if not pluRegEx:
+            return None
+        return pluRegEx.group(1).upper()
+
     def getNormalizedTitle(self):
         return normalizeString(self.getTitle())
 
@@ -75,6 +87,21 @@ class Coupon(Document):
         else:
             return False
 
+    def isContainsFriesOrCoke(self) -> bool:
+        # TODO: Make use of this
+        if couponTitleContainsFriesOrCoke(self.title):
+            return True
+        else:
+            return False
+
+    def getPrice(self) -> Union[float, None]:
+        # TODO: Make use of this
+        return self.price
+
+    def getPriceCompare(self) -> Union[float, None]:
+        # TODO: Make use of this
+        return self.priceCompare
+
     def isEatable(self) -> bool:
         """ If the product(s) this coupon provide(s) is/are not eatable and e.g. just probide a discount like Payback coupons, this will return False, else True. """
         if self.source == CouponSource.PAYBACK:
@@ -85,10 +112,13 @@ class Coupon(Document):
     def isNewCoupon(self) -> bool:
         """ Determines whether or not this coupon is considered 'new'. """
         if self.isNew is not None:
+            # isNew status is pre-given --> Preferably return that
             return self.isNew
         elif self.isNewUntilDate is not None:
+            # Check if maybe coupon should be considered as new for X
             try:
-                enforceIsNewOverrideUntilDate = datetime.strptime(self.isNewUntilDate + ' 23:59:59', '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
+                enforceIsNewOverrideUntilDate = datetime.strptime(self.isNewUntilDate + ' 23:59:59',
+                                                                  '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
                 if enforceIsNewOverrideUntilDate.timestamp() > datetime.now().timestamp():
                     return True
                 else:
@@ -108,29 +138,38 @@ class Coupon(Document):
             logging.warning("Found coupon without expiredate: " + self.id)
             return None
 
-    def getExpireDateFormatted(self, fallback=None) -> Union[str, None]:
-        if self.dateFormattedExpire is not None:
-            return self.dateFormattedExpire
+    def getExpireDateFormatted(self, fallback: Union[str, None] = None) -> Union[str, None]:
+        if self.timestampExpire is not None:
+            # return self.dateFormattedExpire
+            return formatDateGerman(datetime.fromtimestamp(self.timestampExpire))
+        else:
+            return fallback
+
+    def getStartDateFormatted(self, fallback: Union[str, None] = None) -> Union[str, None]:
+        if self.timestampStart is not None:
+            return formatDateGerman(datetime.fromtimestamp(self.timestampStart))
         else:
             return fallback
 
     def getPriceFormatted(self, fallback=None) -> Union[str, None]:
         if self.price is not None:
-            return getFormattedPrice(self.price)
+            return formatPrice(self.price)
         else:
             return fallback
 
     def getPriceCompareFormatted(self, fallback=None) -> Union[str, None]:
-        if self.priceCompare is not None:
-            return getFormattedPrice(self.priceCompare)
+        priceCompare = self.getPriceCompare()
+        if priceCompare is not None:
+            return formatPrice(priceCompare)
         else:
             return fallback
 
     def getReducedPercentageFormatted(self, fallback=None) -> Union[str, None]:
         """ Returns price reduction in percent if bothb the original price and the reduced/coupon-price are available.
          E.g. "-39%" """
-        if self.price is not None and self.priceCompare is not None:
-            return '-' + f'{(1 - (self.price / self.priceCompare)) * 100:2.0f}'.replace('.', ',') + '%'
+        priceCompare = self.getPriceCompare()
+        if self.price is not None and priceCompare is not None:
+            return '-' + f'{(1 - (self.price / priceCompare)) * 100:2.0f}'.replace('.', ',') + '%'
         elif self.staticReducedPercent is not None:  # Sometimes we don't have a compare-price but the reduce amount is pre-given via App-API.
             return '-' + f'{self.staticReducedPercent:2.0f}' + '%'
         elif self.paybackMultiplicator is not None:
@@ -143,7 +182,8 @@ class Coupon(Document):
     def getUniqueIdentifier(self) -> str:
         """ Returns an unique identifier String which can be used to compare coupon objects. """
         expiredateStr = self.getExpireDateFormatted(fallback='undefined')
-        return self.id + '_' + ("undefined" if self.plu is None else self.plu) + '_' + expiredateStr + '_' + self.imageURL
+        return self.id + '_' + (
+            "undefined" if self.plu is None else self.plu) + '_' + expiredateStr + '_' + self.imageURL
 
     def getComparableValue(self) -> str:
         """ Returns value which can be used to compare given coupon object to another one.
@@ -188,7 +228,8 @@ class Coupon(Document):
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
-    def generateCouponShortTextFormattedWithHyperlinkToChannelPost(self, highlightIfNew: bool, publicChannelName: str, messageID: int) -> str:
+    def generateCouponShortTextFormattedWithHyperlinkToChannelPost(self, highlightIfNew: bool, publicChannelName: str,
+                                                                   messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         couponText = "<b>" + self.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
             messageID) + "\">"
@@ -273,7 +314,9 @@ class Coupon(Document):
 
 class UserFavoritesInfo:
     """ Helper class for users favorites. """
-    def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None, favoritesUnavailable: Union[List[Coupon], None] = None):
+
+    def __init__(self, favoritesAvailable: Union[List[Coupon], None] = None,
+                 favoritesUnavailable: Union[List[Coupon], None] = None):
         # Do not allow null values when arrays are expected. This makes it easier to work with this.
         if favoritesAvailable is None:
             favoritesAvailable = []
@@ -300,7 +343,7 @@ class UserFavoritesInfo:
 class User(Document):
     settings = DictField(
         Mapping.build(
-            displayQR=BooleanField(default=False),
+            displayQR=BooleanField(default=True),
             displayBKWebsiteURLs=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
@@ -411,7 +454,8 @@ class User(Document):
             # Sort all coupon arrays by price
             availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
             unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
-            return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons, favoritesUnavailable=unavailableFavoriteCoupons)
+            return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons,
+                                     favoritesUnavailable=unavailableFavoriteCoupons)
 
     def resetSettings(self):
         dummyUser = User()
@@ -495,10 +539,6 @@ def getImageBasePath() -> str:
     return "crawler/images/couponsproductive"
 
 
-def getFormattedPrice(price: float) -> str:
-    return f'{(price / 100):2.2f}'.replace('.', ',') + '€'
-
-
 def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
     """ Returns the total summed price of a list of coupons. """
     totalSum = 0
@@ -509,22 +549,26 @@ def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
 
 
 def getCouponsSeparatedByType(coupons: dict) -> dict:
+    """ Returns dict containing lists of coupons by type """
     couponsSeparatedByType = {}
     for couponSource in BotAllowedCouponSources:
         couponsTmp = list(filter(lambda x: x[Coupon.source.name] == couponSource, list(coupons.values())))
-        couponsSeparatedByType[couponSource] = couponsTmp
+        if couponsTmp is not None and len(couponsTmp) > 0:
+            couponsSeparatedByType[couponSource] = couponsTmp
     return couponsSeparatedByType
 
 
 def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:
-    # Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list.
-    return sorted(couponList, key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
+    """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
+    return sorted(couponList,
+                  key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
 
 
 class CouponFilter(BaseModel):
     activeOnly: Optional[bool] = True
     containsFriesAndCoke: Optional[Union[bool, None]] = None
-    excludeCouponsByDuplicatedProductTitles: Optional[bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
+    excludeCouponsByDuplicatedProductTitles: Optional[
+        bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
     allowedCouponSources: Optional[Union[List[int], None]] = None  # None = allow all sources!
     isNew: Optional[Union[bool, None]] = None
     isHidden: Optional[Union[bool, None]] = None
@@ -552,7 +596,7 @@ USER_SETTINGS_ON_OFF = {
     },
     "displayQR": {
         "description": "QR Codes zeigen",
-        "default": False
+        "default": True
     },
     "displayHiddenAppCouponsWithinGenericCategories": {
         "description": "Versteckte App Coupons in Kategorien zeigen*¹",

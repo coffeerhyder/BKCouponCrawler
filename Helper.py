@@ -2,14 +2,13 @@ import os
 import random
 import re
 from datetime import datetime, timedelta
+from enum import Enum
 from re import Pattern
 from typing import Union
 
 import pytz
 import simplejson as json
 from PIL import Image
-
-from BotUtils import BotProperty
 
 
 class DATABASES:
@@ -38,9 +37,9 @@ class URLs:
 
 def loadConfig(fallback: str = None):
     try:
-        return loadJson(BotProperty.configPath)
+        return loadJson(Paths.configPath)
     except:
-        print('Failed to load ' + BotProperty.configPath)
+        print('Failed to load ' + Paths.configPath)
         return fallback
 
 
@@ -189,8 +188,12 @@ def convertCouponAndOfferDateToGermanFormat(date: str) -> str:
     return formatDateGerman(getDatetimeFromString(date))
 
 
-def formatDateGerman(date: datetime) -> str:
-    """ Returns date in format: 13.10.2020 21:36 Uhr """
+def formatDateGerman(date: Union[datetime, float]) -> str:
+    """ Accepts timestamp as float or datetime instance.
+    Returns date in format: 13.10.2020 21:36 Uhr """
+    if isinstance(date, float):
+        # We want datetime
+        date = datetime.fromtimestamp(date, getTimezone())
     return date.strftime('%d.%m.%Y %H:%M Uhr')
 
 
@@ -231,6 +234,7 @@ class SYMBOLS:
     CONFIRM = '✅'
     DENY = '🚫'
     DENY2 = '❌'
+    FLAG_UA = '🇺🇦'
     THUMBS_UP = '👍'
     THUMBS_DOWN = '👎'
     ARROW_RIGHT = '➡'
@@ -253,6 +257,7 @@ class SYMBOLS:
     GHOST = '👻'
     GIFT = '🎁'
     PARK = '🅿️'
+    CIRLCE_BLUE = '🔵'
 
 
 def getFilenameFromURL(url: str) -> str:
@@ -281,8 +286,6 @@ def couponTitleContainsFriesOrCoke(titleLower: str) -> bool:
 
 
 REGEX_PLU_WITH_AT_LEAST_ONE_LETTER = re.compile(r'(?i)^([A-Z]+)\d+[A-Z]?$')
-# Paper coupons usually only contain one char followed by a 1-2 digit number.
-REGEX_PLU_ONLY_ONE_LETTER = re.compile(r'(?i)^([A-Z])\d+$')
 
 
 def isCouponShortPLUWithAtLeastOneLetter(plu: str) -> bool:
@@ -341,3 +344,30 @@ def isValidImageFile(path: str) -> bool:
         return True
     except:
         return False
+
+
+# All CouponSources which will be used in our bot (will be displayed in bot menu as categories)
+class CouponSource():
+    UNKNOWN = -1
+    APP = 0
+    # APP_VALID_AFTER_DELETION = 1  # Deprecated!
+    # APP_SAME_CHAR_AS_CURRENT_APP_COUPONS = 2 # Deprecated!
+    PAPER = 3
+    PAPER_UNSAFE = 4
+    ONLINE_ONLY = 5
+    ONLINE_ONLY_STORE_SPECIFIC = 6  # Placeholder - not used
+    SPECIAL = 7
+    PAYBACK = 8
+
+
+BotAllowedCouponSources = [CouponSource.APP, CouponSource.PAPER, CouponSource.SPECIAL, CouponSource.PAYBACK]
+
+
+class Paths:
+    configPath = 'config.json'
+    paperCouponExtraDataPath = 'config_paper_coupons.json'
+    extraCouponConfigPath = 'config_extra_coupons.json'
+
+
+def formatPrice(price: float) -> str:
+    return f'{(price / 100):2.2f}'.replace('.', ',') + '€'
