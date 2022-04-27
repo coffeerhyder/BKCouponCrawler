@@ -383,14 +383,14 @@ class BKBot:
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories))
                 couponCategoryDummy = CouponCategory(coupons)
-                menuText = '<b>' + str(len(coupons)) + ' Coupons verfügbar:</b>'
+                menuText = '<b>[' + str(len(coupons)) + ' Stück] Alle Coupons</b>'
                 menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                 # Display all coupons without menu
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
                 couponCategoryDummy = CouponCategory(coupons)
-                menuText = '<b>' + str(len(coupons)) + ' Coupons ohne Menü verfügbar:</b>'
+                menuText = '<b>[' + str(len(coupons)) + ' Stück] Alle Coupons ohne Menü</b>'
                 menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             elif mode == CouponDisplayMode.CATEGORY:
                 # Display all coupons of a particular category
