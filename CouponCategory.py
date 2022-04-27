@@ -30,10 +30,15 @@ class CouponCategory:
             if isAllSameCouponSource:
                 self.couponSource = mainCouponSource
             else:
-                self.couponSource = CouponSource.UNKNOWN
+                self.couponSource = None
         else:
             self.couponSource = parameter
-        if self.couponSource == CouponSource.APP:
+        if self.couponSource is None:
+            self.nameSingular = "Coupon"
+            self.namePlural = "Alle Coupons"
+            self.namePluralWithoutSymbol = "Alle Coupons"
+            self.description = "Coupons mehrerer Kategorien"
+        elif self.couponSource == CouponSource.APP:
             self.nameSingular = "App Coupon"
             self.namePlural = "App Coupons"
             self.namePluralWithoutSymbol = "App Coupons"
@@ -116,18 +121,18 @@ class CouponCategory:
         else:
             return False
 
-    def getCategoryInfoText(self, withMenu: bool, includeHiddenCouponsInCount: bool) -> str:
+    def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:
         if self.couponSource == CouponSource.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
             # Only hidden (App-) coupons
             couponCount = self.numberofCouponsHidden
             text = '<b>[{couponCount} Stück] versteckte {couponCategoryName}</b>'
-        elif withMenu:
+        elif withMenu is None or withMenu is True:
             couponCount = self.numberofCouponsTotal
             text = '<b>[{couponCount} Stück] {couponCategoryName}</b>'
         else:
             couponCount = self.numberofCouponsTotal - self.numberofCouponsWithFriesOrCoke
             text = '<b>[{couponCount} Stück] {couponCategoryName} ohne Menü</b>'
-        if not includeHiddenCouponsInCount:
+        if includeHiddenCouponsInCount is False:
             couponCount -= self.numberofCouponsHidden
         text = text.format(couponCount=couponCount, couponCategoryName=self.namePluralWithoutSymbol)
         if self.displayDescription and self.description is not None:
