@@ -347,7 +347,7 @@ def isValidImageFile(path: str) -> bool:
 
 
 # All CouponSources which will be used in our bot (will be displayed in bot menu as categories)
-class CouponSource():
+class CouponSource:
     UNKNOWN = -1
     APP = 0
     # APP_VALID_AFTER_DELETION = 1  # Deprecated!
