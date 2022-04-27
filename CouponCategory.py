@@ -125,7 +125,7 @@ class CouponCategory:
         if self.couponSource == CouponSource.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
             # Only hidden (App-) coupons
             couponCount = self.numberofCouponsHidden
-            text = '<b>[{couponCount} Stück] versteckte {couponCategoryName}</b>'
+            text = '<b>[{couponCount} Stück] {couponCategoryName} versteckte</b>'
         elif withMenu is None or withMenu is True:
             couponCount = self.numberofCouponsTotal
             text = '<b>[{couponCount} Stück] {couponCategoryName}</b>'
@@ -134,7 +134,11 @@ class CouponCategory:
             text = '<b>[{couponCount} Stück] {couponCategoryName} ohne Menü</b>'
         if includeHiddenCouponsInCount is False:
             couponCount -= self.numberofCouponsHidden
-        text = text.format(couponCount=couponCount, couponCategoryName=self.namePluralWithoutSymbol)
+        if couponCount == 1:
+            couponCategoryName = self.nameSingular
+        else:
+            couponCategoryName = self.namePluralWithoutSymbol
+        text = text.format(couponCount=couponCount, couponCategoryName=couponCategoryName)
         if self.displayDescription and self.description is not None:
             text += '\n' + self.description
         text += '\n' + self.getExpireDateInfoText()
