@@ -1097,10 +1097,10 @@ class BKBot:
                 # Update DB
                 infoDBDoc.store(infoDB)
         """ Re-send coupon overview(s), spread this information on multiple pages if needed. """
-        counter = 1
+        couponOverviewCounter = 1
         for couponSource, coupons in couponsSeparatedByType.items():
             couponCategory = CouponCategory(coupons)
-            logging.info("Working on coupon overview " + str(counter) + "/" + str(len(BotAllowedCouponSources)) + " | " + couponCategory.namePluralWithoutSymbol)
+            logging.info("Working on coupon overview " + str(couponOverviewCounter) + "/" + str(len(couponsSeparatedByType)) + " | " + couponCategory.namePluralWithoutSymbol)
             hasAddedSeparatorAfterCouponsWithoutMenu = False
             listContainsAtLeastOneItemWithoutMenu = False
             # Depends on the max entities per post limit of Telegram and we're not only using hyperlinks but also the "<b>" tag so we do not have 50 hyperlinks left but 49.
@@ -1165,10 +1165,7 @@ class BKBot:
                     infoDBDoc.addCouponCategoryMessageID(couponSource, msg.message_id)
                     infoDBDoc.lastMaintenanceModeState = self.maintenanceMode
                     infoDBDoc.store(infoDB)
-            else:
-                logging.info("Nothing to do: No coupons of this type available :)")
-
-        counter += 1
+            couponOverviewCounter += 1
 
         return
 
