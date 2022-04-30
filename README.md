@@ -141,6 +141,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 ```
 
 # TODOs
+* TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Start-Script prüfen
 * /stats Command fixen --> "Payback Workaround" entfernen/verbessern
 * Handling mit Datumsangaben verbessern
