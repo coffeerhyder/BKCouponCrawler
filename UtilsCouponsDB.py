@@ -625,6 +625,10 @@ USER_SETTINGS_ON_OFF = {
     "autoDeleteExpiredFavorites": {
         "description": "Abgelaufene Favoriten automatisch löschen",
         "default": False
+    },
+    "hideDuplicates": {
+        "description": "Duplikate ausblenden (App CP bevorzugen falls gleichwertig)",
+        "default": False
     }
 }
 
