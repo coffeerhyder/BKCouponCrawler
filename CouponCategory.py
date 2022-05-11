@@ -121,6 +121,12 @@ class CouponCategory:
         else:
             return False
 
+    def isEligibleForDuplicateRemoval(self):
+        if self.couponSource == CouponSource.PAYBACK:
+            return False
+        else:
+            return True
+
     def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:
         if self.couponSource == CouponSource.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
             # Only hidden (App-) coupons

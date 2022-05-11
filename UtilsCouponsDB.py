@@ -95,15 +95,19 @@ class Coupon(Document):
             return False
 
     def getPrice(self) -> Union[float, None]:
-        # TODO: Make use of this
         return self.price
 
     def getPriceCompare(self) -> Union[float, None]:
-        # TODO: Make use of this
         return self.priceCompare
 
     def isEatable(self) -> bool:
         """ If the product(s) this coupon provide(s) is/are not eatable and e.g. just probide a discount like Payback coupons, this will return False, else True. """
+        if self.source == CouponSource.PAYBACK:
+            return False
+        else:
+            return True
+
+    def isEligibleForDuplicateRemoval(self):
         if self.source == CouponSource.PAYBACK:
             return False
         else:
@@ -565,9 +569,11 @@ def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:
 
 
 class CouponFilter(BaseModel):
+    """ removeDuplicates: Enable to filter duplicated coupons for same products - only returns cheapest of all
+     If the same product is available as paper- and app coupon, App coupon is preferred."""
     activeOnly: Optional[bool] = True
     containsFriesAndCoke: Optional[Union[bool, None]] = None
-    excludeCouponsByDuplicatedProductTitles: Optional[
+    removeDuplicates: Optional[
         bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
     allowedCouponSources: Optional[Union[List[int], None]] = None  # None = allow all sources!
     isNew: Optional[Union[bool, None]] = None
