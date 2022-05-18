@@ -617,7 +617,7 @@ USER_SETTINGS_ON_OFF = {
         "default": True
     },
     "displayBKWebsiteURLs": {
-        "description": "BK Verlinkungen im Hauptmenü zeigen?",
+        "description": "BK Verlinkungen im Hauptmenü zeigen",
         "default": True
     },
     "highlightFavoriteCouponsInButtonTexts": {
