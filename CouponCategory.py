@@ -1,14 +1,15 @@
 from typing import Union, List
 
 from Helper import SYMBOLS, formatDateGerman, BotAllowedCouponSources, CouponSource, formatPrice
-from UtilsCouponsDB import Coupon
+from UtilsCouponsDB import Coupon, CouponSortMode
 
 
 class CouponCategory:
 
     def __init__(self, parameter: Union[CouponSource, int, List]):
         self.coupons = None
-        self.couponSource = parameter
+        self.couponSource = None
+        self.couponSources = set()
         self.displayDescription = False  # Display description for this category in bot menu?
         self.expireDatetimeLowest = None
         self.expireDatetimeHighest = None
@@ -127,6 +128,26 @@ class CouponCategory:
         else:
             return True
 
+    def isEligableForSort(self):
+        if self.numberofCouponsTotal == 1:
+            return False
+        else:
+            return True
+
+    def getSortModes(self) -> List:
+        """ Returns all SortModes which make sense for this set of coupons. """
+        if not self.isEligableForSort():
+            return []
+        sortModes = []
+        if self.totalPrice > 0:
+            sortModes.append(CouponSortMode.PRICE)
+            sortModes.append(CouponSortMode.PRICE_DESCENDING)
+        if self.numberofCouponsTotal != self.numberofCouponsWithFriesOrCoke:
+            sortModes.append(CouponSortMode.MENU_PRICE)
+        if len(self.couponSources) > 1:
+            sortModes.append(CouponSortMode.SOURCE_MENU_PRICE)
+        return sortModes
+
     def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:
         if self.couponSource == CouponSource.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
             # Only hidden (App-) coupons
@@ -175,6 +196,7 @@ class CouponCategory:
             couponList = couponOrCouponList
         for coupon in couponList:
             if coupon.isValid():
+                self.couponSources.add(coupon.source)
                 self.setNumberofCouponsTotal(self.numberofCouponsTotal + 1)
                 if coupon.isHidden:
                     self.setNumberofCouponsHidden(self.numberofCouponsHidden + 1)

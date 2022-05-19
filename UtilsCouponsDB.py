@@ -12,7 +12,8 @@ from couchdb.mapping import TextField, FloatField, ListField, IntegerField, Bool
     DateTimeField
 from pydantic import BaseModel
 
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponSources, CouponSource, \
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponSources, \
+    CouponSource, \
     formatPrice
 
 
@@ -535,8 +536,9 @@ class ChannelCoupon(Document):
 
 class CouponSortMode(Enum):
     PRICE = 0
-    MENU_PRICE = 1
-    SOURCE_MENU_PRICE = 2
+    PRICE_DESCENDING = 1
+    MENU_PRICE = 2
+    SOURCE_MENU_PRICE = 3
 
 
 def getImageBasePath() -> str:
@@ -562,10 +564,14 @@ def getCouponsSeparatedByType(coupons: dict) -> dict:
     return couponsSeparatedByType
 
 
-def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:
+def sortCouponsByPrice(couponList: List[Coupon], descending: bool = False) -> List[Coupon]:
     """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
-    return sorted(couponList,
-                  key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
+    if descending:
+        return sorted(couponList,
+                      key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1), reverse=True)
+    else:
+        return sorted(couponList,
+                      key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
 
 
 class CouponFilter(BaseModel):

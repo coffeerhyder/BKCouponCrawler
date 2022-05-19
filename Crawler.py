@@ -1210,6 +1210,8 @@ class BKCrawler:
                 filteredCouponsList = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
             elif filters.sortMode == CouponSortMode.PRICE:
                 filteredCouponsList = sortCouponsByPrice(filteredCouponsList)
+            elif filters.sortMode == CouponSortMode.PRICE_DESCENDING:
+                filteredCouponsList = sortCouponsByPrice(filteredCouponsList, descending=True)
             else:
                 # This should never happen
                 logging.warning("Developer mistake!! Unknown sortMode: " + filters.sortMode.name)
