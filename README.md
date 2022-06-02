@@ -155,8 +155,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
 * App DB per Proxy in der originalen BK App modifizieren?
-* Herausfinden, ob es Store-spezifische Coupons gibt
-* Alte-Coupons-Archiv im Channel verlinken (gedacht vor allem zur Verwendung in Filialen mit Terminals)
+* Alte-Coupons-Archiv im Channel verlinken (gedacht vor allem zur Verwendung in Filialen mit Terminals) | Evtl. hinfällig, weil BK begonnen hat, diese auch per Terminal nicht mehr zu akzeptieren (Stand 03.06.2022)?
 
 # Feature Ideen
 * Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen sonst werden es über die Zeit immer mehr
