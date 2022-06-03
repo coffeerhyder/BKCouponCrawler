@@ -12,7 +12,8 @@ from couchdb.mapping import TextField, FloatField, ListField, IntegerField, Bool
     DateTimeField
 from pydantic import BaseModel
 
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponSources, CouponSource, \
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponSources, \
+    CouponSource, \
     formatPrice
 
 
@@ -95,15 +96,19 @@ class Coupon(Document):
             return False
 
     def getPrice(self) -> Union[float, None]:
-        # TODO: Make use of this
         return self.price
 
     def getPriceCompare(self) -> Union[float, None]:
-        # TODO: Make use of this
         return self.priceCompare
 
     def isEatable(self) -> bool:
         """ If the product(s) this coupon provide(s) is/are not eatable and e.g. just probide a discount like Payback coupons, this will return False, else True. """
+        if self.source == CouponSource.PAYBACK:
+            return False
+        else:
+            return True
+
+    def isEligibleForDuplicateRemoval(self):
         if self.source == CouponSource.PAYBACK:
             return False
         else:
@@ -531,8 +536,9 @@ class ChannelCoupon(Document):
 
 class CouponSortMode(Enum):
     PRICE = 0
-    MENU_PRICE = 1
-    SOURCE_MENU_PRICE = 2
+    PRICE_DESCENDING = 1
+    MENU_PRICE = 2
+    SOURCE_MENU_PRICE = 3
 
 
 def getImageBasePath() -> str:
@@ -558,16 +564,22 @@ def getCouponsSeparatedByType(coupons: dict) -> dict:
     return couponsSeparatedByType
 
 
-def sortCouponsByPrice(couponList: List[Coupon]) -> List[Coupon]:
+def sortCouponsByPrice(couponList: List[Coupon], descending: bool = False) -> List[Coupon]:
     """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
-    return sorted(couponList,
-                  key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
+    if descending:
+        return sorted(couponList,
+                      key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1), reverse=True)
+    else:
+        return sorted(couponList,
+                      key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
 
 
 class CouponFilter(BaseModel):
+    """ removeDuplicates: Enable to filter duplicated coupons for same products - only returns cheapest of all
+     If the same product is available as paper- and app coupon, App coupon is preferred."""
     activeOnly: Optional[bool] = True
     containsFriesAndCoke: Optional[Union[bool, None]] = None
-    excludeCouponsByDuplicatedProductTitles: Optional[
+    removeDuplicates: Optional[
         bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
     allowedCouponSources: Optional[Union[List[int], None]] = None  # None = allow all sources!
     isNew: Optional[Union[bool, None]] = None
@@ -611,7 +623,7 @@ USER_SETTINGS_ON_OFF = {
         "default": True
     },
     "displayBKWebsiteURLs": {
-        "description": "BK Verlinkungen im Hauptmenü zeigen?",
+        "description": "BK Verlinkungen im Hauptmenü zeigen",
         "default": True
     },
     "highlightFavoriteCouponsInButtonTexts": {

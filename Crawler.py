@@ -660,7 +660,7 @@ class BKCrawler:
                         originalPrice = coupon.getPriceCompare()
                 if originalPrice is not None:
                     for coupon in couponsContainingSameProducts:
-                        if coupon.priceCompare is None:
+                        if coupon.getPriceCompare() is None:
                             coupon.priceCompare = originalPrice
         # Collect items we want to add to DB
         couponsToAddToDB = {}
@@ -1119,19 +1119,52 @@ class BKCrawler:
                 continue
             else:
                 desiredCoupons[uniqueCouponID] = coupon
-        if filters.excludeCouponsByDuplicatedProductTitles:
+        # Remove duplicates if needed and if it makes sense to attempt that
+        if filters.removeDuplicates is True and filters.allowedCouponSources is None or (filters.allowedCouponSources is not None and len(filters.allowedCouponSources) > 1):
             couponTitleMappingTmp = getCouponTitleMapping(desiredCoupons)
             # Now clean our mapping: Sometimes one product may be available twice with multiple prices -> We want exactly one mapping per title
             desiredCouponsWithoutDuplicates = {}
             for normalizedTitle, coupons in couponTitleMappingTmp.items():
-                if len(coupons) > 1:
-                    # Sort these ones by price and pick the first (= cheapest) one for our mapping.
-                    couponsSorted = sortCouponsByPrice(coupons)
+                couponsForDuplicateRemoval = []
+                for coupon in coupons:
+                    if coupon.isEligibleForDuplicateRemoval():
+                        couponsForDuplicateRemoval.append(coupon)
+                    else:
+                        # We cannot remove this coupon as duplicate by title -> Add it to our final results list
+                        desiredCouponsWithoutDuplicates[coupon.id] = coupon
+                # Check if anything is left to do
+                if len(couponsForDuplicateRemoval) == 0:
+                    continue
+                # Sort these ones by price and pick the first (= cheapest) one for our mapping.
+                isDifferentPrices = False
+                firstPrice = None
+                appCoupon = None
+                if len(couponsForDuplicateRemoval) == 1:
+                    coupon = couponsForDuplicateRemoval[0]
+                    desiredCouponsWithoutDuplicates[coupon.id] = coupon
+                    continue
+                for coupon in couponsForDuplicateRemoval:
+                    if firstPrice is None:
+                        firstPrice = coupon.getPrice()
+                    elif coupon.getPrice() is not None and coupon.getPrice() != firstPrice:
+                        isDifferentPrices = True
+                    if coupon.source == CouponSource.APP:
+                        appCoupon = coupon
+                if isDifferentPrices:
+                    # Prefer cheapest coupon
+                    couponsSorted = sortCouponsByPrice(couponsForDuplicateRemoval)
                     coupon = couponsSorted[0]
+                elif appCoupon is not None:
+                    # Same prices but different sources -> Prefer App coupon
+                    coupon = appCoupon
                 else:
-                    coupon = coupons[0]
+                    # Same prices but all coupons are from the same source -> Should never happen but we'll cover it anyways -> Select first item.
+                    coupon = couponsForDuplicateRemoval[0]
                 desiredCouponsWithoutDuplicates[coupon.id] = coupon
+            numberofRemovedDuplicates = len(desiredCoupons) - len(desiredCouponsWithoutDuplicates)
+            logging.info("Number of removed duplicates: " + str(numberofRemovedDuplicates))
             desiredCoupons = desiredCouponsWithoutDuplicates
+        # Now check if the result shall be sorted
         if filters.sortMode is None:
             return desiredCoupons
         else:
@@ -1177,6 +1210,8 @@ class BKCrawler:
                 filteredCouponsList = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
             elif filters.sortMode == CouponSortMode.PRICE:
                 filteredCouponsList = sortCouponsByPrice(filteredCouponsList)
+            elif filters.sortMode == CouponSortMode.PRICE_DESCENDING:
+                filteredCouponsList = sortCouponsByPrice(filteredCouponsList, descending=True)
             else:
                 # This should never happen
                 logging.warning("Developer mistake!! Unknown sortMode: " + filters.sortMode.name)
