@@ -1120,7 +1120,7 @@ class BKCrawler:
             else:
                 desiredCoupons[uniqueCouponID] = coupon
         # Remove duplicates if needed and if it makes sense to attempt that
-        if filters.removeDuplicates is True and filters.allowedCouponSources is None or (filters.allowedCouponSources is not None and len(filters.allowedCouponSources) > 1):
+        if filters.removeDuplicates is True and (filters.allowedCouponSources is None or (filters.allowedCouponSources is not None and len(filters.allowedCouponSources) > 1)):
             couponTitleMappingTmp = getCouponTitleMapping(desiredCoupons)
             # Now clean our mapping: Sometimes one product may be available twice with multiple prices -> We want exactly one mapping per title
             desiredCouponsWithoutDuplicates = {}
