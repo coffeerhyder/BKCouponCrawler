@@ -45,13 +45,13 @@ DEBUGCRAWLER = False
 
 class UserStats:
     """ Returns an object containing statistic data about given users Database instance. """
-    def __init__(self, uSB: Database):
+    def __init__(self, usrDB: Database):
         self.numberofUsersWhoFoundEasterEgg = 0
         self.numberofFavorites = 0
         self.numberofUsersWhoBlockedBot = 0
         self.numberofUsersWhoAddedPaybackCard = 0
-        for userID in uSB:
-            userTmp = User.load(uSB, userID)
+        for userID in usrDB:
+            userTmp = User.load(usrDB, userID)
             if userTmp.hasFoundEasterEgg():
                 self.numberofUsersWhoFoundEasterEgg += 1
             self.numberofFavorites += len(userTmp.favoriteCoupons)
