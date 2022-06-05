@@ -143,9 +143,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 # TODOs
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Bot: Beliebige Sortierung einbauen und letzte Sortierung speichern
-* Bot: Einstellungsmöglichkeit "Duplikate entfernen" einbauen
 * Start-Script prüfen
-* /stats Command fixen --> "Payback Workaround" entfernen/verbessern
 * Handling mit Datumsangaben verbessern
 * Produktnamen-Handling für Payback Coupons generischer gestalten
 * isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?

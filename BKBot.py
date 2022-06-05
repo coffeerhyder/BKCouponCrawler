@@ -1,3 +1,4 @@
+import logging
 import math
 import sys
 import time
@@ -18,7 +19,7 @@ from BotUtils import *
 from BaseUtils import *
 
 from Helper import *
-from Crawler import BKCrawler
+from Crawler import BKCrawler, UserStats
 
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
     USER_SETTINGS_ON_OFF
@@ -335,28 +336,16 @@ class BKBot:
         """ Wrapper and this is only to be used for commands. """
         couponDB = self.getBotCoupons()
         userDB = self.crawler.getUsersDB()
+        userStats = UserStats(userDB)
         activeOffers = self.crawler.getOffersActive()
-        numberofUsersWhoFoundEasterEgg = 0
-        numberofFavorites = 0
-        numberofUsersWhoBlockedBot = 0
-        numberofUsersWhoAddedPaybackCard = 0
-        for userID in userDB:
-            userTmp = User.load(userDB, userID)
-            if userTmp.hasFoundEasterEgg():
-                numberofUsersWhoFoundEasterEgg += 1
-            numberofFavorites += len(userTmp.favoriteCoupons)
-            if userTmp.hasProbablyBlockedBot():
-                numberofUsersWhoBlockedBot += 1
-            if userTmp.getPaybackCardNumber() is not None:
-                numberofUsersWhoAddedPaybackCard += 1
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
         text = '<b>Hallo Nerd</b>'
         text += '\n<pre>'
         text += 'Anzahl User im Bot: ' + str(len(userDB))
-        text += '\nAnzahl insgesamt von Usern gesetzte Favoriten: ' + str(numberofFavorites)
-        text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(numberofUsersWhoFoundEasterEgg)
-        text += '\nAnzahl User, die den Bot geblockt haben: ' + str(numberofUsersWhoBlockedBot)
-        text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(numberofUsersWhoAddedPaybackCard)
+        text += '\nAnzahl von Usern gesetzte Favoriten: ' + str(userStats.numberofFavorites)
+        text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(userStats.numberofUsersWhoFoundEasterEgg)
+        text += '\nAnzahl User, die den Bot geblockt haben: ' + str(userStats.numberofUsersWhoBlockedBot)
+        text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
         text += '\nAnzahl Aufrufe Easter-Egg von dir: ' + str(user.easterEggCounter)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(activeOffers))
@@ -381,32 +370,32 @@ class BKBot:
             if mode == CouponDisplayMode.ALL:
                 # Display all coupons
                 coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories))
+                    CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategoryDummy = CouponCategory(coupons)
                 menuText = couponCategoryDummy.getCategoryInfoText(withMenu=None, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                 # Display all coupons without menu
                 coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
+                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategoryDummy = CouponCategory(coupons)
                 menuText = couponCategoryDummy.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.CATEGORY:
                 # Display all coupons of a particular category
                 couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=None,
-                                                               isHidden=displayHiddenCouponsWithinOtherCategories))
+                                                               isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategory = CouponCategory(coupons)
                 menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.CATEGORY_WITHOUT_MENU:
                 # Display all coupons of a particular category without menu
                 couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories))
+                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategory = CouponCategory(coupons)
                 menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                 # Display all hidden App coupons (ONLY)
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[CouponSource.APP], containsFriesAndCoke=None, isHidden=True))
+                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[CouponSource.APP], containsFriesAndCoke=None, isHidden=True, removeDuplicates=user.settings.hideDuplicates))
                 couponCategoryDummy = CouponCategory(coupons)
                 menuText = couponCategoryDummy.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
             elif mode == CouponDisplayMode.FAVORITES:
@@ -631,10 +620,11 @@ class BKBot:
                 if settingKey == 'notifyWhenFavoritesAreBack' and userWantsAutodeleteOfFavoriteCoupons:
                     continue
                 if user.settings.get(settingKey, dummyUser.settings[settingKey]):
-                    # Add symbol to enabled settings button text so user can see which settings are currently enabled
+                    # Setting is currently enabled
                     keyboard.append(
                         [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
                 else:
+                    # Setting is currently disabled
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         if user.getPaybackCardNumber() is None:
             keyboard.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
@@ -1285,14 +1275,6 @@ class BKBot:
             # Add user to DB for the first time
             logging.info('Storing new userID: ' + str(userID))
             user = User(id=str(userID))
-            user.store(userDB)
-        if 'paybackCard' not in user:
-            # 2022-02-01: Workaround for WTF bug; only affects existing users
-            logging.info('Doing Payback DB workaround for user: ' + str(userID))
-            user['paybackCard'] = {
-                'paybackCardNumber': None,
-                'addedDate': None
-            }
             user.store(userDB)
         return user
 

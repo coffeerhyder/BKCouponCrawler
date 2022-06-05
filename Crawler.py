@@ -21,7 +21,7 @@ from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponGetStartTimestamp
 from UtilsCouponsDB import getImageBasePath, \
-    Coupon, InfoEntry, CouponSortMode, sortCouponsByPrice, CouponFilter, getCouponTitleMapping
+    Coupon, InfoEntry, CouponSortMode, sortCouponsByPrice, CouponFilter, getCouponTitleMapping, User
 from CouponCategory import CouponCategory
 
 HEADERS_OLD = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
@@ -41,6 +41,25 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 # x-user-datetime: 2022-03-16T20:59:45+01:00
 """ Enable this to crawl from localhost instead of API. Useful if there is a lot of testing to do! """
 DEBUGCRAWLER = False
+
+
+class UserStats:
+    """ Returns an object containing statistic data about given users Database instance. """
+    def __init__(self, uSB: Database):
+        self.numberofUsersWhoFoundEasterEgg = 0
+        self.numberofFavorites = 0
+        self.numberofUsersWhoBlockedBot = 0
+        self.numberofUsersWhoAddedPaybackCard = 0
+        for userID in uSB:
+            userTmp = User.load(uSB, userID)
+            if userTmp.hasFoundEasterEgg():
+                self.numberofUsersWhoFoundEasterEgg += 1
+            self.numberofFavorites += len(userTmp.favoriteCoupons)
+            if userTmp.hasProbablyBlockedBot():
+                self.numberofUsersWhoBlockedBot += 1
+            userTmp.getPaybackCardNumber()
+            if userTmp.getPaybackCardNumber() is not None:
+                self.numberofUsersWhoAddedPaybackCard += 1
 
 
 class BKCrawler:
@@ -91,6 +110,17 @@ class BKCrawler:
         if DATABASES.TELEGRAM_CHANNEL not in self.couchdb:
             logging.info("Creating missing DB: " + DATABASES.TELEGRAM_CHANNEL)
             self.couchdb.create(DATABASES.TELEGRAM_CHANNEL)
+        # Test 2022-06-05 to find invalid datasets
+        # userDB = self.couchdb[DATABASES.TELEGRAM_USERS]
+        # if os.path.exists('telegram_users.json'):
+        #     usersOld = loadJson("telegram_users.json")['docs']
+        #     for userO in usersOld:
+        #         user = User.wrap(userO)
+        #         del user.data['_rev']
+        #         if user.id not in userDB:
+        #             logging.info("Adding new user: " + str(user.id))
+        #             user.store(userDB)
+
         # Create required folders
         if not os.path.exists(getImageBasePath()):
             logging.info("Creating missing filepath: " + getImageBasePath())
@@ -279,7 +309,6 @@ class BKCrawler:
             crawledCouponsDict[uniqueCouponID] = newCoupon
         logging.info('Coupons in old app API: ' + str(len(appCoupons)))
         logging.info("Total coupons1_old crawl time: " + getFormattedPassedTime(timestampCrawlStart))
-
 
     def crawlCoupons2(self, crawledCouponsDict: dict):
         """ Crawls coupons from secondary sources and adds additional information to the data crawled via app API.
@@ -1162,7 +1191,7 @@ class BKCrawler:
                     coupon = couponsForDuplicateRemoval[0]
                 desiredCouponsWithoutDuplicates[coupon.id] = coupon
             numberofRemovedDuplicates = len(desiredCoupons) - len(desiredCouponsWithoutDuplicates)
-            logging.info("Number of removed duplicates: " + str(numberofRemovedDuplicates))
+            logging.debug("Number of removed duplicates: " + str(numberofRemovedDuplicates))
             desiredCoupons = desiredCouponsWithoutDuplicates
         # Now check if the result shall be sorted
         if filters.sortMode is None:

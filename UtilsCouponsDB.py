@@ -357,6 +357,7 @@ class User(Document):
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
             highlightNewCouponsInCouponButtonTexts=BooleanField(default=True),
+            hideDuplicates=BooleanField(default=False),
             autoDeleteExpiredFavorites=BooleanField(default=False),
             enableBetaFeatures=BooleanField(default=False)
         )
@@ -421,7 +422,12 @@ class User(Document):
             return False
 
     def getPaybackCardNumber(self) -> Union[str, None]:
-        return self.paybackCard.paybackCardNumber
+        """ TODO: Can this be considered a workaround or is the mapping made in a stupid way that it does not return "None" for keys without defined defaults??!
+          doing User.paybackCard.paybackCardNumber directly would raise an AttributeError! """
+        if len(self.paybackCard) > 0:
+            return self.paybackCard.paybackCardNumber
+        else:
+            return None
 
     def getPaybackCardImage(self) -> bytes:
         ean = EuropeanArticleNumber13(ean='240' + self.getPaybackCardNumber(), writer=ImageWriter())
