@@ -4,6 +4,7 @@ from Helper import SYMBOLS
 
 VERSION = '1.6.9'
 
+""" Place static stuff into this class. """
 
 def getBotImpressum() -> str:
     text = "BKBot v." + VERSION
@@ -58,3 +59,7 @@ class BetterBotException(Exception):
 
     def getReplyMarkup(self) -> InlineKeyboardMarkup:
         return self.replyMarkup
+
+
+def getImageBasePath() -> str:
+    return "crawler/images/couponsproductive"

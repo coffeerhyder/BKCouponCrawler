@@ -8,7 +8,7 @@ from telegram import InputMediaPhoto
 from telegram.error import BadRequest, Unauthorized
 
 from BotUtils import getBotImpressum
-from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponSources
+from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes
 
 from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter, sortCouponsByPrice, getCouponTitleMapping
 
@@ -24,7 +24,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info("Checking for pending new coupons notifications")
     timestampStart = datetime.now().timestamp()
     userDB = bkbot.crawler.getUsersDB()
-    allNewCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
+    allNewCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.PRICE))
     if len(allNewCoupons) == 0:
         logging.info("No new coupons available to notify about")
         return
@@ -121,7 +121,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     if len(dbUserFavoritesUpdates) > 0:
         logging.info("Auto updated favorites of " + str(len(dbUserFavoritesUpdates)) + " users")
         userDB.update(list(dbUserFavoritesUpdates))
-    logging.info("Notifying " + str(len(usersNotify)) + " users about favorites / new coupons")
+    logging.info("Notifying " + str(len(usersNotify)) + " users about favorites/new coupons")
     index = -1
     dbUserUpdates = []
     usersToDelete = []
@@ -129,7 +129,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     for userIDStr, postText in usersNotify.items():
         index += 1
         # isLastItem = index == len(usersNotify) - 1
-        logging.info("Sending user notification " + str(index + 1) + " / " + str(len(usersNotify)) + " to user: " + userIDStr)
+        logging.info("Sending user notification " + str(index + 1) + "/" + str(len(usersNotify)) + " to user: " + userIDStr)
         user = User.load(userDB, userIDStr)
         try:
             bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
@@ -182,7 +182,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Update channel info and DB
     channelInfoDoc.timestampLastChannelUpdate = getCurrentDate().timestamp()
     channelInfoDoc.store(channelInfoDB)
-    activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+    activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
@@ -385,7 +385,7 @@ def nukeChannel(bkbot):
         initialItemNumber = len(channelDB)
         for couponID in channelDB:
             index += 1
-            logging.info("Working on coupon " + str(index) + " / " + str(initialItemNumber))
+            logging.info("Working on coupon " + str(index) + "/" + str(initialItemNumber))
             channelCoupon = ChannelCoupon.load(channelDB, couponID)
             messageIDs = channelCoupon.getMessageIDs()
             for messageID in messageIDs:
@@ -394,11 +394,11 @@ def nukeChannel(bkbot):
     # Delete coupon overview messages
     logging.info("Deleting information messages...")
     updateInfoDoc = False
-    for couponSource in BotAllowedCouponSources:
-        couponOverviewMessageIDs = infoDoc.getMessageIDsForCouponCategory(couponSource)
+    for couponType in BotAllowedCouponTypes:
+        couponOverviewMessageIDs = infoDoc.getMessageIDsForCouponCategory(couponType)
         if len(couponOverviewMessageIDs) > 0:
             bkbot.deleteMessages(chat_id=bkbot.getPublicChannelChatID(), messageIDs=couponOverviewMessageIDs)
-            infoDoc.deleteCouponCategoryMessageIDs(couponSource)
+            infoDoc.deleteCouponCategoryMessageIDs(couponType)
             updateInfoDoc = True
     # Delete coupon information message
     if infoDoc.informationMessageID is not None:

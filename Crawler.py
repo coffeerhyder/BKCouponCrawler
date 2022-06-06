@@ -12,16 +12,15 @@ import couchdb
 from json import loads
 
 import PaperCouponHelper
-from BotUtils import Config
+from BotUtils import Config, getImageBasePath
 from Helper import *
 from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, \
-    isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, BotAllowedCouponSources, CouponSource, Paths
+    isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, BotAllowedCouponTypes, CouponType, Paths
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponGetStartTimestamp
-from UtilsCouponsDB import getImageBasePath, \
-    Coupon, InfoEntry, CouponSortMode, sortCouponsByPrice, CouponFilter, getCouponTitleMapping, User
+from UtilsCouponsDB import Coupon, InfoEntry, CouponSortMode, sortCouponsByPrice, CouponFilter, getCouponTitleMapping, User, removeDuplicatedCoupons
 from CouponCategory import CouponCategory
 
 HEADERS_OLD = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
@@ -45,6 +44,7 @@ DEBUGCRAWLER = False
 
 class UserStats:
     """ Returns an object containing statistic data about given users Database instance. """
+
     def __init__(self, usrDB: Database):
         self.numberofUsersWhoFoundEasterEgg = 0
         self.numberofFavorites = 0
@@ -224,13 +224,14 @@ class BKCrawler:
             self.downloadProductiveCouponDBImagesAndCreateQRCodes()
             # self.checkProductiveCouponsDBImagesIntegrity()
             # self.checkProductiveOffersDBImagesIntegrity()
-            self.checkProductiveCouponDBForAnomalies()
             logging.info("Total crawl duration: " + getFormattedPassedTime(timestampStart))
         finally:
             self.updateCache(self.getCouponDB())
 
     def crawlCoupons1New(self, crawledCouponsDict: dict):
-        """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
+        """ Stores coupons from App API, generates- and adds some special strings to DB for later usage.
+         This is work in progress. Does not work yet!!
+         """
         timestampCrawlStart = datetime.now().timestamp()
         conn = HTTP20Connection('euc1-prod-bk.rbictg.com')
         conn.request("POST", '/graphql', body="TODO"
@@ -253,7 +254,7 @@ class BKCrawler:
                 titleFull = sanitizeCouponTitle(title + subtitle)
                 imageURL = couponBK['localizedImage']['de']['app']['asset']['url']
                 newCoupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
-                                   source=CouponSource.APP, price=couponBK['offerPrice'])
+                                   source=CouponType.APP, price=couponBK['offerPrice'])
                 newCoupon.imageURL = imageURL
                 # Find expire-date
                 ruleSets = couponBK['ruleSet']
@@ -281,7 +282,7 @@ class BKCrawler:
             appCouponsIDs.append(uniqueCouponID)
             titleFull = sanitizeCouponTitle(couponGetTitleFull(coupon))
             newCoupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=coupon['plu'], title=titleFull, titleShortened=shortenProductNames(titleFull),
-                               source=CouponSource.APP, isHidden=coupon['hidden'])
+                               source=CouponType.APP, isHidden=coupon['hidden'])
             expireDatetime = couponGetExpireDatetime(coupon)
             if expireDatetime is not None:
                 newCoupon.timestampExpire = expireDatetime.timestamp()
@@ -461,7 +462,7 @@ class BKCrawler:
                         priceCompare = -1
                 # Check if this coupon exists/existed in app -> Update information as other BK endpoints may serve more info than their official app endpoint!
                 existantCoupon = crawledCouponsDict.get(uniqueCouponID)
-                if existantCoupon is not None and existantCoupon.isValid() and existantCoupon.source == CouponSource.APP:
+                if existantCoupon is not None and existantCoupon.isValid() and existantCoupon.getCouponType() == CouponType.APP:
                     # Update existing app coupon with new information.
                     if existantCoupon.price is None:
                         # 201-07-06: Only update current price if we failed to find it before as entrys of this APIs can sometimes be wrong (e.g. for 32749: 4,99€ according to this API but 9,89€ according to API)
@@ -473,7 +474,7 @@ class BKCrawler:
                         existantCoupon.priceCompare = priceCompare
                 else:
                     # Add/Update non-App coupons
-                    newCoupon = Coupon(id=uniqueCouponID, source=CouponSource.UNKNOWN, uniqueID=uniqueCouponID, plu=plu, title=title, titleShortened=shortenProductNames(title),
+                    newCoupon = Coupon(id=uniqueCouponID, source=CouponType.UNKNOWN, uniqueID=uniqueCouponID, plu=plu, title=title, titleShortened=shortenProductNames(title),
                                        timestampStart=expirationDate.timestamp(), timestampExpire=expirationDate.timestamp(),
                                        dateFormattedStart=formatDateGerman(startDate), dateFormattedExpire=formatDateGerman(expirationDate),
                                        price=price, containsFriesOrCoke=couponTitleContainsFriesOrCoke(title))
@@ -560,7 +561,7 @@ class BKCrawler:
             paperCouponOverride = paperCouponMapping.get(coupon.id)
             if paperCouponOverride is not None:
                 usedMappingToFindPaperCoupons = True
-                coupon.source = CouponSource.PAPER
+                coupon.source = CouponType.PAPER
                 coupon.timestampExpire = paperCouponOverride.timestampExpire
                 coupon.dateFormattedExpire = paperCouponOverride.dateFormattedExpire
                 coupon.plu = paperCouponOverride.plu
@@ -569,7 +570,7 @@ class BKCrawler:
         if usedMappingToFindPaperCoupons:
             # New/current handling
             for crawledCoupon in crawledCouponsDict.values():
-                if crawledCoupon.source == CouponSource.PAPER:
+                if crawledCoupon.source == CouponType.PAPER:
                     foundPaperCoupons.append(crawledCoupon)
         else:
             # Old/fallback handling -> DEPRECATED
@@ -630,7 +631,7 @@ class BKCrawler:
                         # Add them with fake validity of 2 days
                         artificialExpireTimestamp = todayDayEnd.timestamp() + 2 * 24 * 60
                         for paperCoupon in paperCoupons:
-                            paperCoupon.source = CouponSource.PAPER
+                            paperCoupon.source = CouponType.PAPER
                             paperCoupon.timestampExpire = artificialExpireTimestamp
                             paperCoupon.dateFormattedExpire = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
                             paperCoupon.isUnsafeExpiredate = True
@@ -848,7 +849,7 @@ class BKCrawler:
         for couponIDStr in couponDB:
             coupon = Coupon.load(couponDB, couponIDStr)
             # 2021-04-20: Skip invalid/expired coupons as they're not relevant for the user (we don't access them anyways at this moment).
-            if coupon.source not in BotAllowedCouponSources or not coupon.isValid():
+            if coupon.source not in BotAllowedCouponTypes or not coupon.isValid():
                 continue
             imagePathCoupon = coupon.getImagePath()
             if not isValidImageFile(imagePathCoupon):
@@ -872,17 +873,6 @@ class BKCrawler:
                 numberOfMissingImages += 1
         if numberOfMissingImages > 0:
             logging.warning("Total number of missing images: " + str(numberOfMissingImages))
-
-    def checkProductiveCouponDBForAnomalies(self):
-        couponDB = self.getCouponDB()
-        # Check for e.g. two times "D13" which is listed under at least two separate IDs -> Should never happen but can happen...
-        pluDuplicateMap = {}
-        for uniqueCouponID in couponDB:
-            currentPLUDupeList = pluDuplicateMap.setdefault(uniqueCouponID, [])
-            currentPLUDupeList.append(uniqueCouponID)
-        for plu, dupeList in pluDuplicateMap.items():
-            if len(dupeList) > 1:
-                logging.warning("Found dupes for PLU: " + plu + " | " + str(dupeList))
 
     def crawlProducts_DEPRECATED(self):
         # 2021-04-20: Not required at this moment!
@@ -1051,7 +1041,7 @@ class BKCrawler:
             writer.writeheader()
             for couponID in couponDB:
                 coupon = Coupon.load(couponDB, couponID)
-                if coupon.source != CouponSource.PAPER:
+                if coupon.source != CouponType.PAPER:
                     continue
                 writer.writerow({'Produkt': coupon.getTitle(), 'Menü': coupon.isContainsFriesOrCoke(),
                                  'PLU': coupon.plu, 'PLU2': coupon.id,
@@ -1072,7 +1062,7 @@ class BKCrawler:
         # Overwrite old cache
         self.cachedAvailableCouponCategories = newCachedAvailableCouponCategories
 
-    def getCachedCouponCategory(self, couponSrc: Union[CouponSource, int]):
+    def getCachedCouponCategory(self, couponSrc: Union[CouponType, int]):
         return self.cachedAvailableCouponCategories.get(couponSrc)
 
     def updateCachedMissingPaperCouponsInfo(self, couponDB: Database):
@@ -1135,7 +1125,7 @@ class BKCrawler:
             if filters.activeOnly and not coupon.isValid():
                 # Skip expired coupons if needed
                 continue
-            elif filters.allowedCouponSources is not None and coupon.source not in filters.allowedCouponSources:
+            elif filters.allowedCouponTypes is not None and coupon.source not in filters.allowedCouponTypes:
                 # Skip non-allowed coupon-types
                 continue
             elif filters.containsFriesAndCoke is not None and coupon.isContainsFriesOrCoke() != filters.containsFriesAndCoke:
@@ -1149,50 +1139,8 @@ class BKCrawler:
             else:
                 desiredCoupons[uniqueCouponID] = coupon
         # Remove duplicates if needed and if it makes sense to attempt that
-        if filters.removeDuplicates is True and (filters.allowedCouponSources is None or (filters.allowedCouponSources is not None and len(filters.allowedCouponSources) > 1)):
-            couponTitleMappingTmp = getCouponTitleMapping(desiredCoupons)
-            # Now clean our mapping: Sometimes one product may be available twice with multiple prices -> We want exactly one mapping per title
-            desiredCouponsWithoutDuplicates = {}
-            for normalizedTitle, coupons in couponTitleMappingTmp.items():
-                couponsForDuplicateRemoval = []
-                for coupon in coupons:
-                    if coupon.isEligibleForDuplicateRemoval():
-                        couponsForDuplicateRemoval.append(coupon)
-                    else:
-                        # We cannot remove this coupon as duplicate by title -> Add it to our final results list
-                        desiredCouponsWithoutDuplicates[coupon.id] = coupon
-                # Check if anything is left to do
-                if len(couponsForDuplicateRemoval) == 0:
-                    continue
-                # Sort these ones by price and pick the first (= cheapest) one for our mapping.
-                isDifferentPrices = False
-                firstPrice = None
-                appCoupon = None
-                if len(couponsForDuplicateRemoval) == 1:
-                    coupon = couponsForDuplicateRemoval[0]
-                    desiredCouponsWithoutDuplicates[coupon.id] = coupon
-                    continue
-                for coupon in couponsForDuplicateRemoval:
-                    if firstPrice is None:
-                        firstPrice = coupon.getPrice()
-                    elif coupon.getPrice() is not None and coupon.getPrice() != firstPrice:
-                        isDifferentPrices = True
-                    if coupon.source == CouponSource.APP:
-                        appCoupon = coupon
-                if isDifferentPrices:
-                    # Prefer cheapest coupon
-                    couponsSorted = sortCouponsByPrice(couponsForDuplicateRemoval)
-                    coupon = couponsSorted[0]
-                elif appCoupon is not None:
-                    # Same prices but different sources -> Prefer App coupon
-                    coupon = appCoupon
-                else:
-                    # Same prices but all coupons are from the same source -> Should never happen but we'll cover it anyways -> Select first item.
-                    coupon = couponsForDuplicateRemoval[0]
-                desiredCouponsWithoutDuplicates[coupon.id] = coupon
-            numberofRemovedDuplicates = len(desiredCoupons) - len(desiredCouponsWithoutDuplicates)
-            logging.debug("Number of removed duplicates: " + str(numberofRemovedDuplicates))
-            desiredCoupons = desiredCouponsWithoutDuplicates
+        if filters.removeDuplicates is True and (filters.allowedCouponTypes is None or (filters.allowedCouponTypes is not None and len(filters.allowedCouponTypes) > 1)):
+            desiredCoupons = removeDuplicatedCoupons(desiredCoupons)
         # Now check if the result shall be sorted
         if filters.sortMode is None:
             return desiredCoupons
@@ -1202,10 +1150,10 @@ class BKCrawler:
             if filters.sortMode == CouponSortMode.SOURCE_MENU_PRICE:
                 couponsWithoutFriesOrCoke = []
                 couponsWithFriesOrCoke = []
-                allContainedCouponSources = []
+                allContainedCouponTypes = []
                 for coupon in filteredCouponsList:
-                    if coupon.source not in allContainedCouponSources:
-                        allContainedCouponSources.append(coupon.source)
+                    if coupon.source not in allContainedCouponTypes:
+                        allContainedCouponTypes.append(coupon.source)
                     if coupon.isContainsFriesOrCoke():
                         couponsWithFriesOrCoke.append(coupon)
                     else:
@@ -1215,12 +1163,12 @@ class BKCrawler:
                 # Merge them together again.
                 filteredCouponsList = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
                 # App coupons(source == 0) > Paper coupons
-                allContainedCouponSources.sort()
+                allContainedCouponTypes.sort()
                 # Separate sorted coupons by type
                 couponsSeparatedByType = {}
-                for couponSource in allContainedCouponSources:
-                    couponsTmp = list(filter(lambda x: x.source == couponSource, filteredCouponsList))
-                    couponsSeparatedByType[couponSource] = couponsTmp
+                for couponType in allContainedCouponTypes:
+                    couponsTmp = list(filter(lambda x: x.source == couponType, filteredCouponsList))
+                    couponsSeparatedByType[couponType] = couponsTmp
                 # Put our list sorted by type together again -> Sort done
                 filteredCouponsList = []
                 for allCouponsOfOneSourceType in couponsSeparatedByType.values():
@@ -1270,7 +1218,7 @@ class BKCrawler:
 
     def getBotCoupons(self) -> dict:
         """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
-        return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.PRICE))
+        return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.PRICE))
 
 
 def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
@@ -1341,7 +1289,7 @@ def getCouponMappingForCrawler() -> dict:
         if mappingTmp is not None:
             expireTimestamp = paperData['expire_timestamp']
             for uniquePaperCouponID, plu in mappingTmp.items():
-                paperCouponMapping[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, source=CouponSource.PAPER, plu=plu, timestampExpire=expireTimestamp,
+                paperCouponMapping[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, source=CouponType.PAPER, plu=plu, timestampExpire=expireTimestamp,
                                                                  dateFormattedExpire=formatDateGerman(expireTimestamp))
     return paperCouponMapping
 
