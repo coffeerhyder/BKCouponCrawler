@@ -93,6 +93,7 @@ class Coupon(Document):
              """
             return True
         else:
+            """ Coupon is not expired or not "long enough". """
             return False
 
     def isValid(self):
