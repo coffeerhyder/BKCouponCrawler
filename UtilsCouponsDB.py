@@ -35,7 +35,7 @@ class Coupon(Document):
     imageURL = TextField()
     paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
-    source = IntegerField()  # Legacy. This is called "type" now!
+    type = IntegerField(name='source')  # Legacy. This is called "type" now!
     containsFriesOrCoke = BooleanField()
     isNew = BooleanField()
     isNewUntilDate = TextField()
@@ -74,6 +74,27 @@ class Coupon(Document):
         return self.titleShortened
         # return shortenProductNames(self.title)
 
+    def isExpired(self):
+        """ Wrapper """
+        if not self.isValid():
+            return True
+        else:
+            return False
+
+    def isExpiredForLongerTime(self):
+        """ Using this check, coupons that e.g. expire on midnight and get elongated will not be marked as new because really they aren't. """
+        expireDatetime = self.getExpireDatetime()
+        if expireDatetime is None:
+            return True
+        elif getCurrentDate().second - expireDatetime.second > 3600:
+            """ 
+             Coupon expired over one hour ago -> We consider this a "longer time"
+             Using this check, coupons that e.g. expire on midnight and get elongated will not be marked as new because really they aren't.
+             """
+            return True
+        else:
+            return False
+
     def isValid(self):
         expireDatetime = self.getExpireDatetime()
         if expireDatetime is None:
@@ -86,7 +107,7 @@ class Coupon(Document):
 
     def isValidForBot(self) -> bool:
         """ Checks if the given coupon can be used in bot e.g. is from allowed source (App/Paper) and is valid. """
-        if self.source in BotAllowedCouponTypes and self.isValid():
+        if self.type in BotAllowedCouponTypes and self.isValid():
             return True
         else:
             return False
@@ -106,13 +127,13 @@ class Coupon(Document):
 
     def isEatable(self) -> bool:
         """ If the product(s) this coupon provide(s) is/are not eatable and e.g. just probide a discount like Payback coupons, this will return False, else True. """
-        if self.source == CouponType.PAYBACK:
+        if self.type == CouponType.PAYBACK:
             return False
         else:
             return True
 
     def isEligibleForDuplicateRemoval(self):
-        if self.source == CouponType.PAYBACK:
+        if self.type == CouponType.PAYBACK:
             return False
         else:
             return True
@@ -192,7 +213,7 @@ class Coupon(Document):
         return self.addedVia
 
     def getCouponType(self):
-        return self.source
+        return self.type
 
     def getUniqueIdentifier(self) -> str:
         """ Returns an unique identifier String which can be used to compare coupon objects. """
@@ -461,24 +482,23 @@ class User(Document):
         if len(self.favoriteCoupons) == 0:
             # User does not have any favorites set --> There is no point to look for the additional information
             return UserFavoritesInfo()
-        else:
-            availableFavoriteCoupons = []
-            unavailableFavoriteCoupons = []
-            for uniqueCouponID, coupon in self.favoriteCoupons.items():
-                couponFromProductiveDB = couponsFromDB.get(uniqueCouponID)
-                if couponFromProductiveDB is not None and couponFromProductiveDB.isValid():
-                    availableFavoriteCoupons.append(couponFromProductiveDB)
-                else:
-                    # User chosen favorite coupon has expired or is not in DB
-                    coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
-                    unavailableFavoriteCoupons.append(coupon)
-            # Sort all coupon arrays by price
-            if self.settings.hideDuplicates:
-                availableFavoriteCoupons = removeDuplicatedCoupons(availableFavoriteCoupons)
-            availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
-            unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
-            return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons,
-                                     favoritesUnavailable=unavailableFavoriteCoupons)
+        availableFavoriteCoupons = []
+        unavailableFavoriteCoupons = []
+        for uniqueCouponID, coupon in self.favoriteCoupons.items():
+            couponFromProductiveDB = couponsFromDB.get(uniqueCouponID)
+            if couponFromProductiveDB is not None and couponFromProductiveDB.isValid():
+                availableFavoriteCoupons.append(couponFromProductiveDB)
+            else:
+                # User chosen favorite coupon has expired or is not in DB
+                coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
+                unavailableFavoriteCoupons.append(coupon)
+        # Sort all coupon arrays by price
+        if self.settings.hideDuplicates:
+            availableFavoriteCoupons = removeDuplicatedCoupons(availableFavoriteCoupons)
+        availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
+        unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
+        return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons,
+                                 favoritesUnavailable=unavailableFavoriteCoupons)
 
     def resetSettings(self):
         dummyUser = User()
@@ -572,7 +592,7 @@ def getCouponsSeparatedByType(coupons: dict) -> dict:
     """ Returns dict containing lists of coupons by type """
     couponsSeparatedByType = {}
     for couponType in BotAllowedCouponTypes:
-        couponsTmp = list(filter(lambda x: x[Coupon.source.name] == couponType, list(coupons.values())))
+        couponsTmp = list(filter(lambda x: x[Coupon.type.name] == couponType, list(coupons.values())))
         if couponsTmp is not None and len(couponsTmp) > 0:
             couponsSeparatedByType[couponType] = couponsTmp
     return couponsSeparatedByType
@@ -702,7 +722,7 @@ def removeDuplicatedCoupons(coupons: Union[list, dict]) -> dict:
                 firstPrice = coupon.getPrice()
             elif coupon.getPrice() is not None and coupon.getPrice() != firstPrice:
                 isDifferentPrices = True
-            if coupon.source == CouponType.APP:
+            if coupon.type == CouponType.APP:
                 appCoupon = coupon
         if isDifferentPrices:
             # Prefer cheapest coupon

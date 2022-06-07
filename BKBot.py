@@ -247,6 +247,14 @@ class BKBot:
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+        # Test code to update DB structure TODO: maybe make use of this
+        # userDB = self.crawler.getUsersDB()
+        # dummyUser = User()
+        # dct = user.__dict__
+        # # dct2 = {**dct['_data'], **dummyUser.__dict__['_data']}
+        # dct2 = {**dummyUser.__dict__['_data'], **dct['_data']}
+        # user2 = User.wrap(dct2)
+        # user2.store(userDB)
         allButtons = []
         if self.getPublicChannelName() is not None:
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste + Pics + News', url='https://t.me/' + self.getPublicChannelName())])

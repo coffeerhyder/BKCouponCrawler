@@ -22,11 +22,11 @@ class CouponCategory:
         self.totalPrice = 0
         if isinstance(parameter, list):
             self.coupons = parameter
-            mainCouponType = self.coupons[0].source
+            mainCouponType = self.coupons[0].type
             isAllSameCouponType = True
             for coupon in self.coupons:
                 self.updateWithCouponInfo(coupon)
-                if coupon.source != mainCouponType:
+                if coupon.type != mainCouponType:
                     isAllSameCouponType = False
             if isAllSameCouponType:
                 self.mainCouponType = mainCouponType
@@ -196,7 +196,7 @@ class CouponCategory:
             couponList = couponOrCouponList
         for coupon in couponList:
             if coupon.isValid():
-                self.couponTypes.add(coupon.source)
+                self.couponTypes.add(coupon.type)
                 self.setNumberofCouponsTotal(self.numberofCouponsTotal + 1)
                 if coupon.isHidden:
                     self.setNumberofCouponsHidden(self.numberofCouponsHidden + 1)
@@ -225,7 +225,7 @@ class CouponCategory:
 def getCouponCategory(coupons: List[Coupon]) -> CouponCategory:
     """ Returns CouponCategory for given list of coupons.Assumes that this list only contains coupons of one
     category. """
-    mainCouponType = coupons[0].source
+    mainCouponType = coupons[0].type
     category = CouponCategory(parameter=mainCouponType)
     for coupon in coupons:
         category.updateWithCouponInfo(coupon)
