@@ -678,7 +678,7 @@ USER_SETTINGS_ON_OFF = {
         "default": False
     },
     "hideDuplicates": {
-        "description": "Duplikate ausblenden (App CP bevorzug.)",
+        "description": "Duplikate ausblenden |App CP bevorz.",
         "default": False
     }
 }

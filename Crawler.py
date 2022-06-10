@@ -735,17 +735,17 @@ class BKCrawler:
             flagNewCouponsAsNew = False
             logging.info("Not flagging new coupons as new in this run!!")
         for crawledCoupon in couponsToAddToDB.values():
-            existentCoupon = Coupon.load(couponDB, crawledCoupon.id)
+            existingCoupon = Coupon.load(couponDB, crawledCoupon.id)
             # Update DB
-            if existentCoupon is not None:
+            if existingCoupon is not None:
                 # Update existing coupon
-                if hasChanged(existentCoupon, crawledCoupon):
+                if hasChanged(existingCoupon, crawledCoupon):
                     # Set isNew flag if necessary
-                    if not existentCoupon.isValid() and crawledCoupon.isValid():
+                    if existingCoupon.isExpiredForLongerTime() and crawledCoupon.isValid():
                         crawledCoupon.isNew = True
                         numberofCouponsFlaggedAsNew += 1
                     # Important: We need the "_rev" value to be able to update/overwrite existing documents!
-                    crawledCoupon["_rev"] = existentCoupon.rev
+                    crawledCoupon["_rev"] = existingCoupon.rev
                     dbUpdates.append(crawledCoupon)
                     updatedCouponIDs.append(crawledCoupon.id)
                     numberofCouponsUpdated += 1
