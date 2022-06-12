@@ -24,7 +24,7 @@ from Crawler import BKCrawler, UserStats
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
     USER_SETTINGS_ON_OFF
 from CouponCategory import CouponCategory, getCouponCategory
-from Helper import BotAllowedCouponSources, CouponSource, formatPrice
+from Helper import BotAllowedCouponTypes, CouponType, formatPrice
 from UtilsOffers import offerGetImagePath
 
 
@@ -247,25 +247,33 @@ class BKBot:
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+        # Test code to update DB structure TODO: maybe make use of this
+        # userDB = self.crawler.getUsersDB()
+        # dummyUser = User()
+        # dct = user.__dict__
+        # # dct2 = {**dct['_data'], **dummyUser.__dict__['_data']}
+        # dct2 = {**dummyUser.__dict__['_data'], **dct['_data']}
+        # user2 = User.wrap(dct2)
+        # user2.store(userDB)
         allButtons = []
         if self.getPublicChannelName() is not None:
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste + Pics + News', url='https://t.me/' + self.getPublicChannelName())])
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste lange Titel + Pics', callback_data=CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES)])
         allButtons.append([InlineKeyboardButton('Alle Coupons', callback_data=CouponCallbackVars.ALL_COUPONS)])
         allButtons.append([InlineKeyboardButton('Alle Coupons ohne Menü', callback_data=CouponCallbackVars.ALL_COUPONS_WITHOUT_MENU)])
-        for couponSrc in BotAllowedCouponSources:
+        for couponSrc in BotAllowedCouponTypes:
             # Only add buttons for coupon categories for which at least one coupon is available
             couponCategory = self.crawler.getCachedCouponCategory(couponSrc)
             if couponCategory is None:
                 continue
-            elif couponSrc == CouponSource.PAYBACK and not user.settings.displayCouponCategoryPayback:
+            elif couponSrc == CouponType.PAYBACK and not user.settings.displayCouponCategoryPayback:
                 # Do not display this category if disabled by user
                 continue
             allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural, callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY + "&cs=" + str(couponSrc))])
             if couponCategory.numberofCouponsWithFriesOrCoke < couponCategory.numberofCouponsTotal and couponCategory.isEatable():
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' ohne Menü',
                                                         callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY_WITHOUT_MENU + "&cs=" + str(couponSrc))])
-            if couponSrc == CouponSource.APP and couponCategory.numberofCouponsHidden > 0:
+            if couponSrc == CouponType.APP and couponCategory.numberofCouponsHidden > 0:
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' versteckte',
                                                         callback_data="?a=dcs&m=" + CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY + "&cs=" + str(couponSrc))])
         keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data="?a=dcs&m=" + CouponDisplayMode.FAVORITES),
@@ -300,7 +308,7 @@ class BKBot:
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
         """ Send list containing all coupons with long titles linked to coupon channel to user. This may result in up to 10 messages being sent! """
         update.callback_query.answer()
-        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
                                                 channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
@@ -370,19 +378,19 @@ class BKBot:
             if mode == CouponDisplayMode.ALL:
                 # Display all coupons
                 coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
+                    CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategoryDummy = CouponCategory(coupons)
                 menuText = couponCategoryDummy.getCategoryInfoText(withMenu=None, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                 # Display all coupons without menu
                 coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
+                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategoryDummy = CouponCategory(coupons)
                 menuText = couponCategoryDummy.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.CATEGORY:
                 # Display all coupons of a particular category
                 couponSrc = int(urlinfo['cs'])
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=None,
+                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=None,
                                                                isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategory = CouponCategory(coupons)
                 menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
@@ -390,12 +398,12 @@ class BKBot:
                 # Display all coupons of a particular category without menu
                 couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
+                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategory = CouponCategory(coupons)
                 menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                 # Display all hidden App coupons (ONLY)
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=[CouponSource.APP], containsFriesAndCoke=None, isHidden=True, removeDuplicates=user.settings.hideDuplicates))
+                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True, removeDuplicates=user.settings.hideDuplicates))
                 couponCategoryDummy = CouponCategory(coupons)
                 menuText = couponCategoryDummy.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
             elif mode == CouponDisplayMode.FAVORITES:
@@ -428,7 +436,7 @@ class BKBot:
             if len(userFavoritesInfo.couponsUnavailable) == 0:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
             else:
-                menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' / ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
+                menuText += str(len(userFavoritesInfo.couponsAvailable)) + '/' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
             couponCategoryDummy = getCouponCategory(userFavoritesInfo.couponsAvailable)
             menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             priceInfo = couponCategoryDummy.getPriceInfoText()
@@ -473,7 +481,7 @@ class BKBot:
             index += 1
         if paginationMax > 1:
             # Add pagination navigation buttons if needed
-            menuText += "\nSeite " + str(desiredPage) + " / " + str(paginationMax)
+            menuText += "\nSeite " + str(desiredPage) + "/" + str(paginationMax)
             navigationButtons = []
             if desiredPage > 1:
                 # Add button to go to previous page
@@ -483,7 +491,7 @@ class BKBot:
             else:
                 # Add dummy button for a consistent button layout
                 navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonPrevPage"))
-            navigationButtons.append(InlineKeyboardButton("Seite " + str(desiredPage) + " / " + str(paginationMax), callback_data="DummyButtonMiddle"))
+            navigationButtons.append(InlineKeyboardButton("Seite " + str(desiredPage) + "/" + str(paginationMax), callback_data="DummyButtonMiddle"))
             if desiredPage < paginationMax:
                 # Add button to go to next page
                 nextPage = desiredPage + 1
@@ -546,7 +554,7 @@ class BKBot:
         showCouponIndexText = False
         for coupon in coupons:
             if showCouponIndexText:
-                additionalText = 'Coupon ' + str(index + 1) + ' / ' + str(len(coupons))
+                additionalText = 'Coupon ' + str(index + 1) + '/' + str(len(coupons))
                 self.displayCouponWithImage(update=update, context=context, coupon=coupon, user=user, additionalText=additionalText)
             else:
                 self.displayCouponWithImage(update=update, context=context, coupon=coupon, user=user, additionalText=None)
@@ -635,7 +643,7 @@ class BKBot:
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
         if not user.hasDefaultSettings():
-            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen (" + SYMBOLS.STAR + " & PB Karte bleiben)",
+            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen |" + SYMBOLS.STAR + " & PB Karte bleiben",
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
@@ -1088,7 +1096,7 @@ class BKBot:
                 infoDBDoc.store(infoDB)
         """ Re-send coupon overview(s), spread this information on multiple pages if needed. """
         couponOverviewCounter = 1
-        for couponSource, coupons in couponsSeparatedByType.items():
+        for couponType, coupons in couponsSeparatedByType.items():
             couponCategory = CouponCategory(coupons)
             logging.info("Working on coupon overview " + str(couponOverviewCounter) + "/" + str(len(couponsSeparatedByType)) + " | " + couponCategory.namePluralWithoutSymbol)
             hasAddedSeparatorAfterCouponsWithoutMenu = False
@@ -1100,7 +1108,7 @@ class BKBot:
                 logging.info("Sending category page: " + str(page) + "/" + str(maxPage))
                 couponOverviewText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
                 if maxPage > 1:
-                    couponOverviewText += "<b>Teil " + str(page) + " / " + str(maxPage) + "</b>"
+                    couponOverviewText += "<b>Teil " + str(page) + "/" + str(maxPage) + "</b>"
                 couponOverviewText += '\n---'
                 # Calculate in which range the coupons of our current page are
                 startIndex = page * maxCouponsPerPage - maxCouponsPerPage
@@ -1152,7 +1160,7 @@ class BKBot:
                                        disable_notification=True)
                 if infoDBDoc is not None:
                     # Update DB
-                    infoDBDoc.addCouponCategoryMessageID(couponSource, msg.message_id)
+                    infoDBDoc.addCouponCategoryMessageID(couponType, msg.message_id)
                     infoDBDoc.lastMaintenanceModeState = self.maintenanceMode
                     infoDBDoc.store(infoDB)
             couponOverviewCounter += 1
@@ -1165,7 +1173,7 @@ class BKBot:
             return
         index = 0
         for msgID in messageIDs:
-            logging.info("Deleting message " + str(index + 1) + " / " + str(len(messageIDs)) + " | " + str(msgID))
+            logging.info("Deleting message " + str(index + 1) + "/" + str(len(messageIDs)) + " | " + str(msgID))
             self.deleteMessage(chat_id=chat_id, messageID=msgID)
             index += 1
 

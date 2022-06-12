@@ -12,8 +12,9 @@ from couchdb.mapping import TextField, FloatField, ListField, IntegerField, Bool
     DateTimeField
 from pydantic import BaseModel
 
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponSources, \
-    CouponSource, \
+from BotUtils import getImageBasePath
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponTypes, \
+    CouponType, \
     formatPrice
 
 
@@ -34,7 +35,7 @@ class Coupon(Document):
     imageURL = TextField()
     paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
-    source = IntegerField()
+    type = IntegerField(name='source')  # Legacy. This is called "type" now!
     containsFriesOrCoke = BooleanField()
     isNew = BooleanField()
     isNewUntilDate = TextField()
@@ -42,6 +43,8 @@ class Coupon(Document):
     isUnsafeExpiredate = BooleanField(
         default=False)  # Set this if timestampExpire is a made up date that is just there to ensure that the coupon is considered valid for a specified time
     description = TextField()
+    # TODO: Make use of this once it is possible for users to add coupons to DB via API
+    addedVia = IntegerField()
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -71,6 +74,28 @@ class Coupon(Document):
         return self.titleShortened
         # return shortenProductNames(self.title)
 
+    def isExpired(self):
+        """ Wrapper """
+        if not self.isValid():
+            return True
+        else:
+            return False
+
+    def isExpiredForLongerTime(self):
+        """ Using this check, coupons that e.g. expire on midnight and get elongated will not be marked as new because really they aren't. """
+        expireDatetime = self.getExpireDatetime()
+        if expireDatetime is None:
+            return True
+        elif getCurrentDate().second - expireDatetime.second > 3600:
+            """ 
+             Coupon expired over one hour ago -> We consider this a "longer time"
+             Using this check, coupons that e.g. expire on midnight and get elongated will not be marked as new because really they aren't.
+             """
+            return True
+        else:
+            """ Coupon is not expired or not "long enough". """
+            return False
+
     def isValid(self):
         expireDatetime = self.getExpireDatetime()
         if expireDatetime is None:
@@ -83,7 +108,7 @@ class Coupon(Document):
 
     def isValidForBot(self) -> bool:
         """ Checks if the given coupon can be used in bot e.g. is from allowed source (App/Paper) and is valid. """
-        if self.source in BotAllowedCouponSources and self.isValid():
+        if self.type in BotAllowedCouponTypes and self.isValid():
             return True
         else:
             return False
@@ -103,13 +128,13 @@ class Coupon(Document):
 
     def isEatable(self) -> bool:
         """ If the product(s) this coupon provide(s) is/are not eatable and e.g. just probide a discount like Payback coupons, this will return False, else True. """
-        if self.source == CouponSource.PAYBACK:
+        if self.type == CouponType.PAYBACK:
             return False
         else:
             return True
 
     def isEligibleForDuplicateRemoval(self):
-        if self.source == CouponSource.PAYBACK:
+        if self.type == CouponType.PAYBACK:
             return False
         else:
             return True
@@ -183,6 +208,13 @@ class Coupon(Document):
             return '-' + f'{paybackReducedPercent:2.1f}' + '%'
         else:
             return fallback
+
+    def getAddedVia(self):
+        """ Returns origin of how this coupon got added to DB e.g. API, by admin etc. """
+        return self.addedVia
+
+    def getCouponType(self):
+        return self.type
 
     def getUniqueIdentifier(self) -> str:
         """ Returns an unique identifier String which can be used to compare coupon objects. """
@@ -451,22 +483,23 @@ class User(Document):
         if len(self.favoriteCoupons) == 0:
             # User does not have any favorites set --> There is no point to look for the additional information
             return UserFavoritesInfo()
-        else:
-            availableFavoriteCoupons = []
-            unavailableFavoriteCoupons = []
-            for uniqueCouponID, coupon in self.favoriteCoupons.items():
-                couponFromProductiveDB = couponsFromDB.get(uniqueCouponID)
-                if couponFromProductiveDB is not None and couponFromProductiveDB.isValid():
-                    availableFavoriteCoupons.append(couponFromProductiveDB)
-                else:
-                    # User chosen favorite coupon has expired or is not in DB
-                    coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
-                    unavailableFavoriteCoupons.append(coupon)
-            # Sort all coupon arrays by price
-            availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
-            unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
-            return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons,
-                                     favoritesUnavailable=unavailableFavoriteCoupons)
+        availableFavoriteCoupons = []
+        unavailableFavoriteCoupons = []
+        for uniqueCouponID, coupon in self.favoriteCoupons.items():
+            couponFromProductiveDB = couponsFromDB.get(uniqueCouponID)
+            if couponFromProductiveDB is not None and couponFromProductiveDB.isValid():
+                availableFavoriteCoupons.append(couponFromProductiveDB)
+            else:
+                # User chosen favorite coupon has expired or is not in DB
+                coupon = Coupon.wrap(coupon)  # We want a 'real' coupon object
+                unavailableFavoriteCoupons.append(coupon)
+        # Sort all coupon arrays by price
+        if self.settings.hideDuplicates:
+            availableFavoriteCoupons = removeDuplicatedCoupons(availableFavoriteCoupons)
+        availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
+        unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
+        return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons,
+                                 favoritesUnavailable=unavailableFavoriteCoupons)
 
     def resetSettings(self):
         dummyUser = User()
@@ -490,11 +523,11 @@ class InfoEntry(Document):
         for messageID in messageIDs:
             self.addMessageIDToDelete(messageID)
 
-    def addCouponCategoryMessageID(self, couponSource: int, messageID: int):
-        self.couponTypeOverviewMessageIDs.setdefault(couponSource, []).append(messageID)
+    def addCouponCategoryMessageID(self, couponType: int, messageID: int):
+        self.couponTypeOverviewMessageIDs.setdefault(couponType, []).append(messageID)
 
-    def getMessageIDsForCouponCategory(self, couponSource: int) -> List[int]:
-        return self.couponTypeOverviewMessageIDs.get(str(couponSource), [])
+    def getMessageIDsForCouponCategory(self, couponType: int) -> List[int]:
+        return self.couponTypeOverviewMessageIDs.get(str(couponType), [])
 
     def getAllCouponCategoryMessageIDs(self) -> List[int]:
         messageIDs = []
@@ -502,9 +535,9 @@ class InfoEntry(Document):
             messageIDs += messageIDsTemp
         return messageIDs
 
-    def deleteCouponCategoryMessageIDs(self, couponSource: int):
-        if str(couponSource) in self.couponTypeOverviewMessageIDs:
-            del self.couponTypeOverviewMessageIDs[str(couponSource)]
+    def deleteCouponCategoryMessageIDs(self, couponType: int):
+        if str(couponType) in self.couponTypeOverviewMessageIDs:
+            del self.couponTypeOverviewMessageIDs[str(couponType)]
 
     def deleteAllCouponCategoryMessageIDs(self):
         self.couponTypeOverviewMessageIDs = {}
@@ -547,10 +580,6 @@ class CouponSortMode(Enum):
     SOURCE_MENU_PRICE = 3
 
 
-def getImageBasePath() -> str:
-    return "crawler/images/couponsproductive"
-
-
 def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
     """ Returns the total summed price of a list of coupons. """
     totalSum = 0
@@ -563,15 +592,17 @@ def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
 def getCouponsSeparatedByType(coupons: dict) -> dict:
     """ Returns dict containing lists of coupons by type """
     couponsSeparatedByType = {}
-    for couponSource in BotAllowedCouponSources:
-        couponsTmp = list(filter(lambda x: x[Coupon.source.name] == couponSource, list(coupons.values())))
+    for couponType in BotAllowedCouponTypes:
+        couponsTmp = list(filter(lambda x: x[Coupon.type.name] == couponType, list(coupons.values())))
         if couponsTmp is not None and len(couponsTmp) > 0:
-            couponsSeparatedByType[couponSource] = couponsTmp
+            couponsSeparatedByType[couponType] = couponsTmp
     return couponsSeparatedByType
 
 
-def sortCouponsByPrice(couponList: List[Coupon], descending: bool = False) -> List[Coupon]:
+def sortCouponsByPrice(couponList: Union[List[Coupon], dict], descending: bool = False) -> List[Coupon]:
     """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
+    if isinstance(couponList, dict):
+        couponList = couponList.values()
     if descending:
         return sorted(couponList,
                       key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1), reverse=True)
@@ -587,17 +618,19 @@ class CouponFilter(BaseModel):
     containsFriesAndCoke: Optional[Union[bool, None]] = None
     removeDuplicates: Optional[
         bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
-    allowedCouponSources: Optional[Union[List[int], None]] = None  # None = allow all sources!
+    allowedCouponTypes: Optional[Union[List[int], None]] = None  # None = allow all sources!
     isNew: Optional[Union[bool, None]] = None
     isHidden: Optional[Union[bool, None]] = None
     sortMode: Optional[Union[None, CouponSortMode]]
 
 
-def getCouponTitleMapping(coupons: dict) -> dict:
+def getCouponTitleMapping(coupons: Union[dict, list]) -> dict:
     """ Maps normalized coupon titles to coupons with the goal of being able to match coupons by title
     e.g. to find duplicates or coupons with different IDs containing the same products. """
+    if isinstance(coupons, dict):
+        coupons = coupons.values()
     couponTitleMappingTmp = {}
-    for coupon in coupons.values():
+    for coupon in coupons:
         couponTitleMappingTmp.setdefault(coupon.getNormalizedTitle(), []).append(coupon)
     return couponTitleMappingTmp
 
@@ -645,7 +678,7 @@ USER_SETTINGS_ON_OFF = {
         "default": False
     },
     "hideDuplicates": {
-        "description": "Duplikate ausblenden (App CP bevorzugen falls gleichwertig)",
+        "description": "Duplikate ausblenden |App CP bevorz.",
         "default": False
     }
 }
@@ -660,3 +693,49 @@ if DISPLAY_BETA_SETTING:
         "description": "Beta Features aktivieren",
         "default": False
     }
+
+
+def removeDuplicatedCoupons(coupons: Union[list, dict]) -> dict:
+    couponTitleMappingTmp = getCouponTitleMapping(coupons)
+    # Now clean our mapping: Sometimes one product may be available twice with multiple prices -> We want exactly one mapping per title
+    couponsWithoutDuplicates = {}
+    for normalizedTitle, coupons in couponTitleMappingTmp.items():
+        couponsForDuplicateRemoval = []
+        for coupon in coupons:
+            if coupon.isEligibleForDuplicateRemoval():
+                couponsForDuplicateRemoval.append(coupon)
+            else:
+                # We cannot remove this coupon as duplicate by title -> Add it to our final results list
+                couponsWithoutDuplicates[coupon.id] = coupon
+        # Check if anything is left to do
+        if len(couponsForDuplicateRemoval) == 0:
+            continue
+        # Sort these ones by price and pick the first (= cheapest) one for our mapping.
+        isDifferentPrices = False
+        firstPrice = None
+        appCoupon = None
+        if len(couponsForDuplicateRemoval) == 1:
+            coupon = couponsForDuplicateRemoval[0]
+            couponsWithoutDuplicates[coupon.id] = coupon
+            continue
+        for coupon in couponsForDuplicateRemoval:
+            if firstPrice is None:
+                firstPrice = coupon.getPrice()
+            elif coupon.getPrice() is not None and coupon.getPrice() != firstPrice:
+                isDifferentPrices = True
+            if coupon.type == CouponType.APP:
+                appCoupon = coupon
+        if isDifferentPrices:
+            # Prefer cheapest coupon
+            couponsSorted = sortCouponsByPrice(couponsForDuplicateRemoval)
+            coupon = couponsSorted[0]
+        elif appCoupon is not None:
+            # Same prices but different sources -> Prefer App coupon
+            coupon = appCoupon
+        else:
+            # Same prices but all coupons are from the same source -> Should never happen but we'll cover it anyways -> Select first item.
+            coupon = couponsForDuplicateRemoval[0]
+        couponsWithoutDuplicates[coupon.id] = coupon
+    numberofRemovedDuplicates = len(coupons) - len(couponsWithoutDuplicates)
+    logging.debug("Number of removed duplicates: " + str(numberofRemovedDuplicates))
+    return couponsWithoutDuplicates

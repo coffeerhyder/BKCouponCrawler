@@ -40,7 +40,7 @@ for storeID in storeIDsToCheck:
     if index > 0:
         # time.sleep(5)
         pass
-    logging.info("Checking coupons of store " + str(index + 1) + " / " + str(len(storeIDsToCheck)) + " | " + str(storeID))
+    logging.info("Checking coupons of store " + str(index + 1) + "/" + str(len(storeIDsToCheck)) + " | " + str(storeID))
     conn = HTTP20Connection('mo.burgerking-app.eu')
     conn.request("GET", '/api/v2/stores/' + str(storeID) + '/menu', headers=HEADERS_OLD)
     apiResponse = loads(conn.get_response().read())

@@ -83,7 +83,7 @@ if __name__ == "__main__":
 
 def getActivePaperCouponInfo() -> dict:
     paperCouponInfo = {}
-    """ Load file which contains some extra data which can be useful to correctly determine the "CouponSource" and expire date of paper coupons. """
+    """ Load file which contains some extra data which can be useful to correctly determine the "CouponType" and expire date of paper coupons. """
     for paperIdentifier, paperData in loadPaperCouponConfigFile().items():
         validuntil = datetime.strptime(paperData['expire_date'] + ' 23:59:59', '%Y-%m-%d %H:%M:%S').astimezone(getTimezone()).timestamp()
         if validuntil > datetime.now().timestamp():

@@ -1,15 +1,15 @@
 from typing import Union, List
 
-from Helper import SYMBOLS, formatDateGerman, BotAllowedCouponSources, CouponSource, formatPrice
+from Helper import SYMBOLS, formatDateGerman, BotAllowedCouponTypes, CouponType, formatPrice
 from UtilsCouponsDB import Coupon, CouponSortMode
 
 
 class CouponCategory:
 
-    def __init__(self, parameter: Union[CouponSource, int, List]):
+    def __init__(self, parameter: Union[CouponType, int, List]):
         self.coupons = None
-        self.couponSource = None
-        self.couponSources = set()
+        self.mainCouponType = None
+        self.couponTypes = set()
         self.displayDescription = False  # Display description for this category in bot menu?
         self.expireDatetimeLowest = None
         self.expireDatetimeHighest = None
@@ -22,54 +22,54 @@ class CouponCategory:
         self.totalPrice = 0
         if isinstance(parameter, list):
             self.coupons = parameter
-            mainCouponSource = self.coupons[0].source
-            isAllSameCouponSource = True
+            mainCouponType = self.coupons[0].type
+            isAllSameCouponType = True
             for coupon in self.coupons:
                 self.updateWithCouponInfo(coupon)
-                if coupon.source != mainCouponSource:
-                    isAllSameCouponSource = False
-            if isAllSameCouponSource:
-                self.couponSource = mainCouponSource
+                if coupon.type != mainCouponType:
+                    isAllSameCouponType = False
+            if isAllSameCouponType:
+                self.mainCouponType = mainCouponType
             else:
-                self.couponSource = None
+                self.mainCouponType = None
         else:
-            self.couponSource = parameter
-        if self.couponSource is None:
+            self.mainCouponType = parameter
+        if self.mainCouponType is None:
             self.nameSingular = "Coupon"
             self.namePlural = "Alle Coupons"
             self.namePluralWithoutSymbol = "Alle Coupons"
             self.description = "Coupons mehrerer Kategorien"
-        elif self.couponSource == CouponSource.APP:
+        elif self.mainCouponType == CouponType.APP:
             self.nameSingular = "App Coupon"
             self.namePlural = "App Coupons"
             self.namePluralWithoutSymbol = "App Coupons"
             self.description = "Coupons aus der BK App"
-        elif self.couponSource == CouponSource.PAPER:
+        elif self.mainCouponType == CouponType.PAPER:
             self.nameSingular = "Papiercoupon"
             self.namePlural = SYMBOLS.NEWSPAPER + "Papiercoupons"
             self.namePluralWithoutSymbol = "Papiercoupons"
             self.description = "Coupons der Papier Couponbögen"
-        elif self.couponSource == CouponSource.PAPER_UNSAFE:
+        elif self.mainCouponType == CouponType.PAPER_UNSAFE:
             self.nameSingular = "Papiercoupon (unsafe)"
             self.namePlural = SYMBOLS.NEWSPAPER + "Papiercoupons (unsafe)"
             self.namePluralWithoutSymbol = "Papiercoupons (unsafe)"
             self.description = "Coupons aus der \"Coupons2\" API, die keinem anderen Coupon-Typen zugewiesen werden konnten."
-        elif self.couponSource == CouponSource.ONLINE_ONLY:
+        elif self.mainCouponType == CouponType.ONLINE_ONLY:
             self.nameSingular = "Online Only"
             self.namePlural = "Online only"
             self.namePluralWithoutSymbol = "Online Only"
             self.description = "Coupons, die mit hoher Wahrscheinlichkeit nur online oder am Terminal bestellbar sind"
-        elif self.couponSource == CouponSource.ONLINE_ONLY_STORE_SPECIFIC:
+        elif self.mainCouponType == CouponType.ONLINE_ONLY_STORE_SPECIFIC:
             self.nameSingular = "Online only (store specific)"
             self.namePlural = "Online only (store specific)"
             self.namePluralWithoutSymbol = "Online only (store specific)"
             self.description = "Coupons, die nur in bestimmten Filialen gültig sind"
-        elif self.couponSource == CouponSource.SPECIAL:
+        elif self.mainCouponType == CouponType.SPECIAL:
             self.nameSingular = "Special Coupon"
             self.namePlural = SYMBOLS.GIFT + "Special Coupons"
             self.namePluralWithoutSymbol = "Special Coupons"
             self.description = "Diese Coupons sind evtl. nicht in allen Filialen einlösbar!"
-        elif self.couponSource == CouponSource.PAYBACK:
+        elif self.mainCouponType == CouponType.PAYBACK:
             self.nameSingular = "Payback Coupon"
             self.namePlural = SYMBOLS.PARK + "ayback Coupons"
             self.namePluralWithoutSymbol = "Payback Coupons"
@@ -80,7 +80,7 @@ class CouponCategory:
             self.namePluralWithoutSymbol = "Unbekannt"
 
     def isValidSourceForBot(self) -> bool:
-        if self.couponSource in BotAllowedCouponSources:
+        if self.mainCouponType in BotAllowedCouponTypes:
             return True
         else:
             return False
@@ -123,7 +123,7 @@ class CouponCategory:
             return False
 
     def isEligibleForDuplicateRemoval(self):
-        if self.couponSource == CouponSource.PAYBACK:
+        if self.mainCouponType == CouponType.PAYBACK:
             return False
         else:
             return True
@@ -144,12 +144,12 @@ class CouponCategory:
             sortModes.append(CouponSortMode.PRICE_DESCENDING)
         if self.numberofCouponsTotal != self.numberofCouponsWithFriesOrCoke:
             sortModes.append(CouponSortMode.MENU_PRICE)
-        if len(self.couponSources) > 1:
+        if len(self.couponTypes) > 1:
             sortModes.append(CouponSortMode.SOURCE_MENU_PRICE)
         return sortModes
 
     def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:
-        if self.couponSource == CouponSource.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
+        if self.mainCouponType == CouponType.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
             # Only hidden (App-) coupons
             couponCount = self.numberofCouponsHidden
             text = '<b>[{couponCount} Stück] {couponCategoryName} versteckte</b>'
@@ -196,7 +196,7 @@ class CouponCategory:
             couponList = couponOrCouponList
         for coupon in couponList:
             if coupon.isValid():
-                self.couponSources.add(coupon.source)
+                self.couponTypes.add(coupon.type)
                 self.setNumberofCouponsTotal(self.numberofCouponsTotal + 1)
                 if coupon.isHidden:
                     self.setNumberofCouponsHidden(self.numberofCouponsHidden + 1)
@@ -225,8 +225,8 @@ class CouponCategory:
 def getCouponCategory(coupons: List[Coupon]) -> CouponCategory:
     """ Returns CouponCategory for given list of coupons.Assumes that this list only contains coupons of one
     category. """
-    mainCouponSource = coupons[0].source
-    category = CouponCategory(parameter=mainCouponSource)
+    mainCouponType = coupons[0].type
+    category = CouponCategory(parameter=mainCouponType)
     for coupon in coupons:
         category.updateWithCouponInfo(coupon)
     return category

@@ -135,9 +135,9 @@ crawler.setExportCSVs(False)
 # Coupons crawlen
 crawler.crawlAndProcessData()
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
-activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponSources=BotAllowedCouponSources, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
-activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponSources=CouponSource.APP, containsFriesAndCoke=None, isHidden=True))
+activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=CouponType.APP, containsFriesAndCoke=None, isHidden=True))
 ```
 
 # TODOs
@@ -245,6 +245,12 @@ Es gibt mehrere Möglichkeiten:
 - Fahre durch den Drive hier werden idR. alle genommen
 - Falls deine BK Filiale die Vorbestellen Funktion bietet, scanne die Coupons im Bestellvorgang mit deinem Handy (Zweitgerät/Laptop benötigt)
 - Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
+
+Wie kann ich noch mehr sparen?
+In Filialen mit Terminals lassen sich teilweise die alten Papiercoupons mind. aus 2018-2020 verwenden.
+Hier findest du ein Archiv alter Papiercoupons: mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
+Vor Ort einfach die QR Codes am Terminal bestellen.
+Wichtig: Es kann passieren, dass ganz am Ende vor dem Bezahlen ein Fehler auftritt. In diesem Fall hat die entsprechende BK Filiale ein oder mehrere der in deiner Bestellung verwendeten alten Codes bereits gesperrt.
 
 Wo finde ich den Quellcode?
 Hier: github.com/coffeerhyder/BKCouponCrawler
