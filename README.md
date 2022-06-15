@@ -229,7 +229,7 @@ FAQ BetterKing Bot und Channel
 Wo finde ich die aktuellen Papiercoupons als Scan?
 Sofern es welche gibt, hier:
 mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
-Derzeitige Papiercoipons gültig bis: 29.07.2022
+Derzeitige Papiercoupons gültig bis: 29.07.2022
 
 Warum fehlen manchmal Papiercoupons?
 Seit dem 03.12.2021 sind Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlen manchmal welche.
