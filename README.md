@@ -142,9 +142,11 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 
 # TODOs
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
+* Crawler: Zweite History DB einbauen und/oder bestehendes System entsprechend ändern
 * Bot: Beliebige Sortierung einbauen und letzte Sortierung speichern
 * Start-Script prüfen
 * Handling mit Datumsangaben verbessern
+* Fragen, ob der Betreiber von pbcp.de lust hat, die Coupons hier zu zeigen: pbcp.de/partner/burger-king
 * Produktnamen-Handling für Payback Coupons generischer gestalten
 * isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
@@ -227,8 +229,8 @@ FAQ BetterKing Bot und Channel
 
 Wo finde ich die aktuellen Papiercoupons als Scan?
 Sofern es welche gibt, hier:
-mydealz.de/deals/bundesweit-neue-burger-king-papier-couponsgutscheine-bis-04032022-1928924
-Gültig bis: 04.03.2022
+mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
+Derzeitige Papiercoupons gültig bis: 29.07.2022
 
 Warum fehlen manchmal Papiercoupons?
 Seit dem 03.12.2021 sind Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlen manchmal welche.
@@ -247,8 +249,9 @@ Es gibt mehrere Möglichkeiten:
 - Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
 
 Wie kann ich noch mehr sparen?
-In Filialen mit Terminals lassen sich teilweise die alten Papiercoupons mind. aus 2018-2020 verwenden.
-Hier findest du ein Archiv alter Papiercoupons: mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
+In Filialen mit Terminals lassen sich teilweise die alten Papiercoupons mind. aus 2018-2020 verwenden.  
+App Coupons theoretisch ebenso, wenn man sie gesammelt hat.
+Hier findest du ein stetig aktualisiertes Archiv alter (Papier-)coupons: mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
 Vor Ort einfach die QR Codes am Terminal bestellen.
 Wichtig: Es kann passieren, dass ganz am Ende vor dem Bezahlen ein Fehler auftritt. In diesem Fall hat die entsprechende BK Filiale ein oder mehrere der in deiner Bestellung verwendeten alten Codes bereits gesperrt.
 

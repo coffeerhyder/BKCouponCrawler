@@ -341,7 +341,7 @@ class BKBot:
         return self.displayCoupons(update, context, CouponCallbackVars.FAVORITES)
 
     def botDisplayStats(self, update: Update, context: CallbackContext):
-        """ Wrapper and this is only to be used for commands. """
+        msg = self.editOrSendMessage(update, text='Statistiken werden geladen...')
         couponDB = self.getBotCoupons()
         userDB = self.crawler.getUsersDB()
         userStats = UserStats(userDB)
@@ -358,7 +358,10 @@ class BKBot:
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(activeOffers))
         text += '</pre>'
-        self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode="html", disable_web_page_preview=True)
+        if isinstance(msg, Message) and not True:
+            self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
+        else:
+            self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode='html', disable_web_page_preview=True)
         return ConversationHandler.END
 
     def displayCoupons(self, update: Update, context: CallbackContext, callbackVar: str):
