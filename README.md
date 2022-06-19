@@ -142,6 +142,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE
 
 # TODOs
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
+* Crawler: Zweite History DB einbauen und/oder bestehendes System entsprechend ändern
 * Bot: Beliebige Sortierung einbauen und letzte Sortierung speichern
 * Start-Script prüfen
 * Handling mit Datumsangaben verbessern
