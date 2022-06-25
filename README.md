@@ -266,7 +266,9 @@ Ja: Würger King: wurgerking.wfr.moe
 Quellcode: github.com/WebFreak001/WurgerKing
 
 Gibt es sowas auch für McDonalds/KFC/...?
-Mir ist kein solches Projekt bekannt.
+McDonalds:
+Coupons: mccoupon.deals
+Gratis Getränke: t.me/gimmecockbot
 ```
 
 ### Test Cases

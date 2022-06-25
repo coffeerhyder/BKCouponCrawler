@@ -315,12 +315,17 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + missingPaperCouponsText
         infoText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.'
         infoText += '</b>'
-    # Add 'useful links' text
+    # Add 'useful links text'
     infoText += '\n<b>------</b>'
     infoText += '\n<b>Nützliche Links</b>:'
+    infoText += '\n<b>BK</b>:'
     infoText += '\n•<a href=\"' + URLs.BK_SPAR_KINGS + '\">Spar Kings</a>'
     infoText += '\n•<a href=\"' + URLs.BK_KING_FINDER + '\">KING Finder</a>'
-    infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to Forum Thread</a>'
+    infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to BetterKing Forum Thread</a>'
+    infoText += '\n•<a href=\"' + URLs.BK_WUERGER_KING + '\">Würger King</a> (' + '<a href=\"' + URLs.BK_WUERGER_KING_SOURCE + '\">source</a>' + ')'
+    infoText += '\n<b>McDonalds</b>'
+    infoText += '\n•<a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a>'
+    infoText += '\n•<a href=\"' + URLs.MCD_COCKBOT + '\">t.me/gimmecockbot</a>'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"
@@ -402,7 +407,7 @@ def nukeChannel(bkbot):
             updateInfoDoc = True
     # Delete coupon information message
     if infoDoc.informationMessageID is not None:
-        logging.info("Deleting channel overview message")
+        logging.info("Deleting channel overview message: " + infoDoc.informationMessageID)
         bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=infoDoc.informationMessageID)
         infoDoc.informationMessageID = None
         updateInfoDoc = True
