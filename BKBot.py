@@ -358,7 +358,7 @@ class BKBot:
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(activeOffers))
         text += '</pre>'
-        if isinstance(msg, Message) and not True:
+        if isinstance(msg, Message):
             self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
         else:
             self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode='html', disable_web_page_preview=True)
