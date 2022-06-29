@@ -129,15 +129,13 @@ class CouponCategory:
             return True
 
     def isEligableForSort(self):
-        if self.numberofCouponsTotal == 1:
-            return False
-        else:
+        if len(self.getSortModes()) > 1:
             return True
+        else:
+            return False
 
     def getSortModes(self) -> List:
         """ Returns all SortModes which make sense for this set of coupons. """
-        if not self.isEligableForSort():
-            return []
         sortModes = []
         if self.totalPrice > 0:
             sortModes.append(CouponSortMode.PRICE)
@@ -145,8 +143,17 @@ class CouponCategory:
         if self.numberofCouponsTotal != self.numberofCouponsWithFriesOrCoke:
             sortModes.append(CouponSortMode.MENU_PRICE)
         if len(self.couponTypes) > 1:
-            sortModes.append(CouponSortMode.SOURCE_MENU_PRICE)
+            sortModes.append(CouponSortMode.TYPE_MENU_PRICE)
         return sortModes
+
+    def getNextPossibleSortMode(self, sortMode: CouponSortMode) -> CouponSortMode:
+        possibleSortModes = self.getSortModes()
+        for possibleSortMode in possibleSortModes:
+            if possibleSortMode.sortCode > sortMode.sortCode:
+                return possibleSortMode
+        # Fallback/Rollover to first sort
+        return possibleSortModes[0]
+
 
     def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:
         if self.mainCouponType == CouponType.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
@@ -230,4 +237,5 @@ def getCouponCategory(coupons: List[Coupon]) -> CouponCategory:
     for coupon in coupons:
         category.updateWithCouponInfo(coupon)
     return category
+
 

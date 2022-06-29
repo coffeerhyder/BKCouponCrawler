@@ -17,6 +17,40 @@ from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, nor
     CouponType, \
     formatPrice
 
+# class CouponSortCode:
+#     PRICE = 0
+#     PRICE_DESCENDING = 1
+#     MENU_PRICE = 2
+#     TYPE_MENU_PRICE = 3
+
+
+class CouponSortMode:
+    PRICE = 0
+    PRICE_DESCENDING = 1
+    MENU_PRICE = 2
+    TYPE_MENU_PRICE = 3
+
+    def __init__(self, sortCode: int, text: str, isDescending: bool = False):
+        self.sortCode = sortCode
+        self.text = text
+        self.isDescending = isDescending
+
+
+class CouponSortModes:
+    PRICE = CouponSortMode(0, "Preis aufsteigend")
+    PRICE_DESCENDING = CouponSortMode(1, "Preis absteigend", True)
+    MENU_PRICE = CouponSortMode(2, "Menü_Preis")
+    SOURCE_MENU_PRICE = CouponSortMode(3, "Typ_Menü_Preis")
+
+    def getAllSortModes(self) -> list:
+        return [self.PRICE, self.PRICE_DESCENDING, self.MENU_PRICE, self.SOURCE_MENU_PRICE]
+
+    def getSortModeBySortCode(self, sortCode: int) -> Union[CouponSortMode, None]:
+        for couponSortMode in self.getAllSortModes():
+            if couponSortMode.sortCode == sortCode:
+                return couponSortMode
+        return None
+
 
 class Coupon(Document):
     plu = TextField()
@@ -573,13 +607,6 @@ class ChannelCoupon(Document):
         return self.channelMessageID_image
 
 
-class CouponSortMode(Enum):
-    PRICE = 0
-    PRICE_DESCENDING = 1
-    MENU_PRICE = 2
-    SOURCE_MENU_PRICE = 3
-
-
 def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
     """ Returns the total summed price of a list of coupons. """
     totalSum = 0
@@ -621,7 +648,7 @@ class CouponFilter(BaseModel):
     allowedCouponTypes: Optional[Union[List[int], None]] = None  # None = allow all sources!
     isNew: Optional[Union[bool, None]] = None
     isHidden: Optional[Union[bool, None]] = None
-    sortMode: Optional[Union[None, CouponSortMode]]
+    sortMode: Optional[Union[None, int]]
 
 
 def getCouponTitleMapping(coupons: Union[dict, list]) -> dict:

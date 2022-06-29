@@ -20,7 +20,7 @@ from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponGetStartTimestamp
-from UtilsCouponsDB import Coupon, InfoEntry, CouponSortMode, sortCouponsByPrice, CouponFilter, getCouponTitleMapping, User, removeDuplicatedCoupons
+from UtilsCouponsDB import Coupon, InfoEntry, sortCouponsByPrice, CouponFilter, getCouponTitleMapping, User, removeDuplicatedCoupons, CouponSortMode
 from CouponCategory import CouponCategory
 
 HEADERS_OLD = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
@@ -1147,7 +1147,7 @@ class BKCrawler:
         else:
             # Sort coupons: Separate by type and sort each by coupons with/without menu and price.
             filteredCouponsList = list(desiredCoupons.values())
-            if filters.sortMode == CouponSortMode.SOURCE_MENU_PRICE:
+            if filters.sortMode == CouponSortMode.TYPE_MENU_PRICE:
                 couponsWithoutFriesOrCoke = []
                 couponsWithFriesOrCoke = []
                 allContainedCouponTypes = []
@@ -1191,7 +1191,7 @@ class BKCrawler:
                 filteredCouponsList = sortCouponsByPrice(filteredCouponsList, descending=True)
             else:
                 # This should never happen
-                logging.warning("Developer mistake!! Unknown sortMode: " + filters.sortMode.name)
+                logging.warning("Developer mistake!! Unknown sortMode: " + filters.sortMode)
             # Make dict out of list
             filteredAndSortedCouponsDict = {}
             for coupon in filteredCouponsList:

@@ -21,8 +21,8 @@ from BaseUtils import *
 from Helper import *
 from Crawler import BKCrawler, UserStats
 
-from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
-    USER_SETTINGS_ON_OFF
+from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
+    USER_SETTINGS_ON_OFF, CouponSortMode, CouponSortModes
 from CouponCategory import CouponCategory, getCouponCategory
 from Helper import BotAllowedCouponTypes, CouponType, formatPrice
 from UtilsOffers import offerGetImagePath
@@ -308,7 +308,7 @@ class BKBot:
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
         """ Send list containing all coupons with long titles linked to coupon channel to user. This may result in up to 10 messages being sent! """
         update.callback_query.answer()
-        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.TYPE_MENU_PRICE))
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
                                                 channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
@@ -368,12 +368,10 @@ class BKBot:
         """ Displays all coupons in a pre selected mode """
         # Important! This is required so that we can e.g. jump from "Category 'App coupons' page 2 display single coupon" back into "Category 'App coupons' page 2"
         callbackVar += "&cb=" + urllib.parse.quote(callbackVar)
-        urlQuery = furl(callbackVar)
-        urlinfo = urlQuery.args
+        urlquery = furl(callbackVar)
+        urlinfo = urlquery.args
         mode = urlinfo["m"]
         try:
-            coupons = None
-            menuText = None
             user = self.getUser(userID=update.effective_user.id, addIfNew=True)
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
@@ -382,14 +380,16 @@ class BKBot:
                 # Display all coupons
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                couponCategoryDummy = CouponCategory(coupons)
-                menuText = couponCategoryDummy.getCategoryInfoText(withMenu=None, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
+                # Dummy category
+                couponCategory = CouponCategory(coupons)
+                menuText = couponCategory.getCategoryInfoText(withMenu=None, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                 # Display all coupons without menu
                 coupons = self.getFilteredCoupons(
                     CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                couponCategoryDummy = CouponCategory(coupons)
-                menuText = couponCategoryDummy.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
+                # Dummy category
+                couponCategory = CouponCategory(coupons)
+                menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.CATEGORY:
                 # Display all coupons of a particular category
                 couponSrc = int(urlinfo['cs'])
@@ -407,13 +407,78 @@ class BKBot:
             elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                 # Display all hidden App coupons (ONLY)
                 coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True, removeDuplicates=user.settings.hideDuplicates))
-                couponCategoryDummy = CouponCategory(coupons)
-                menuText = couponCategoryDummy.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
+                couponCategory = CouponCategory(coupons)
+                menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
             elif mode == CouponDisplayMode.FAVORITES:
                 userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user)
                 coupons = userFavorites.couponsAvailable
+                couponCategory = CouponCategory(coupons)
                 highlightFavorites = False
-            self.displayCouponsAsButtons(update, user, coupons, menuText, urlQuery, highlightFavorites=highlightFavorites)
+            else:
+                raise BetterBotException("WTF developer mistake")
+            if len(coupons) == 0:
+                # This should never happen
+                raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
+                                         InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=urlquery.url)]]))
+            # Build bot menu
+            query = update.callback_query
+            if query is not None:
+                query.answer()
+            urlquery_callbackBack = furl(urlquery.args["cb"])
+            buttons = []
+            maxCouponsPerPage = 20
+            paginationMax = math.ceil(len(coupons) / maxCouponsPerPage)
+            desiredPage = int(urlquery.args.get("p", 1))
+            if desiredPage > paginationMax:
+                # Fallback - can happen if user leaves menu open for a long time, DB changes and user presses old "next/previous page" button
+                desiredPage = paginationMax
+            # Grab all items in desired range (= on desired page)
+            index = (desiredPage * maxCouponsPerPage - maxCouponsPerPage)
+            # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy middle page overview button which usually does not do anything with Easter Egg functionality
+            desiredPageContainsAtLeastOneFavoriteCoupon = False
+            while len(buttons) < maxCouponsPerPage and index < len(coupons):
+                coupon = coupons[index]
+                if user.isFavoriteCoupon(coupon) and highlightFavorites:
+                    buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
+                    desiredPageContainsAtLeastOneFavoriteCoupon = True
+                else:
+                    buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
+
+                buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
+                index += 1
+            if paginationMax > 1:
+                # Add pagination navigation buttons if needed
+                menuText += "\nSeite " + str(desiredPage) + "/" + str(paginationMax)
+                navigationButtons = []
+                if desiredPage > 1:
+                    # Add button to go to previous page
+                    lastPage = desiredPage - 1
+                    urlquery_callbackBack.args['p'] = lastPage
+                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_LEFT, callback_data=urlquery_callbackBack.url))
+                else:
+                    # Add dummy button for a consistent button layout
+                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonPrevPage"))
+                navigationButtons.append(InlineKeyboardButton("Seite " + str(desiredPage) + "/" + str(paginationMax), callback_data="DummyButtonMiddle"))
+                if desiredPage < paginationMax:
+                    # Add button to go to next page
+                    nextPage = desiredPage + 1
+                    urlquery_callbackBack.args['p'] = nextPage
+                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_RIGHT, callback_data=urlquery_callbackBack.url))
+                else:
+                    # Add dummy button for a consistent button layout
+                    # Easter egg: Trigger it if there are at least two pages available AND user is currently on the last page AND that page contains at least one user-favorited coupon.
+                    if desiredPageContainsAtLeastOneFavoriteCoupon and desiredPage > 1:
+                        navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data=CallbackVars.EASTER_EGG))
+                    else:
+                        navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonNextPage"))
+                buttons.append(navigationButtons)
+            # sortModes = couponCategory.getSortModes()
+            # if len(sortModes) > 1 and True:
+            #     testSortMode = CouponSortModes.PRICE
+            #     buttons.append([InlineKeyboardButton("Sortieren nach " + testSortMode.text, callback_data=CallbackVars.MENU_MAIN)])
+            buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
+            reply_markup = InlineKeyboardMarkup(buttons)
+            self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
             return CallbackVars.MENU_DISPLAY_COUPON
         except BetterBotException as botError:
             self.handleBotErrorGently(update, context, botError)
@@ -451,67 +516,6 @@ class BKBot:
                 menuText += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
                 menuText += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
             return userFavoritesInfo, menuText
-
-    def displayCouponsAsButtons(self, update: Update, user: Union[User, None], coupons: list, menuText: str, urlquery, highlightFavorites: bool):
-        if len(coupons) == 0:
-            # This should never happen
-            raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
-                                     InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=urlquery.url)]]))
-        query = update.callback_query
-        if query is not None:
-            query.answer()
-        urlquery_callbackBack = furl(urlquery.args["cb"])
-        buttons = []
-        maxCouponsPerPage = 20
-        paginationMax = math.ceil(len(coupons) / maxCouponsPerPage)
-        desiredPage = int(urlquery.args.get("p", 1))
-        if desiredPage > paginationMax:
-            # Fallback - can happen if user leaves menu open for a long time, DB changes and user presses old "next/previous page" button
-            desiredPage = paginationMax
-        # Grab all items in desired range (= on desired page)
-        index = (desiredPage * maxCouponsPerPage - maxCouponsPerPage)
-        # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy middle page overview button which usually does not do anything with Easter Egg functionality
-        desiredPageContainsAtLeastOneFavoriteCoupon = False
-        while len(buttons) < maxCouponsPerPage and index < len(coupons):
-            coupon = coupons[index]
-            if user.isFavoriteCoupon(coupon) and highlightFavorites:
-                buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
-                desiredPageContainsAtLeastOneFavoriteCoupon = True
-            else:
-                buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
-
-            buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
-            index += 1
-        if paginationMax > 1:
-            # Add pagination navigation buttons if needed
-            menuText += "\nSeite " + str(desiredPage) + "/" + str(paginationMax)
-            navigationButtons = []
-            if desiredPage > 1:
-                # Add button to go to previous page
-                lastPage = desiredPage - 1
-                urlquery_callbackBack.args['p'] = lastPage
-                navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_LEFT, callback_data=urlquery_callbackBack.url))
-            else:
-                # Add dummy button for a consistent button layout
-                navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonPrevPage"))
-            navigationButtons.append(InlineKeyboardButton("Seite " + str(desiredPage) + "/" + str(paginationMax), callback_data="DummyButtonMiddle"))
-            if desiredPage < paginationMax:
-                # Add button to go to next page
-                nextPage = desiredPage + 1
-                urlquery_callbackBack.args['p'] = nextPage
-                navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_RIGHT, callback_data=urlquery_callbackBack.url))
-            else:
-                # Add dummy button for a consistent button layout
-                # Easter egg: Trigger it if there are at least two pages available AND user is currently on the last page AND that page contains at least one user-favorited coupon.
-                if desiredPageContainsAtLeastOneFavoriteCoupon and desiredPage > 1:
-                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data=CallbackVars.EASTER_EGG))
-                else:
-                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonNextPage"))
-            buttons.append(navigationButtons)
-        buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
-        reply_markup = InlineKeyboardMarkup(buttons)
-        self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
-        return CallbackVars.MENU_DISPLAY_COUPON
 
     def botDisplayEasterEgg(self, update: Update, context: CallbackContext):
         query = update.callback_query
