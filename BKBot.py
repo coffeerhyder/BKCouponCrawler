@@ -22,7 +22,7 @@ from Helper import *
 from Crawler import BKCrawler, UserStats
 
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
-    USER_SETTINGS_ON_OFF, CouponSortMode, CouponSortModes
+    USER_SETTINGS_ON_OFF, CouponSortMode, CouponSortModes, CouponSortCode
 from CouponCategory import CouponCategory, getCouponCategory
 from Helper import BotAllowedCouponTypes, CouponType, formatPrice
 from UtilsOffers import offerGetImagePath
@@ -308,7 +308,7 @@ class BKBot:
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
         """ Send list containing all coupons with long titles linked to coupon channel to user. This may result in up to 10 messages being sent! """
         update.callback_query.answer()
-        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.TYPE_MENU_PRICE))
+        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortModes.TYPE_MENU_PRICE))
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
                                                 channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
@@ -376,43 +376,54 @@ class BKBot:
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
+            """ TODO:
+            1. Do not sort here but only down below because only then we know how we want to sort.
+            2. Add default coupon "views" which also hold default sort modes.
+            3. Once user defined sort is implemented, maybe even save last user preferred sort in DB and re-use it here.
+              """
             if mode == CouponDisplayMode.ALL:
                 # Display all coupons
                 coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
+                    CouponFilter(sortMode=CouponSortCode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 # Dummy category
                 couponCategory = CouponCategory(coupons)
+                defaultSortMode = CouponSortModes.MENU_PRICE
                 menuText = couponCategory.getCategoryInfoText(withMenu=None, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                 # Display all coupons without menu
                 coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
+                    CouponFilter(sortMode=CouponSortCode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 # Dummy category
                 couponCategory = CouponCategory(coupons)
+                defaultSortMode = CouponSortModes.PRICE
                 menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.CATEGORY:
                 # Display all coupons of a particular category
                 couponSrc = int(urlinfo['cs'])
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=None,
+                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortCode.MENU_PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=None,
                                                                isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategory = CouponCategory(coupons)
+                defaultSortMode = CouponSortModes.MENU_PRICE
                 menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.CATEGORY_WITHOUT_MENU:
                 # Display all coupons of a particular category without menu
                 couponSrc = int(urlinfo['cs'])
                 coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
+                    CouponFilter(sortMode=CouponSortCode.PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
                 couponCategory = CouponCategory(coupons)
+                defaultSortMode = CouponSortModes.PRICE
                 menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                 # Display all hidden App coupons (ONLY)
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True, removeDuplicates=user.settings.hideDuplicates))
+                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortCode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True, removeDuplicates=user.settings.hideDuplicates))
                 couponCategory = CouponCategory(coupons)
+                defaultSortMode = CouponSortModes.PRICE
                 menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
             elif mode == CouponDisplayMode.FAVORITES:
                 userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user)
                 coupons = userFavorites.couponsAvailable
                 couponCategory = CouponCategory(coupons)
+                defaultSortMode = CouponSortModes.PRICE
                 highlightFavorites = False
             else:
                 raise BetterBotException("WTF developer mistake")
@@ -434,7 +445,7 @@ class BKBot:
                 desiredPage = paginationMax
             # Grab all items in desired range (= on desired page)
             index = (desiredPage * maxCouponsPerPage - maxCouponsPerPage)
-            # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy middle page overview button which usually does not do anything with Easter Egg functionality
+            # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy middle page overview button and add Easter Egg functionality :)
             desiredPageContainsAtLeastOneFavoriteCoupon = False
             while len(buttons) < maxCouponsPerPage and index < len(coupons):
                 coupon = coupons[index]
@@ -446,14 +457,15 @@ class BKBot:
 
                 buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
                 index += 1
+            numberofCouponsOnCurrentPage = len(buttons)
             if paginationMax > 1:
                 # Add pagination navigation buttons if needed
                 menuText += "\nSeite " + str(desiredPage) + "/" + str(paginationMax)
                 navigationButtons = []
                 if desiredPage > 1:
                     # Add button to go to previous page
-                    lastPage = desiredPage - 1
-                    urlquery_callbackBack.args['p'] = lastPage
+                    previousPage = desiredPage - 1
+                    urlquery_callbackBack.args['p'] = previousPage
                     navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_LEFT, callback_data=urlquery_callbackBack.url))
                 else:
                     # Add dummy button for a consistent button layout
@@ -472,10 +484,17 @@ class BKBot:
                     else:
                         navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonNextPage"))
                 buttons.append(navigationButtons)
-            # sortModes = couponCategory.getSortModes()
-            # if len(sortModes) > 1 and True:
-            #     testSortMode = CouponSortModes.PRICE
-            #     buttons.append([InlineKeyboardButton("Sortieren nach " + testSortMode.text, callback_data=CallbackVars.MENU_MAIN)])
+            # possibleSortModes = couponCategory.getSortModes()
+            # if len(possibleSortModes) > 1:
+            #     if numberofCouponsOnCurrentPage == 1:
+            #         # Only one item available on current page -> Do not allow sort
+            #         buttons.append([InlineKeyboardButton("Sortiert nach " + defaultSortMode.text, callback_data="DummySortButton")])
+            #     else:
+            #         urlquery_callbackBack.args['a'] = 's'
+            #         buttons.append([InlineKeyboardButton("Sortieren nach " + defaultSortMode.text, callback_data=urlquery_callbackBack.url)])
+            # else:
+            #     # TODO this might not make any sense
+            #     buttons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummySortButton"))
             buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
             reply_markup = InlineKeyboardMarkup(buttons)
             self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')

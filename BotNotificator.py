@@ -10,7 +10,7 @@ from telegram.error import BadRequest, Unauthorized
 from BotUtils import getBotImpressum
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes
 
-from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortMode
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortMode, CouponSortModes
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
@@ -24,7 +24,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info("Checking for pending new coupons notifications")
     timestampStart = datetime.now().timestamp()
     userDB = bkbot.crawler.getUsersDB()
-    allNewCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.PRICE))
+    allNewCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortModes.PRICE))
     if len(allNewCoupons) == 0:
         logging.info("No new coupons available to notify about")
         return
@@ -156,12 +156,9 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
 
 class ChannelUpdateMode(Enum):
     """ Different modes that can be used to perform a channel update """
-    # Dummy entry: This mode would only work if TG bots were able to delete messages older than 48 hours!
-    # UPDATE = 1  # Deprecated
-    # Delete- and re-send all coupons into our channel
-    RESEND_ALL = 2
+    RESEND_ALL = 1
     # This will only re-send all items older than X hours - can be used to resume channel update if it was e.g. interrupted due to a connection loss
-    RESUME_CHANNEL_UPDATE = 3
+    RESUME_CHANNEL_UPDATE = 2
 
 
 def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
@@ -182,7 +179,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Update channel info and DB
     channelInfoDoc.timestampLastChannelUpdate = getCurrentDate().timestamp()
     channelInfoDoc.store(channelInfoDB)
-    activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.TYPE_MENU_PRICE))
+    activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortModes.TYPE_MENU_PRICE))
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
@@ -300,8 +297,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         # Add detailed information about added coupons. Limit the max. number of that so our information message doesn't get too big.
         infoText += '\n<b>' + SYMBOLS.NEW + ' ' + str(len(newCoupons)) + ' Coupons hinzugefügt:</b>'
         infoText += bkbot.getNewCouponsTextWithChannelHyperlinks(newCoupons, 10)
-    if updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE:
-        infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
+    infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
     if DEBUGNOTIFICATOR:
         infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!!' + SYMBOLS.WARNING + '</b>'
     if bkbot.maintenanceMode:

@@ -17,18 +17,15 @@ from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, nor
     CouponType, \
     formatPrice
 
-# class CouponSortCode:
-#     PRICE = 0
-#     PRICE_DESCENDING = 1
-#     MENU_PRICE = 2
-#     TYPE_MENU_PRICE = 3
 
-
-class CouponSortMode:
+class CouponSortCode:
     PRICE = 0
     PRICE_DESCENDING = 1
     MENU_PRICE = 2
     TYPE_MENU_PRICE = 3
+
+
+class CouponSortMode:
 
     def __init__(self, sortCode: int, text: str, isDescending: bool = False):
         self.sortCode = sortCode
@@ -37,13 +34,13 @@ class CouponSortMode:
 
 
 class CouponSortModes:
-    PRICE = CouponSortMode(0, "Preis aufsteigend")
-    PRICE_DESCENDING = CouponSortMode(1, "Preis absteigend", True)
-    MENU_PRICE = CouponSortMode(2, "Menü_Preis")
-    SOURCE_MENU_PRICE = CouponSortMode(3, "Typ_Menü_Preis")
+    PRICE = CouponSortMode(CouponSortCode.PRICE, "Preis aufsteigend")
+    PRICE_DESCENDING = CouponSortMode(CouponSortCode.PRICE_DESCENDING, "Preis absteigend", True)
+    MENU_PRICE = CouponSortMode(CouponSortCode.MENU_PRICE, "Menü_Preis")
+    TYPE_MENU_PRICE = CouponSortMode(CouponSortCode.TYPE_MENU_PRICE, "Typ_Menü_Preis")
 
     def getAllSortModes(self) -> list:
-        return [self.PRICE, self.PRICE_DESCENDING, self.MENU_PRICE, self.SOURCE_MENU_PRICE]
+        return [self.PRICE, self.PRICE_DESCENDING, self.MENU_PRICE, self.TYPE_MENU_PRICE]
 
     def getSortModeBySortCode(self, sortCode: int) -> Union[CouponSortMode, None]:
         for couponSortMode in self.getAllSortModes():

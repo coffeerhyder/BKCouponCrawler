@@ -1,7 +1,7 @@
 from typing import Union, List
 
 from Helper import SYMBOLS, formatDateGerman, BotAllowedCouponTypes, CouponType, formatPrice
-from UtilsCouponsDB import Coupon, CouponSortMode
+from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
 
 
 class CouponCategory:
@@ -138,13 +138,21 @@ class CouponCategory:
         """ Returns all SortModes which make sense for this set of coupons. """
         sortModes = []
         if self.totalPrice > 0:
-            sortModes.append(CouponSortMode.PRICE)
-            sortModes.append(CouponSortMode.PRICE_DESCENDING)
+            sortModes.append(CouponSortModes.PRICE)
+            sortModes.append(CouponSortModes.PRICE_DESCENDING)
         if self.numberofCouponsTotal != self.numberofCouponsWithFriesOrCoke:
-            sortModes.append(CouponSortMode.MENU_PRICE)
+            sortModes.append(CouponSortModes.MENU_PRICE)
         if len(self.couponTypes) > 1:
-            sortModes.append(CouponSortMode.TYPE_MENU_PRICE)
+            sortModes.append(CouponSortModes.TYPE_MENU_PRICE)
         return sortModes
+
+    def allowsSortModeCode(self, sortModeCode: int) -> bool:
+        """ Checks if desired sortMode is currently allowed. """
+        sortModes = self.getSortModes()
+        for sortMode in sortModes:
+            if sortMode.sortCode == sortModeCode:
+                return True
+        return False
 
     def getNextPossibleSortMode(self, sortMode: CouponSortMode) -> CouponSortMode:
         possibleSortModes = self.getSortModes()
@@ -153,6 +161,12 @@ class CouponCategory:
                 return possibleSortMode
         # Fallback/Rollover to first sort
         return possibleSortModes[0]
+
+    def getSortModeCode(self, desiredSortModeCode: int, fallbackSortModeCode: int) -> int:
+        if self.allowsSortModeCode(desiredSortModeCode):
+            return desiredSortModeCode
+        else:
+            return fallbackSortModeCode
 
 
     def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:

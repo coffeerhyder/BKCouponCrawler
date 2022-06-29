@@ -20,7 +20,7 @@ from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponGetStartTimestamp
-from UtilsCouponsDB import Coupon, InfoEntry, sortCouponsByPrice, CouponFilter, getCouponTitleMapping, User, removeDuplicatedCoupons, CouponSortMode
+from UtilsCouponsDB import Coupon, InfoEntry, sortCouponsByPrice, CouponFilter, getCouponTitleMapping, User, removeDuplicatedCoupons, CouponSortCode
 from CouponCategory import CouponCategory
 
 HEADERS_OLD = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
@@ -76,6 +76,7 @@ class BKCrawler:
         self.storeCouponAPIDataAsJson = False
         self.exportCSVs = False
         self.missingPaperCouponPLUs = []
+        self.cachedMissingPaperCouponsText = None
         # Create required DBs
         if DATABASES.INFO_DB not in self.couchdb:
             logging.info("Creating missing DB: " + DATABASES.INFO_DB)
@@ -1147,7 +1148,7 @@ class BKCrawler:
         else:
             # Sort coupons: Separate by type and sort each by coupons with/without menu and price.
             filteredCouponsList = list(desiredCoupons.values())
-            if filters.sortMode == CouponSortMode.TYPE_MENU_PRICE:
+            if filters.sortMode == CouponSortCode.TYPE_MENU_PRICE:
                 couponsWithoutFriesOrCoke = []
                 couponsWithFriesOrCoke = []
                 allContainedCouponTypes = []
@@ -1173,7 +1174,7 @@ class BKCrawler:
                 filteredCouponsList = []
                 for allCouponsOfOneSourceType in couponsSeparatedByType.values():
                     filteredCouponsList += allCouponsOfOneSourceType
-            elif filters.sortMode == CouponSortMode.MENU_PRICE:
+            elif filters.sortMode == CouponSortCode.MENU_PRICE:
                 couponsWithoutFriesOrCoke = []
                 couponsWithFriesOrCoke = []
                 for coupon in filteredCouponsList:
@@ -1185,13 +1186,13 @@ class BKCrawler:
                 couponsWithFriesOrCoke = sortCouponsByPrice(couponsWithFriesOrCoke)
                 # Merge them together again.
                 filteredCouponsList = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
-            elif filters.sortMode == CouponSortMode.PRICE:
+            elif filters.sortMode == CouponSortCode.PRICE:
                 filteredCouponsList = sortCouponsByPrice(filteredCouponsList)
-            elif filters.sortMode == CouponSortMode.PRICE_DESCENDING:
+            elif filters.sortMode == CouponSortCode.PRICE_DESCENDING:
                 filteredCouponsList = sortCouponsByPrice(filteredCouponsList, descending=True)
             else:
                 # This should never happen
-                logging.warning("Developer mistake!! Unknown sortMode: " + filters.sortMode)
+                logging.warning("Developer mistake!! Unknown sortMode: " + str(filters.sortMode))
             # Make dict out of list
             filteredAndSortedCouponsDict = {}
             for coupon in filteredCouponsList:
@@ -1201,7 +1202,7 @@ class BKCrawler:
 
     def getFilteredCouponsAsList(
             self, filters: CouponFilter
-    ) -> List[dict]:
+    ) -> List[Coupon]:
         """ Wrapper """
         filteredCouponsDict = self.getFilteredCoupons(filters)
         return list(filteredCouponsDict.values())
@@ -1218,7 +1219,7 @@ class BKCrawler:
 
     def getBotCoupons(self) -> dict:
         """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
-        return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.PRICE))
+        return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortCode.PRICE))
 
 
 def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
