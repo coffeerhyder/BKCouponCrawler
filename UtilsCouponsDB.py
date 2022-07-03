@@ -18,6 +18,19 @@ from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, nor
     formatPrice
 
 
+class CouponFilter(BaseModel):
+    """ removeDuplicates: Enable to filter duplicated coupons for same products - only returns cheapest of all
+     If the same product is available as paper- and app coupon, App coupon is preferred."""
+    activeOnly: Optional[bool] = True
+    containsFriesAndCoke: Optional[Union[bool, None]] = None
+    removeDuplicates: Optional[
+        bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
+    allowedCouponTypes: Optional[Union[List[int], None]] = None  # None = allow all sources!
+    isNew: Optional[Union[bool, None]] = None
+    isHidden: Optional[Union[bool, None]] = None
+    sortMode: Optional[Union[None, int]]
+
+
 class CouponSortCode:
     PRICE = 0
     PRICE_DESCENDING = 1
@@ -47,6 +60,27 @@ class CouponSortModes:
             if couponSortMode.sortCode == sortCode:
                 return couponSortMode
         return None
+
+
+class CouponView:
+
+    def getFilter(self):
+        return self.couponfilter
+
+    def __init__(self, couponfilter: CouponFilter):
+        self.couponfilter = couponfilter
+        # self.defaultSortMode = defaultSortMode
+
+
+class CouponViews:
+    ALL = CouponView(CouponFilter(sortMode=CouponSortCode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None))
+    ALL_WITHOUT_MENU = CouponView(CouponFilter(sortMode=CouponSortCode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False))
+    CATEGORY = CouponView(CouponFilter(sortMode=CouponSortCode.MENU_PRICE, containsFriesAndCoke=None))
+    CATEGORY_WITHOUT_MENU = CouponView(CouponFilter(sortMode=CouponSortCode.MENU_PRICE, containsFriesAndCoke=False))
+    HIDDEN_APP_COUPONS_ONLY = CouponFilter(sortMode=CouponSortCode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True)
+
+    def getAllCouponViews(self) -> list:
+        return [self.ALL, self.ALL_WITHOUT_MENU, self.CATEGORY, self.CATEGORY_WITHOUT_MENU, self.HIDDEN_APP_COUPONS_ONLY]
 
 
 class Coupon(Document):
@@ -633,19 +667,6 @@ def sortCouponsByPrice(couponList: Union[List[Coupon], dict], descending: bool =
     else:
         return sorted(couponList,
                       key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
-
-
-class CouponFilter(BaseModel):
-    """ removeDuplicates: Enable to filter duplicated coupons for same products - only returns cheapest of all
-     If the same product is available as paper- and app coupon, App coupon is preferred."""
-    activeOnly: Optional[bool] = True
-    containsFriesAndCoke: Optional[Union[bool, None]] = None
-    removeDuplicates: Optional[
-        bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
-    allowedCouponTypes: Optional[Union[List[int], None]] = None  # None = allow all sources!
-    isNew: Optional[Union[bool, None]] = None
-    isHidden: Optional[Union[bool, None]] = None
-    sortMode: Optional[Union[None, int]]
 
 
 def getCouponTitleMapping(coupons: Union[dict, list]) -> dict:

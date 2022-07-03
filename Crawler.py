@@ -1147,56 +1147,8 @@ class BKCrawler:
             return desiredCoupons
         else:
             # Sort coupons: Separate by type and sort each by coupons with/without menu and price.
-            filteredCouponsList = list(desiredCoupons.values())
-            if filters.sortMode == CouponSortCode.TYPE_MENU_PRICE:
-                couponsWithoutFriesOrCoke = []
-                couponsWithFriesOrCoke = []
-                allContainedCouponTypes = []
-                for coupon in filteredCouponsList:
-                    if coupon.type not in allContainedCouponTypes:
-                        allContainedCouponTypes.append(coupon.type)
-                    if coupon.isContainsFriesOrCoke():
-                        couponsWithFriesOrCoke.append(coupon)
-                    else:
-                        couponsWithoutFriesOrCoke.append(coupon)
-                couponsWithoutFriesOrCoke = sortCouponsByPrice(couponsWithoutFriesOrCoke)
-                couponsWithFriesOrCoke = sortCouponsByPrice(couponsWithFriesOrCoke)
-                # Merge them together again.
-                filteredCouponsList = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
-                # App coupons(source == 0) > Paper coupons
-                allContainedCouponTypes.sort()
-                # Separate sorted coupons by type
-                couponsSeparatedByType = {}
-                for couponType in allContainedCouponTypes:
-                    couponsTmp = list(filter(lambda x: x.type == couponType, filteredCouponsList))
-                    couponsSeparatedByType[couponType] = couponsTmp
-                # Put our list sorted by type together again -> Sort done
-                filteredCouponsList = []
-                for allCouponsOfOneSourceType in couponsSeparatedByType.values():
-                    filteredCouponsList += allCouponsOfOneSourceType
-            elif filters.sortMode == CouponSortCode.MENU_PRICE:
-                couponsWithoutFriesOrCoke = []
-                couponsWithFriesOrCoke = []
-                for coupon in filteredCouponsList:
-                    if coupon.isContainsFriesOrCoke():
-                        couponsWithFriesOrCoke.append(coupon)
-                    else:
-                        couponsWithoutFriesOrCoke.append(coupon)
-                couponsWithoutFriesOrCoke = sortCouponsByPrice(couponsWithoutFriesOrCoke)
-                couponsWithFriesOrCoke = sortCouponsByPrice(couponsWithFriesOrCoke)
-                # Merge them together again.
-                filteredCouponsList = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
-            elif filters.sortMode == CouponSortCode.PRICE:
-                filteredCouponsList = sortCouponsByPrice(filteredCouponsList)
-            elif filters.sortMode == CouponSortCode.PRICE_DESCENDING:
-                filteredCouponsList = sortCouponsByPrice(filteredCouponsList, descending=True)
-            else:
-                # This should never happen
-                logging.warning("Developer mistake!! Unknown sortMode: " + str(filters.sortMode))
             # Make dict out of list
-            filteredAndSortedCouponsDict = {}
-            for coupon in filteredCouponsList:
-                filteredAndSortedCouponsDict[coupon.id] = coupon
+            filteredAndSortedCouponsDict = sortCoupons(desiredCoupons, filters.sortMode)
             logging.debug("Time it took to get- and sort coupons: " + getFormattedPassedTime(timestampStart))
             return filteredAndSortedCouponsDict
 
@@ -1220,6 +1172,61 @@ class BKCrawler:
     def getBotCoupons(self) -> dict:
         """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
         return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortCode.PRICE))
+
+
+def sortCoupons(coupons: Union[list, dict], sortCode: int) -> dict:
+    if isinstance(coupons, dict):
+        coupons = list(coupons.values())
+    if sortCode == CouponSortCode.TYPE_MENU_PRICE:
+        couponsWithoutFriesOrCoke = []
+        couponsWithFriesOrCoke = []
+        allContainedCouponTypes = []
+        for coupon in coupons:
+            if coupon.type not in allContainedCouponTypes:
+                allContainedCouponTypes.append(coupon.type)
+            if coupon.isContainsFriesOrCoke():
+                couponsWithFriesOrCoke.append(coupon)
+            else:
+                couponsWithoutFriesOrCoke.append(coupon)
+        couponsWithoutFriesOrCoke = sortCouponsByPrice(couponsWithoutFriesOrCoke)
+        couponsWithFriesOrCoke = sortCouponsByPrice(couponsWithFriesOrCoke)
+        # Merge them together again.
+        coupons = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
+        # App coupons(source == 0) > Paper coupons
+        allContainedCouponTypes.sort()
+        # Separate sorted coupons by type
+        couponsSeparatedByType = {}
+        for couponType in allContainedCouponTypes:
+            couponsTmp = list(filter(lambda x: x.type == couponType, coupons))
+            couponsSeparatedByType[couponType] = couponsTmp
+        # Put our list sorted by type together again -> Sort done
+        coupons = []
+        for allCouponsOfOneSourceType in couponsSeparatedByType.values():
+            coupons += allCouponsOfOneSourceType
+    elif sortCode == CouponSortCode.MENU_PRICE:
+        couponsWithoutFriesOrCoke = []
+        couponsWithFriesOrCoke = []
+        for coupon in coupons:
+            if coupon.isContainsFriesOrCoke():
+                couponsWithFriesOrCoke.append(coupon)
+            else:
+                couponsWithoutFriesOrCoke.append(coupon)
+        couponsWithoutFriesOrCoke = sortCouponsByPrice(couponsWithoutFriesOrCoke)
+        couponsWithFriesOrCoke = sortCouponsByPrice(couponsWithFriesOrCoke)
+        # Merge them together again.
+        coupons = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
+    elif sortCode == CouponSortCode.PRICE:
+        coupons = sortCouponsByPrice(coupons)
+    elif sortCode == CouponSortCode.PRICE_DESCENDING:
+        coupons = sortCouponsByPrice(coupons, descending=True)
+    else:
+        # This should never happen
+        logging.warning("Developer mistake!! Unknown sortMode: " + str(sortCode))
+    # Make dict out of list
+    filteredAndSortedCouponsDict = {}
+    for coupon in coupons:
+        filteredAndSortedCouponsDict[coupon.id] = coupon
+    return filteredAndSortedCouponsDict
 
 
 def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
