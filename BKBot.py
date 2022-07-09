@@ -19,7 +19,7 @@ from BotUtils import *
 from BaseUtils import *
 
 from Helper import *
-from Crawler import BKCrawler, UserStats
+from Crawler import BKCrawler, UserStats, sortCoupons
 
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
     USER_SETTINGS_ON_OFF, CouponSortMode, CouponSortModes, CouponSortCode, CouponViews
@@ -393,57 +393,34 @@ class BKBot:
                 if mode == CouponDisplayMode.ALL:
                     # Display all coupons
                     view = CouponViews.ALL
-                    coupons = self.getFilteredCoupons(
-                        CouponFilter(sortMode=CouponSortCode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                    # Dummy category
-                    couponCategory = CouponCategory(coupons)
-                    defaultSortMode = CouponSortModes.MENU_PRICE
-                    menuText = couponCategory.getCategoryInfoText(withMenu=None, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
                 elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                     # Display all coupons without menu
                     view = CouponViews.ALL_WITHOUT_MENU
-                    coupons = self.getFilteredCoupons(
-                        CouponFilter(sortMode=CouponSortCode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                    # Dummy category
-                    couponCategory = CouponCategory(coupons)
-                    defaultSortMode = CouponSortModes.PRICE
-                    menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
                 elif mode == CouponDisplayMode.CATEGORY:
                     # Display all coupons of a particular category
                     view = CouponViews.CATEGORY
                     couponSrc = int(urlinfo['cs'])
                     view.getFilter().allowedCouponTypes = [couponSrc]
-                    coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortCode.MENU_PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=None,
-                                                                   isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                    couponCategory = CouponCategory(coupons)
-                    defaultSortMode = CouponSortModes.MENU_PRICE
-                    menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
                 elif mode == CouponDisplayMode.CATEGORY_WITHOUT_MENU:
                     # Display all coupons of a particular category without menu
                     view = CouponViews.CATEGORY_WITHOUT_MENU
                     couponSrc = int(urlinfo['cs'])
                     view.getFilter().allowedCouponTypes = [couponSrc]
-                    coupons = self.getFilteredCoupons(
-                        CouponFilter(sortMode=CouponSortCode.PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                    couponCategory = CouponCategory(coupons)
-                    defaultSortMode = CouponSortModes.PRICE
-                    menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
                 elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                     # Display all hidden App coupons (ONLY)
                     view = CouponViews.HIDDEN_APP_COUPONS_ONLY
-                    coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortCode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True, removeDuplicates=user.settings.hideDuplicates))
-                    couponCategory = CouponCategory(coupons)
-                    defaultSortMode = CouponSortModes.PRICE
-                    menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
                     displayHiddenCouponsWithinOtherCategories = True
                 else:
                     raise BetterBotException("WTF developer mistake")
                 couponFilter = view.getFilter()
                 defaultSortMode = couponFilter.sortMode
-                # couponFilter.sortMode = None
-                # coupons = self.getFilteredCoupons(couponFilter)
-                # couponCategory = CouponCategory(coupons)
-                # menuText = couponCategory.getCategoryInfoText(withMenu=couponFilter.containsFriesAndCoke, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
+                # First we only want to filter coupons. Sort them later according to user preference.
+                couponFilter.sortMode = None
+                coupons = self.getFilteredCoupons(couponFilter)
+                coupons = sortCoupons(coupons, defaultSortMode)
+                coupons = list(coupons.values())
+                couponCategory = CouponCategory(coupons)
+                menuText = couponCategory.getCategoryInfoText(withMenu=couponFilter.containsFriesAndCoke, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             if len(coupons) == 0:
                 # This should never happen
                 raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
