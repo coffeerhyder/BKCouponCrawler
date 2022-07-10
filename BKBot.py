@@ -3,6 +3,7 @@ import math
 import sys
 import time
 import traceback
+from copy import copy, deepcopy
 from typing import List, Tuple
 
 import schedule
@@ -19,10 +20,10 @@ from BotUtils import *
 from BaseUtils import *
 
 from Helper import *
-from Crawler import BKCrawler, UserStats, sortCoupons
+from Crawler import BKCrawler, UserStats
 
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
-    USER_SETTINGS_ON_OFF, CouponSortMode, CouponSortModes, CouponSortCode, CouponViews
+    USER_SETTINGS_ON_OFF, CouponSortMode, CouponSortModes, CouponSortCode, CouponViews, getSortModeBySortCode, getNextSortMode, sortCoupons, sortCouponsAsList
 from CouponCategory import CouponCategory, getCouponCategory
 from Helper import BotAllowedCouponTypes, CouponType, formatPrice
 from UtilsOffers import offerGetImagePath
@@ -86,6 +87,7 @@ class BKBot:
         self.couchdb = self.crawler.couchdb
         self.updater = Updater(self.cfg[Config.BOT_TOKEN], request_kwargs={"read_timeout": 30})
         dispatcher = self.updater.dispatcher
+        self.currentSortMode = None
 
         # Main conversation handler - handles nearly all bot menus.
         conv_handler = ConversationHandler(
@@ -364,6 +366,8 @@ class BKBot:
             self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode='html', disable_web_page_preview=True)
         return ConversationHandler.END
 
+
+
     def displayCoupons(self, update: Update, context: CallbackContext, callbackVar: str):
         """ Displays all coupons in a pre selected mode """
         # Important! This is required so that we can e.g. jump from "Category 'App coupons' page 2 display single coupon" back into "Category 'App coupons' page 2"
@@ -372,21 +376,16 @@ class BKBot:
         urlinfo = urlquery.args
         mode = urlinfo["m"]
         try:
-            user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+            user = self.getUser(userID=update.effective_user.id, addIfNew=False)
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
-            """ TODO:
-            1. Do not sort here but only down below because only then we know how we want to sort.
-            2. Add default coupon "views" which also hold default sort modes.
-            3. Once user defined sort is implemented, maybe even save last user preferred sort in DB and re-use it here.
-              """
             if mode == CouponDisplayMode.FAVORITES:
                 # TODO: Improve/define default sort mode stuff for this case
-                userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user)
+                userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user, sortCoupons=True)
                 coupons = userFavorites.couponsAvailable
                 couponCategory = CouponCategory(coupons)
-                defaultSortMode = CouponSortModes.PRICE
+                defaultSortMode = CouponViews.FAVORITES.getFilter().sortCode
                 # When displaying only favorites we do not need the highlight symbol -> Gives us one character more of space in our buttons :)
                 highlightFavorites = False
             else:
@@ -412,19 +411,22 @@ class BKBot:
                     displayHiddenCouponsWithinOtherCategories = True
                 else:
                     raise BetterBotException("WTF developer mistake")
-                couponFilter = view.getFilter()
-                defaultSortMode = couponFilter.sortMode
+                couponFilter = deepcopy(view.getFilter())
+                defaultSortMode = getSortModeBySortCode(sortCode=couponFilter.sortCode)
                 # First we only want to filter coupons. Sort them later according to user preference.
-                couponFilter.sortMode = None
+                couponFilter.sortCode = None
                 coupons = self.getFilteredCoupons(couponFilter)
-                coupons = sortCoupons(coupons, defaultSortMode)
-                coupons = list(coupons.values())
                 couponCategory = CouponCategory(coupons)
                 menuText = couponCategory.getCategoryInfoText(withMenu=couponFilter.containsFriesAndCoke, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
             if len(coupons) == 0:
                 # This should never happen
                 raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
                                          InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=urlquery.url)]]))
+            # TODO: Implement user defined sorting
+            if self.currentSortMode is None:
+                self.currentSortMode = defaultSortMode
+            self.currentSortMode = getNextSortMode(currentSortMode=self.currentSortMode)
+            coupons = sortCouponsAsList(coupons, self.currentSortMode)
             # Build bot menu
             query = update.callback_query
             if query is not None:
@@ -451,7 +453,7 @@ class BKBot:
 
                 buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
                 index += 1
-            numberofCouponsOnCurrentPage = len(buttons)
+            # numberofCouponsOnCurrentPage = len(buttons)
             if paginationMax > 1:
                 # Add pagination navigation buttons if needed
                 menuText += "\nSeite " + str(desiredPage) + "/" + str(paginationMax)
@@ -478,17 +480,13 @@ class BKBot:
                     else:
                         navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonNextPage"))
                 buttons.append(navigationButtons)
-            # possibleSortModes = couponCategory.getSortModes()
-            # if len(possibleSortModes) > 1:
-            #     if numberofCouponsOnCurrentPage == 1:
-            #         # Only one item available on current page -> Do not allow sort
-            #         buttons.append([InlineKeyboardButton("Sortiert nach " + defaultSortMode.text, callback_data="DummySortButton")])
-            #     else:
-            #         urlquery_callbackBack.args['a'] = 's'
-            #         buttons.append([InlineKeyboardButton("Sortieren nach " + defaultSortMode.text, callback_data=urlquery_callbackBack.url)])
-            # else:
-            #     # TODO this might not make any sense
-            #     buttons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummySortButton"))
+            # Display sort button if it makes sense
+            possibleSortModes = couponCategory.getSortModes()
+            if len(possibleSortModes) > 1:
+                nextSortMode = getNextSortMode(currentSortMode=self.currentSortMode)
+                buttons.append([InlineKeyboardButton(SYMBOLS.ARROWS_CLOCKWISE_VERTICAL + self.currentSortMode.text + " -> " + nextSortMode.text, callback_data=urlquery_callbackBack.url)])
+                urlquery_callbackBack.args['a'] = 's'
+
             buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
             reply_markup = InlineKeyboardMarkup(buttons)
             self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
@@ -497,14 +495,14 @@ class BKBot:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_MAIN
 
-    def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavoritesInfo, str]:
+    def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None, sortCoupons: bool = False) -> Tuple[UserFavoritesInfo, str]:
         if len(user.favoriteCoupons) == 0:
             raise BetterBotException('<b>Du hast noch keine Favoriten!</b>', InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
         else:
             if coupons is None:
                 # Perform DB request if not already done before
                 coupons = self.getBotCoupons()
-            userFavoritesInfo = user.getUserFavoritesInfo(coupons)
+            userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=sortCoupons)
             if len(userFavoritesInfo.couponsAvailable) == 0:
                 # Edge case
                 errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar:</b>'
@@ -547,7 +545,7 @@ class BKBot:
 
     def botDisplayCouponsWithImagesFavorites(self, update: Update, context: CallbackContext):
         try:
-            userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(user=self.getUser(userID=update.effective_user.id, addIfNew=True))
+            userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(user=self.getUser(userID=update.effective_user.id, addIfNew=True), sortCoupons=True)
         except BetterBotException as botError:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_DISPLAY_COUPON
@@ -667,7 +665,7 @@ class BKBot:
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
-            userFavoritesInfo = user.getUserFavoritesInfo(self.getBotCoupons())
+            userFavoritesInfo = user.getUserFavoritesInfo(self.getBotCoupons(), sortCoupons=True)
             if len(userFavoritesInfo.couponsUnavailable) > 0:
                 keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavoritesInfo.couponsUnavailable)) + ")?*²",
                                                       callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])

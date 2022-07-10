@@ -245,6 +245,7 @@ class SYMBOLS:
     ARROW_LEFT = '⬅'
     ARROW_UP_RIGHT = '↗'
     ARROW_DOWN = '⬇'
+    ARROWS_CLOCKWISE_VERTICAL = '🔃'
     STAR = '⭐'
     HEART = '❤'
     BEER = '🍺'

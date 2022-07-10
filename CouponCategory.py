@@ -6,7 +6,7 @@ from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
 
 class CouponCategory:
 
-    def __init__(self, parameter: Union[CouponType, int, List]):
+    def __init__(self, parameter: Union[CouponType, int, dict, List]):
         self.coupons = None
         self.mainCouponType = None
         self.couponTypes = set()
@@ -20,6 +20,8 @@ class CouponCategory:
         self.numberofCouponsNew = 0
         self.numberofCouponsWithFriesOrCoke = 0
         self.totalPrice = 0
+        if isinstance(parameter, dict):
+            parameter = list(parameter.values())
         if isinstance(parameter, list):
             self.coupons = parameter
             mainCouponType = self.coupons[0].type
