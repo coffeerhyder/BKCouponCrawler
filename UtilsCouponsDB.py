@@ -593,8 +593,6 @@ class User(Document):
             favoritesFilter = CouponViews.FAVORITES.getFilter()
             availableFavoriteCoupons = sortCouponsAsList(availableFavoriteCoupons, favoritesFilter.sortCode)
             unavailableFavoriteCoupons = sortCouponsAsList(unavailableFavoriteCoupons, favoritesFilter.sortCode)
-            # availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
-            # unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
         return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons,
                                  favoritesUnavailable=unavailableFavoriteCoupons)
 
