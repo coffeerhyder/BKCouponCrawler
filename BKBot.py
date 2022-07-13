@@ -248,7 +248,8 @@ class BKBot:
         self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
-        user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+        userDB = self.crawler.getUsersDB()
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
         # Test code to update DB structure TODO: maybe make use of this
         # userDB = self.crawler.getUsersDB()
         # dummyUser = User()
@@ -305,6 +306,11 @@ class BKBot:
                 menuText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ im ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + ' verlinkt.'
             menuText += '</b>'
         self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
+        currentTimestamp = getCurrentDate().timestamp()
+        # Introduced: 2022-07-13, released: TODO and TODO: Delete all users with timestamp == 0 like 6 months later
+        if currentTimestamp - user.timestampLastTimeCommandStartUsed > 24 * 60 * 60 * 1000:
+            user.timestampLastTimeCommandStartUsed = currentTimestamp
+            user.store(db=userDB)
         return CallbackVars.MENU_MAIN
 
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
@@ -380,12 +386,13 @@ class BKBot:
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
+            view = None
             if mode == CouponDisplayMode.FAVORITES:
                 # TODO: Improve/define default sort mode stuff for this case
-                userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user, sortCoupons=True)
+                userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user, sortCoupons=False)
                 coupons = userFavorites.couponsAvailable
                 couponCategory = CouponCategory(coupons)
-                defaultSortMode = CouponViews.FAVORITES.getFilter().sortCode
+                view = CouponViews.FAVORITES
                 # When displaying only favorites we do not need the highlight symbol -> Gives us one character more of space in our buttons :)
                 highlightFavorites = False
             else:
@@ -412,7 +419,6 @@ class BKBot:
                 else:
                     raise BetterBotException("WTF developer mistake")
                 couponFilter = deepcopy(view.getFilter())
-                defaultSortMode = getSortModeBySortCode(sortCode=couponFilter.sortCode)
                 # First we only want to filter coupons. Sort them later according to user preference.
                 couponFilter.sortCode = None
                 coupons = self.getFilteredCoupons(couponFilter)
@@ -424,7 +430,7 @@ class BKBot:
                                          InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=urlquery.url)]]))
             # TODO: Implement user defined sorting
             if self.currentSortMode is None:
-                self.currentSortMode = defaultSortMode
+                self.currentSortMode = user.getSortModeForCouponView(couponView=view)
             self.currentSortMode = getNextSortMode(currentSortMode=self.currentSortMode)
             coupons = sortCouponsAsList(coupons, self.currentSortMode)
             # Build bot menu

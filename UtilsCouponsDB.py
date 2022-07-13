@@ -93,22 +93,42 @@ class CouponView:
     def getFilter(self):
         return self.couponfilter
 
-    def __init__(self, couponfilter: CouponFilter):
+    def __init__(self, viewCode: int, couponfilter: CouponFilter):
+        self.viewCode = viewCode
         self.couponfilter = couponfilter
         # self.defaultSortMode = defaultSortMode
 
 
-class CouponViews:
-    ALL = CouponView(CouponFilter(sortCode=CouponSortCode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None))
-    ALL_WITHOUT_MENU = CouponView(CouponFilter(sortCode=CouponSortCode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False))
-    CATEGORY = CouponView(CouponFilter(sortCode=CouponSortCode.MENU_PRICE, containsFriesAndCoke=None))
-    CATEGORY_WITHOUT_MENU = CouponView(CouponFilter(sortCode=CouponSortCode.MENU_PRICE, containsFriesAndCoke=False))
-    HIDDEN_APP_COUPONS_ONLY = CouponView(CouponFilter(sortCode=CouponSortCode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
-    # Dummy item basically only used for holding default sortCode for users' favorites
-    FAVORITES = CouponView(CouponFilter(sortCode=CouponSortCode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=None))
+class CouponViewCode:
+    ALL = 0
+    ALL_WITHOUT_MENU = 1
+    CATEGORY = 2
+    CATEGORY_WITHOUT_MENU = 3
+    HIDDEN_APP_COUPONS_ONLY = 4
+    FAVORITES = 5
 
-    def getAllCouponViews(self) -> list:
-        return [self.ALL, self.ALL_WITHOUT_MENU, self.CATEGORY, self.CATEGORY_WITHOUT_MENU, self.HIDDEN_APP_COUPONS_ONLY]
+
+class CouponViews:
+    ALL = CouponView(viewCode=CouponViewCode.ALL, couponfilter=CouponFilter(sortCode=CouponSortCode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None))
+    ALL_WITHOUT_MENU = CouponView(viewCode=CouponViewCode.ALL_WITHOUT_MENU,
+                                  couponfilter=CouponFilter(sortCode=CouponSortCode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False))
+    CATEGORY = CouponView(viewCode=CouponViewCode.CATEGORY, couponfilter=CouponFilter(sortCode=CouponSortCode.MENU_PRICE, containsFriesAndCoke=None))
+    CATEGORY_WITHOUT_MENU = CouponView(viewCode=CouponViewCode.CATEGORY_WITHOUT_MENU, couponfilter=CouponFilter(sortCode=CouponSortCode.MENU_PRICE, containsFriesAndCoke=False))
+    HIDDEN_APP_COUPONS_ONLY = CouponView(viewCode=CouponViewCode.HIDDEN_APP_COUPONS_ONLY,
+                                         couponfilter=CouponFilter(sortCode=CouponSortCode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
+    # Dummy item basically only used for holding default sortCode for users' favorites
+    FAVORITES = CouponView(viewCode=CouponViewCode.FAVORITES, couponfilter=CouponFilter(sortCode=CouponSortCode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=None))
+
+
+def getAllCouponViews() -> list:
+    return [CouponViews.ALL, CouponViews.ALL_WITHOUT_MENU, CouponViews.CATEGORY, CouponViews.CATEGORY_WITHOUT_MENU, CouponViews.HIDDEN_APP_COUPONS_ONLY]
+
+
+def getCouponViewByViewCode(viewCode: int) -> Union[CouponSortMode, None]:
+    for couponView in getAllCouponViews():
+        if couponView.viewCode == viewCode:
+            return couponView
+    return None
 
 
 class Coupon(Document):
@@ -138,6 +158,7 @@ class Coupon(Document):
     description = TextField()
     # TODO: Make use of this once it is possible for users to add coupons to DB via API
     addedVia = IntegerField()
+
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -495,6 +516,9 @@ class User(Document):
             paybackCardNumber=TextField(),
             addedDate=DateTimeField()
         ))
+    couponViewSortModes = DictField()
+    # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
+    timestampLastTimeCommandStartUsed = FloatField(default=0)
 
     def hasProbablyBlockedBot(self) -> bool:
         if self.botBlockedCounter > 0:
@@ -595,6 +619,14 @@ class User(Document):
             unavailableFavoriteCoupons = sortCouponsAsList(unavailableFavoriteCoupons, favoritesFilter.sortCode)
         return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons,
                                  favoritesUnavailable=unavailableFavoriteCoupons)
+
+    def getSortModeForCouponView(self, couponView: CouponView) -> CouponSortMode:
+        if self.couponViewSortModes is not None:
+            # User has at least one custom sortCode for one CouponView
+            sortCode = self.couponViewSortModes.setdefault(couponView.viewCode, couponView.couponfilter.sortCode)
+            return getSortModeBySortCode(sortCode=sortCode)
+        # User has no saved sortCode --> Return default
+        return getSortModeBySortCode(sortCode=couponView.couponfilter.sortCode)
 
     def resetSettings(self):
         dummyUser = User()
