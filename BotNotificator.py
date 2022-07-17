@@ -125,7 +125,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     index = -1
     dbUserUpdates = []
     usersToDelete = []
-    deleteBlockedUsersAfterDays = 30
+    # TODO: Update auto deletion handling
     for userIDStr, postText in usersNotify.items():
         index += 1
         # isLastItem = index == len(usersNotify) - 1
@@ -141,7 +141,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
             # Almost certainly it will be "Forbidden: bot was blocked by the user"
             logging.info(botBlocked.message + " --> chat_id: " + userIDStr)
             user.botBlockedCounter += 1
-            if user.botBlockedCounter >= deleteBlockedUsersAfterDays:
+            if user.hasProbablyBlockedBotForLongerTime():
                 usersToDelete.append(user)
             else:
                 dbUserUpdates.append(user)
@@ -149,7 +149,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         logging.info("Pushing DB updates for users who have blocked/unblocked bot: " + str(len(dbUserUpdates)))
         userDB.update(dbUserUpdates)
     if len(usersToDelete) > 0:
-        logging.info("Deleting users who blocked bot for >= " + str(deleteBlockedUsersAfterDays) + " days: " + str(len(usersToDelete)))
+        logging.info("Deleting users who blocked bot for a longer time: " + str(len(usersToDelete)))
         userDB.purge(usersToDelete)
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 

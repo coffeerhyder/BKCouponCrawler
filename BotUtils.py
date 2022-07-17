@@ -6,6 +6,7 @@ VERSION = '1.7.1'
 
 """ Place static stuff into this class. """
 
+
 def getBotImpressum() -> str:
     text = "BKBot v." + VERSION
     # 2022-04-26: Add some love for Ukraine (RE stupid war RU vs UA 2022)

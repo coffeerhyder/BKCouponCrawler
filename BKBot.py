@@ -23,9 +23,9 @@ from Helper import *
 from Crawler import BKCrawler, UserStats
 
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
-    USER_SETTINGS_ON_OFF, CouponSortMode, CouponSortModes, CouponSortCode, CouponViews, getSortModeBySortCode, getNextSortMode, sortCoupons, sortCouponsAsList
+    USER_SETTINGS_ON_OFF, CouponSortModes, CouponViews, getNextSortMode, sortCouponsAsList
 from CouponCategory import CouponCategory, getCouponCategory
-from Helper import BotAllowedCouponTypes, CouponType, formatPrice
+from Helper import BotAllowedCouponTypes, CouponType
 from UtilsOffers import offerGetImagePath
 
 
@@ -42,6 +42,10 @@ class CouponCallbackVars:
     ALL_COUPONS = "?a=dcs&m=" + CouponDisplayMode.ALL + "&cs="
     ALL_COUPONS_WITHOUT_MENU = "?a=dcs&m=" + CouponDisplayMode.ALL_WITHOUT_MENU + "&cs="
     FAVORITES = "?a=dcs&m=" + CouponDisplayMode.FAVORITES + "&cs="
+
+
+class CallbackPattern:
+    DISPLAY_COUPONS = '.*a=dcs.*'
 
 
 def generateCallbackRegEx(settings: dict):
@@ -101,7 +105,7 @@ class BKBot:
                     # Main menu
                     # CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),  # E.g. "back" button on error -> Go back to main menu
                     CallbackQueryHandler(self.botDisplayAllCouponsListWithFullTitles, pattern='^' + CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES + '$'),
-                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
+                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
                     CallbackQueryHandler(self.botDisplayCouponsWithImagesFavorites, pattern='^' + CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES + '$'),
                     CallbackQueryHandler(self.botDisplayOffers, pattern='^' + CallbackVars.MENU_OFFERS + '$'),
                     CallbackQueryHandler(self.botDisplayFeedbackCodes, pattern='^' + CallbackVars.MENU_FEEDBACK_CODES + '$'),
@@ -110,7 +114,7 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$')
                 ],
                 CallbackVars.MENU_OFFERS: [
-                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
+                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
                     # Back to main menu
                     CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),
                 ],
@@ -120,7 +124,7 @@ class BKBot:
                 ],
                 CallbackVars.MENU_DISPLAY_COUPON: [
                     # Back to last coupons menu
-                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
+                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
                     # Display single coupon
                     CallbackQueryHandler(self.botDisplaySingleCoupon, pattern='.*a=dc.*'),
                     # Back to main menu
@@ -249,7 +253,7 @@ class BKBot:
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
         userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         # Test code to update DB structure TODO: maybe make use of this
         # userDB = self.crawler.getUsersDB()
         # dummyUser = User()
@@ -308,8 +312,8 @@ class BKBot:
         self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         currentTimestamp = getCurrentDate().timestamp()
         # Introduced: 2022-07-13, released: TODO and TODO: Delete all users with timestamp == 0 like 6 months later
-        if currentTimestamp - user.timestampLastTimeCommandStartUsed > 24 * 60 * 60 * 1000:
-            user.timestampLastTimeCommandStartUsed = currentTimestamp
+        if currentTimestamp - user.timestampLastTimeAccountUsed > 24 * 60 * 60 * 1000:
+            user.timestampLastTimeAccountUsed = currentTimestamp
             user.store(db=userDB)
         return CallbackVars.MENU_MAIN
 
@@ -353,26 +357,27 @@ class BKBot:
         couponDB = self.getBotCoupons()
         userDB = self.crawler.getUsersDB()
         userStats = UserStats(userDB)
-        activeOffers = self.crawler.getOffersActive()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
-        text = '<b>Hallo Nerd</b>'
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        text = '<b>Hallo <s>Nerd</s> ' + update.effective_user.first_name + '</b>'
         text += '\n<pre>'
         text += 'Anzahl User im Bot: ' + str(len(userDB))
         text += '\nAnzahl von Usern gesetzte Favoriten: ' + str(userStats.numberofFavorites)
         text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(userStats.numberofUsersWhoFoundEasterEgg)
         text += '\nAnzahl User, die den Bot geblockt haben: ' + str(userStats.numberofUsersWhoBlockedBot)
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
-        text += '\nAnzahl Aufrufe Easter-Egg von dir: ' + str(user.easterEggCounter)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
-        text += '\nAnzahl gültige Angebote: ' + str(len(activeOffers))
+        text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
+        text += '\n---'
+        text += '\nDein BetterKing Account:'
+        text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
+        text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
+        text += '\nBot zuletzt verwendet (auf 48h genau): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
         text += '</pre>'
         if isinstance(msg, Message):
             self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
         else:
             self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode='html', disable_web_page_preview=True)
         return ConversationHandler.END
-
-
 
     def displayCoupons(self, update: Update, context: CallbackContext, callbackVar: str):
         """ Displays all coupons in a pre selected mode """
@@ -381,8 +386,9 @@ class BKBot:
         urlquery = furl(callbackVar)
         urlinfo = urlquery.args
         mode = urlinfo["m"]
+        action = urlinfo.get('a')
         try:
-            user = self.getUser(userID=update.effective_user.id, addIfNew=False)
+            user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
@@ -431,8 +437,12 @@ class BKBot:
             # TODO: Implement user defined sorting
             if self.currentSortMode is None:
                 self.currentSortMode = user.getSortModeForCouponView(couponView=view)
-            self.currentSortMode = getNextSortMode(currentSortMode=self.currentSortMode)
-            coupons = sortCouponsAsList(coupons, self.currentSortMode)
+            if action == 'dcss':
+                # Change sort of coupons
+                self.currentSortMode = getNextSortMode(currentSortMode=self.currentSortMode)
+                coupons = sortCouponsAsList(coupons, self.currentSortMode)
+            else:
+                coupons = sortCouponsAsList(coupons, user.getSortModeForCouponView(couponView=view))
             # Build bot menu
             query = update.callback_query
             if query is not None:
@@ -490,8 +500,9 @@ class BKBot:
             possibleSortModes = couponCategory.getSortModes()
             if len(possibleSortModes) > 1:
                 nextSortMode = getNextSortMode(currentSortMode=self.currentSortMode)
-                buttons.append([InlineKeyboardButton(SYMBOLS.ARROWS_CLOCKWISE_VERTICAL + self.currentSortMode.text + " -> " + nextSortMode.text, callback_data=urlquery_callbackBack.url)])
-                urlquery_callbackBack.args['a'] = 's'
+                urlquery_callbackBack.args['a'] = 'dcss'
+                buttons.append(
+                    [InlineKeyboardButton(self.currentSortMode.text + ' | 🔃 | ' + nextSortMode.text, callback_data=urlquery_callbackBack.url)])
 
             buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
             reply_markup = InlineKeyboardMarkup(buttons)
@@ -539,7 +550,7 @@ class BKBot:
         if query is not None:
             query.answer()
         userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.easterEggCounter += 1
         user.store(db=userDB)
 
@@ -551,7 +562,8 @@ class BKBot:
 
     def botDisplayCouponsWithImagesFavorites(self, update: Update, context: CallbackContext):
         try:
-            userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(user=self.getUser(userID=update.effective_user.id, addIfNew=True), sortCoupons=True)
+            userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(
+                user=self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True), sortCoupons=True)
         except BetterBotException as botError:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_DISPLAY_COUPON
@@ -636,7 +648,7 @@ class BKBot:
         return CallbackVars.MENU_FEEDBACK_CODES
 
     def botDisplayMenuSettings(self, update: Update, context: CallbackContext):
-        user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         return self.displaySettings(update, context, user)
 
     def displaySettings(self, update: Update, context: CallbackContext, user: User):
@@ -711,7 +723,7 @@ class BKBot:
         return self.botUserDeleteAccountSTART(update, context, CallbackVars.GENERIC_BACK)
 
     def botUserDeleteAccountSTART(self, update: Update, context: CallbackContext, callbackBackButton: str):
-        user = self.getUser(userID=update.effective_user.id, addIfNew=False)
+        user = self.getUser(userID=update.effective_user.id)
         if user is None:
             menuText = SYMBOLS.WARNING + 'Es existiert kein Benutzer mit der ID ' + str(update.effective_user.id) + ' in der Datenbank.'
             menuText += '\nMit /start meldest du dich erstmalig an.'
@@ -775,7 +787,7 @@ class BKBot:
         uniqueCouponID = re.search(PATTERN.PLU_TOGGLE_FAV, update.callback_query.data).group(1)
         query = update.callback_query
         userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         query.answer()
 
         if uniqueCouponID in user.favoriteCoupons:
@@ -879,7 +891,7 @@ class BKBot:
         settingKey = update.callback_query.data
         userDB = self.crawler.getUsersDB()
         dummyUser = User()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         if user.settings.get(settingKey, dummyUser.settings[settingKey]):
             user.settings[settingKey] = False
         else:
@@ -890,7 +902,7 @@ class BKBot:
     def botResetSettings(self, update: Update, context: CallbackContext):
         """ Resets users' settings to default """
         userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.resetSettings()
         # Update DB
         user.store(userDB)
@@ -900,7 +912,7 @@ class BKBot:
     def botDeleteUnavailableFavoriteCoupons(self, update: Update, context: CallbackContext):
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
         userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
 
@@ -919,7 +931,7 @@ class BKBot:
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
         elif userInput.isdecimal() and len(userInput) == 10:
             userDB = self.crawler.getUsersDB()
-            user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+            user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
             text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.'
@@ -934,7 +946,7 @@ class BKBot:
         """ Deletes Payback card from users account if his answer is matching his Payback card number. """
         # Validate input
         userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB, userID=update.effective_user.id, addIfNew=False)
+        user = self.getUserFromDB(userDB, userID=update.effective_user.id, addIfNew=False, updateUsageTimestamp=True)
         userInput = None if update.message is None else update.message.text
         if userInput is None:
             self.editOrSendMessage(update, text='Antworte mit deiner Payback Kartennummer <b>' + user.getPaybackCardNumber() + '</b>, um diese zu löschen.',
@@ -953,7 +965,7 @@ class BKBot:
         return CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD
 
     def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
-        user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         return self.displayPaybackCard(update, context, user)
 
     def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
@@ -1295,19 +1307,26 @@ class BKBot:
             """ Typically this means that this message has already been deleted """
             logging.warning("Failed to delete message with message_id: " + str(messageID))
 
-    def getUser(self, userID: Union[int, str], addIfNew: bool = False) -> User:
+    def getUser(self, userID: Union[int, str], addIfNew: bool = False, updateUsageTimestamp: bool = False) -> User:
         """ Wrapper. Only call this if you do not wish to write to the userDB in the calling methods otherwise you're wasting resources! """
-        return self.getUserFromDB(self.crawler.getUsersDB(), userID, addIfNew=addIfNew)
+        return self.getUserFromDB(self.crawler.getUsersDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
 
-    def getUserFromDB(self, userDB: Database, userID: Union[str, int], addIfNew: bool) -> Union[User, None]:
+    def getUserFromDB(self, userDB: Database, userID: Union[str, int], addIfNew: bool, updateUsageTimestamp: bool) -> Union[User, None]:
         """ Returns user from given DB. Adds it to DB if wished and it doesn't exist. """
         user = User.load(userDB, str(userID))
-        if user is None and addIfNew:
+        if user is not None:
+            # Store a rough timestamp of when user used bot last time
+            currentTimestamp = getCurrentDate().timestamp()
+            if updateUsageTimestamp and currentTimestamp - user.timestampLastTimeAccountUsed > 48 * 60 * 60:
+                user.timestampLastTimeAccountUsed = currentTimestamp
+                user.store(userDB)
+        elif addIfNew:
             """ New user? --> Add userID to DB if wished. """
             # Add user to DB for the first time
             logging.info('Storing new userID: ' + str(userID))
             user = User(id=str(userID))
             user.store(userDB)
+
         return user
 
 
