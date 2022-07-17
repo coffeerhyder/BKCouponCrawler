@@ -320,6 +320,7 @@ class Coupon(Document):
         reducedPercentage = self.getReducedPercentage()
         if reducedPercentage is not None:
             if self.paybackMultiplicator is not None:
+                # Add one decimal point for low percentage reducements such as Payback coupons as those will often only get us like 2.5% discount.
                 return '-' + f'{reducedPercentage:2.1f}' + '%'
             else:
                 return '-' + f'{reducedPercentage:2.0f}' + '%'
