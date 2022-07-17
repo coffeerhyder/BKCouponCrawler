@@ -23,7 +23,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     """
     logging.info("Checking for pending new coupons notifications")
     timestampStart = datetime.now().timestamp()
-    userDB = bkbot.crawler.getUsersDB()
+    userDB = bkbot.crawler.getUserDB()
     allNewCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortModes.PRICE))
     if len(allNewCoupons) == 0:
         logging.info("No new coupons available to notify about")

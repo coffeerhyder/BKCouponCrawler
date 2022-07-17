@@ -52,3 +52,5 @@ f = open('somefile.png', 'wb')
 ean = EAN13(ean='100000011111', writer=ImageWriter())
 ean.save(filename='test22.png', options={'foreground': 'black', 'text': 'Test'})
 
+a = "33"
+b = None

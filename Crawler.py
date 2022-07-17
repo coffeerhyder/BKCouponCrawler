@@ -1101,7 +1101,7 @@ class BKCrawler:
     def getOfferDB(self):
         return self.couchdb[DATABASES.OFFERS]
 
-    def getUsersDB(self):
+    def getUserDB(self):
         return self.couchdb[DATABASES.TELEGRAM_USERS]
 
     def getFilteredCoupons(
@@ -1256,7 +1256,7 @@ if __name__ == '__main__':
     # 2021-08-20: JokerGermany goodie:
     # crawler.setExportCSVs(True)
     # crawler.setCrawlOnlyBotCompatibleCoupons(False)
-    userDB = crawler.getUsersDB()
+    userDB = crawler.getUserDB()
     print("Number of userIDs in DB: " + str(len(userDB)))
     crawler.crawlAndProcessData()
     print("Crawler done!")

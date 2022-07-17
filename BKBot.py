@@ -91,7 +91,6 @@ class BKBot:
         self.couchdb = self.crawler.couchdb
         self.updater = Updater(self.cfg[Config.BOT_TOKEN], request_kwargs={"read_timeout": 30})
         dispatcher = self.updater.dispatcher
-        self.currentSortMode = None
 
         # Main conversation handler - handles nearly all bot menus.
         conv_handler = ConversationHandler(
@@ -252,7 +251,7 @@ class BKBot:
         self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         # Test code to update DB structure TODO: maybe make use of this
         # userDB = self.crawler.getUsersDB()
@@ -355,7 +354,7 @@ class BKBot:
     def botDisplayStats(self, update: Update, context: CallbackContext):
         msg = self.editOrSendMessage(update, text='Statistiken werden geladen...')
         couponDB = self.getBotCoupons()
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         userStats = UserStats(userDB)
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         text = '<b>Hallo <s>Nerd</s> ' + update.effective_user.first_name + '</b>'
@@ -388,7 +387,11 @@ class BKBot:
         mode = urlinfo["m"]
         action = urlinfo.get('a')
         try:
-            user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+            saveUserToDB = False
+            userDB = self.crawler.getUserDB()
+            user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=False)
+            if user.updateActivityTimestamp():
+                saveUserToDB = True
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
@@ -434,13 +437,12 @@ class BKBot:
                 # This should never happen
                 raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
                                          InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=urlquery.url)]]))
-            # TODO: Implement user defined sorting
-            if self.currentSortMode is None:
-                self.currentSortMode = user.getSortModeForCouponView(couponView=view)
             if action == 'dcss':
                 # Change sort of coupons
-                self.currentSortMode = getNextSortMode(currentSortMode=self.currentSortMode)
-                coupons = sortCouponsAsList(coupons, self.currentSortMode)
+                saveUserToDB = True
+                nextSortMode = user.getNextSortModeForCouponView(couponView=view)
+                coupons = sortCouponsAsList(coupons, nextSortMode)
+                user.setDefaultSortModeForCouponView(couponView=view, sortMode=nextSortMode)
             else:
                 coupons = sortCouponsAsList(coupons, user.getSortModeForCouponView(couponView=view))
             # Build bot menu
@@ -453,11 +455,11 @@ class BKBot:
             paginationMax = math.ceil(len(coupons) / maxCouponsPerPage)
             desiredPage = int(urlquery.args.get("p", 1))
             if desiredPage > paginationMax:
-                # Fallback - can happen if user leaves menu open for a long time, DB changes and user presses old "next/previous page" button
+                # Fallback - can happen if user leaves menu open for a long time, DB changes, user presses "next/previous page" button but max page number has changed in the meanwhile.
                 desiredPage = paginationMax
             # Grab all items in desired range (= on desired page)
             index = (desiredPage * maxCouponsPerPage - maxCouponsPerPage)
-            # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy middle page overview button and add Easter Egg functionality :)
+            # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy button in the middle and add Easter Egg functionality :)
             desiredPageContainsAtLeastOneFavoriteCoupon = False
             while len(buttons) < maxCouponsPerPage and index < len(coupons):
                 coupon = coupons[index]
@@ -499,14 +501,19 @@ class BKBot:
             # Display sort button if it makes sense
             possibleSortModes = couponCategory.getSortModes()
             if len(possibleSortModes) > 1:
-                nextSortMode = getNextSortMode(currentSortMode=self.currentSortMode)
+                # TODO: 1. Fix this button. 2. Add sort by "Is new"
+                currentSortMode = user.getSortModeForCouponView(couponView=view)
+                nextSortMode = user.getNextSortModeForCouponView(couponView=view)
                 urlquery_callbackBack.args['a'] = 'dcss'
                 buttons.append(
-                    [InlineKeyboardButton(self.currentSortMode.text + ' | 🔃 | ' + nextSortMode.text, callback_data=urlquery_callbackBack.url)])
+                    [InlineKeyboardButton(currentSortMode.text + ' | 🔃 | ' + nextSortMode.text, callback_data=urlquery_callbackBack.url)])
 
             buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
             reply_markup = InlineKeyboardMarkup(buttons)
             self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
+            if saveUserToDB:
+                # User document has changed -> Update DB
+                user.store(db=userDB)
             return CallbackVars.MENU_DISPLAY_COUPON
         except BetterBotException as botError:
             self.handleBotErrorGently(update, context, botError)
@@ -549,7 +556,7 @@ class BKBot:
         query = update.callback_query
         if query is not None:
             query.answer()
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.easterEggCounter += 1
         user.store(db=userDB)
@@ -586,7 +593,7 @@ class BKBot:
     def displayCouponsWithImages(self, update: Update, context: CallbackContext, coupons: list, msgText: str):
         self.sendMessage(chat_id=update.effective_message.chat_id, text=msgText, parse_mode='HTML')
         index = 0
-        user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
+        user = User.load(self.crawler.getUserDB(), str(update.effective_user.id))
         showCouponIndexText = False
         for coupon in coupons:
             if showCouponIndexText:
@@ -703,7 +710,7 @@ class BKBot:
         uniqueCouponID = callbackArgs['plu']
         callbackBack = callbackArgs['cb']
         coupon = Coupon.load(self.crawler.getCouponDB(), uniqueCouponID)
-        user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
+        user = User.load(self.crawler.getUserDB(), str(update.effective_user.id))
         # Send coupon image in chat
         self.displayCouponWithImage(update, context, coupon, user)
         # Post user-menu into chat
@@ -739,7 +746,7 @@ class BKBot:
         """ Deletes users' account from DB. """
         userInput = None if update.message is None else update.message.text
         if userInput is not None and userInput == str(update.effective_user.id):
-            userDB = self.crawler.getUsersDB()
+            userDB = self.crawler.getUserDB()
             # Delete user from DB
             del userDB[str(update.effective_user.id)]
             menuText = SYMBOLS.CONFIRM + 'Dein BetterKing Account wurde vernichtet!'
@@ -786,7 +793,7 @@ class BKBot:
         """ Toggles coupon favorite state and edits reply_markup accordingly so user gets to see the new state of this setting. """
         uniqueCouponID = re.search(PATTERN.PLU_TOGGLE_FAV, update.callback_query.data).group(1)
         query = update.callback_query
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         query.answer()
 
@@ -889,7 +896,7 @@ class BKBot:
         """ Toggles pre-selected setting via settingKey. """
         update.callback_query.answer()
         settingKey = update.callback_query.data
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         dummyUser = User()
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         if user.settings.get(settingKey, dummyUser.settings[settingKey]):
@@ -901,7 +908,7 @@ class BKBot:
 
     def botResetSettings(self, update: Update, context: CallbackContext):
         """ Resets users' settings to default """
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.resetSettings()
         # Update DB
@@ -911,7 +918,7 @@ class BKBot:
 
     def botDeleteUnavailableFavoriteCoupons(self, update: Update, context: CallbackContext):
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
@@ -930,7 +937,7 @@ class BKBot:
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
         elif userInput.isdecimal() and len(userInput) == 10:
-            userDB = self.crawler.getUsersDB()
+            userDB = self.crawler.getUserDB()
             user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
@@ -945,7 +952,7 @@ class BKBot:
     def botDeletePaybackCard(self, update: Update, context: CallbackContext):
         """ Deletes Payback card from users account if his answer is matching his Payback card number. """
         # Validate input
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         user = self.getUserFromDB(userDB, userID=update.effective_user.id, addIfNew=False, updateUsageTimestamp=True)
         userInput = None if update.message is None else update.message.text
         if userInput is None:
@@ -986,7 +993,7 @@ class BKBot:
 
     def batchProcessAutoDeleteUsersUnavailableFavorites(self):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         users = []
         for userIDStr in userDB:
             user = User.load(userDB, userIDStr)
@@ -1309,16 +1316,14 @@ class BKBot:
 
     def getUser(self, userID: Union[int, str], addIfNew: bool = False, updateUsageTimestamp: bool = False) -> User:
         """ Wrapper. Only call this if you do not wish to write to the userDB in the calling methods otherwise you're wasting resources! """
-        return self.getUserFromDB(self.crawler.getUsersDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
+        return self.getUserFromDB(self.crawler.getUserDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
 
     def getUserFromDB(self, userDB: Database, userID: Union[str, int], addIfNew: bool, updateUsageTimestamp: bool) -> Union[User, None]:
         """ Returns user from given DB. Adds it to DB if wished and it doesn't exist. """
         user = User.load(userDB, str(userID))
         if user is not None:
             # Store a rough timestamp of when user used bot last time
-            currentTimestamp = getCurrentDate().timestamp()
-            if updateUsageTimestamp and currentTimestamp - user.timestampLastTimeAccountUsed > 48 * 60 * 60:
-                user.timestampLastTimeAccountUsed = currentTimestamp
+            if updateUsageTimestamp and user.updateActivityTimestamp():
                 user.store(userDB)
         elif addIfNew:
             """ New user? --> Add userID to DB if wished. """

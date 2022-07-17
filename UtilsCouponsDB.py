@@ -46,6 +46,16 @@ class CouponSortMode:
         self.text = text
         self.isDescending = isDescending
 
+    def getSortCode(self) -> Union[int, None]:
+        """ Returns position of current sort mode in array of all sort modes. """
+        allSortModes = getAllSortModes()
+        for i in range(len(allSortModes)):
+            sortModeTmp = allSortModes[i]
+            if sortModeTmp == self:
+                return i
+        # This should never happen
+        return None
+
 
 class CouponSortModes:
     PRICE = CouponSortMode("Preis " + SYMBOLS.ARROW_UP)
@@ -74,13 +84,17 @@ def getNextSortMode(currentSortMode: CouponSortMode) -> CouponSortMode:
             else:
                 # Return next sortMode
                 return allSortModes[index + 1]
-
     # Fallback, should not be needed
     return currentSortMode
 
 
-def getSortModeBySortCode(sortCode: int) -> Union[CouponSortMode, None]:
-    return getAllSortModes()[sortCode]
+def getSortModeBySortCode(sortCode: int) -> CouponSortMode:
+    allSortModes = getAllSortModes()
+    if sortCode < len(allSortModes):
+        return getAllSortModes()[sortCode]
+    else:
+        # Fallback
+        return allSortModes[0]
 
 
 class CouponView:
@@ -649,15 +663,33 @@ class User(Document):
     def getSortModeForCouponView(self, couponView: CouponView) -> CouponSortMode:
         if self.couponViewSortModes is not None:
             # User has at least one custom sortCode for one CouponView
-            sortCode = self.couponViewSortModes.setdefault(couponView.viewCode, couponView.couponfilter.sortCode)
-            return getSortModeBySortCode(sortCode=sortCode)
+            sortCode = self.couponViewSortModes.get(str(couponView.viewCode))
+            if sortCode is not None:
+                return getSortModeBySortCode(sortCode=sortCode)
+            else:
+                return getSortModeBySortCode(sortCode=couponView.couponfilter.sortCode)
         # User has no saved sortCode --> Return default
         return getSortModeBySortCode(sortCode=couponView.couponfilter.sortCode)
+
+    def getNextSortModeForCouponView(self, couponView: CouponView) -> CouponSortMode:
+        currentSortMode = self.getSortModeForCouponView(couponView=couponView)
+        return getNextSortMode(currentSortMode=currentSortMode)
+
+    def setDefaultSortModeForCouponView(self, couponView: CouponView, sortMode: CouponSortMode):
+        self.couponViewSortModes[couponView.viewCode] = sortMode.getSortCode()
+
+    def updateActivityTimestamp(self) -> bool:
+        currentTimestamp = getCurrentDate().timestamp()
+        if currentTimestamp - self.timestampLastTimeAccountUsed > 48 * 60 * 60:
+            self.timestampLastTimeAccountUsed = currentTimestamp
+            return True
+        else:
+            return False
 
     def resetSettings(self):
         dummyUser = User()
         self.settings = dummyUser.settings
-        self.couponViewSortModes = None
+        self.couponViewSortModes = {}
 
 
 class InfoEntry(Document):
@@ -833,7 +865,7 @@ if DISPLAY_BETA_SETTING:
     }
 
 
-def removeDuplicatedCoupons(coupons: Union[list, dict]) -> dict:
+def removeDuplicatedCoupons(coupons: Union[List[Coupon], dict]) -> dict:
     couponTitleMappingTmp = getCouponTitleMapping(coupons)
     # Now clean our mapping: Sometimes one product may be available twice with multiple prices -> We want exactly one mapping per title
     couponsWithoutDuplicates = {}
@@ -859,7 +891,7 @@ def removeDuplicatedCoupons(coupons: Union[list, dict]) -> dict:
         for coupon in couponsForDuplicateRemoval:
             if firstPrice is None:
                 firstPrice = coupon.getPrice()
-            elif coupon.getPrice() is not None and coupon.getPrice() != firstPrice:
+            elif coupon.getPrice() != firstPrice:
                 isDifferentPrices = True
             if coupon.type == CouponType.APP:
                 appCoupon = coupon

@@ -143,10 +143,8 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRIC
 # TODOs
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Crawler: Zweite History DB einbauen und/oder bestehendes System entsprechend ändern
-* Bot: Beliebige Sortierung einbauen und letzte Sortierung speichern
 * Start-Script prüfen
 * Handling mit Datumsangaben verbessern
-* Fragen, ob der Betreiber von pbcp.de lust hat, die Coupons hier zu zeigen: pbcp.de/partner/burger-king
 * Produktnamen-Handling für Payback Coupons generischer gestalten
 * isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
@@ -321,13 +319,14 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
 * http://www.fastfood-forum.net/wbb3/upload/index.php/Board/9-Burger-King/
 
-### Ähnliche Projekte auf GitHub (teilweise veraltet)
+### Ähnliche Projekte (teilweise veraltet)
 * https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
 * https://github.com/reteps/burger-king-api-wrapper
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
 * https://bk.eris.cc/ --> https://gist.github.com/printfuck
 * https://t.me/gimmecockbot (https://t.me/freecokebot)
 * https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
+* [pbcp.de/partner/burger-king](https://pbcp.de/partner/burger-king)
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot
