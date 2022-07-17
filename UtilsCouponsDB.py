@@ -676,7 +676,7 @@ class User(Document):
         return getNextSortMode(currentSortMode=currentSortMode)
 
     def setDefaultSortModeForCouponView(self, couponView: CouponView, sortMode: CouponSortMode):
-        self.couponViewSortModes[couponView.viewCode] = sortMode.getSortCode()
+        self.couponViewSortModes[str(couponView.viewCode)] = sortMode.getSortCode()
 
     def updateActivityTimestamp(self) -> bool:
         currentTimestamp = getCurrentDate().timestamp()
