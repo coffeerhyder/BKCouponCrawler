@@ -245,9 +245,11 @@ class CouponCategory:
         return None
 
 
-def getCouponCategory(coupons: List[Coupon]) -> CouponCategory:
+def getCouponCategory(coupons: Union[List[Coupon], dict]) -> CouponCategory:
     """ Returns CouponCategory for given list of coupons.Assumes that this list only contains coupons of one
     category. """
+    if isinstance(coupons, dict):
+        coupons = list(coupons.values())
     mainCouponType = coupons[0].type
     category = CouponCategory(parameter=mainCouponType)
     for coupon in coupons:

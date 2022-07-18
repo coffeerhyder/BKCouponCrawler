@@ -319,7 +319,7 @@ class BKBot:
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
         """ Send list containing all coupons with long titles linked to coupon channel to user. This may result in up to 10 messages being sent! """
         update.callback_query.answer()
-        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortModes.TYPE_MENU_PRICE))
+        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
                                                 channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
@@ -390,6 +390,7 @@ class BKBot:
             saveUserToDB = False
             userDB = self.crawler.getUserDB()
             user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=False)
+            userOld = copy(user)
             if user.updateActivityTimestamp():
                 saveUserToDB = True
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
@@ -504,7 +505,6 @@ class BKBot:
             # Display sort button if it makes sense
             possibleSortModes = couponCategory.getSortModes()
             if len(possibleSortModes) > 1:
-                # TODO: 1. Fix this button. 2. Add sort by "Is new"
                 currentSortMode = user.getSortModeForCouponView(couponView=view)
                 nextSortMode = user.getNextSortModeForCouponView(couponView=view)
                 urlquery_callbackBack.args['a'] = 'dcss'

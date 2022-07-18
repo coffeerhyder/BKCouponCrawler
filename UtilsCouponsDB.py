@@ -31,15 +31,6 @@ class CouponFilter(BaseModel):
     sortCode: Optional[Union[None, int]]
 
 
-class CouponSortCode:
-    PRICE = 0
-    PRICE_DESCENDING = 1
-    DISCOUNT = 2
-    DISCOUNT_DESCENDING = 3
-    MENU_PRICE = 4
-    TYPE_MENU_PRICE = 5
-
-
 class CouponSortMode:
 
     def __init__(self, text: str, isDescending: bool = False):
@@ -62,13 +53,15 @@ class CouponSortModes:
     PRICE_DESCENDING = CouponSortMode("Preis " + SYMBOLS.ARROW_DOWN, isDescending=True)
     DISCOUNT = CouponSortMode("Rabatt " + SYMBOLS.ARROW_UP)
     DISCOUNT_DESCENDING = CouponSortMode("Rabatt " + SYMBOLS.ARROW_DOWN, isDescending=True)
+    NEW = CouponSortMode("Neue Coupons " + SYMBOLS.ARROW_UP)
+    NEW_DESCENDING = CouponSortMode("Neue Coupons " + SYMBOLS.ARROW_DOWN, isDescending=True)
     MENU_PRICE = CouponSortMode("Menü_Preis")
     TYPE_MENU_PRICE = CouponSortMode("Typ_Menü_Preis")
 
 
 def getAllSortModes() -> list:
     # Important! The order of this will also determine the sort order which gets presented to the user!
-    return [CouponSortModes.PRICE, CouponSortModes.PRICE_DESCENDING, CouponSortModes.DISCOUNT_DESCENDING, CouponSortModes.DISCOUNT, CouponSortModes.MENU_PRICE, CouponSortModes.TYPE_MENU_PRICE]
+    return [CouponSortModes.PRICE, CouponSortModes.PRICE_DESCENDING, CouponSortModes.DISCOUNT_DESCENDING, CouponSortModes.DISCOUNT, CouponSortModes.NEW, CouponSortModes.NEW_DESCENDING, CouponSortModes.MENU_PRICE, CouponSortModes.TYPE_MENU_PRICE]
 
 
 def getNextSortMode(currentSortMode: CouponSortMode) -> CouponSortMode:
@@ -118,15 +111,15 @@ class CouponViewCode:
 
 
 class CouponViews:
-    ALL = CouponView(viewCode=CouponViewCode.ALL, couponfilter=CouponFilter(sortCode=CouponSortCode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None))
+    ALL = CouponView(viewCode=CouponViewCode.ALL, couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
     ALL_WITHOUT_MENU = CouponView(viewCode=CouponViewCode.ALL_WITHOUT_MENU,
-                                  couponfilter=CouponFilter(sortCode=CouponSortCode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False))
-    CATEGORY = CouponView(viewCode=CouponViewCode.CATEGORY, couponfilter=CouponFilter(sortCode=CouponSortCode.MENU_PRICE, containsFriesAndCoke=None))
-    CATEGORY_WITHOUT_MENU = CouponView(viewCode=CouponViewCode.CATEGORY_WITHOUT_MENU, couponfilter=CouponFilter(sortCode=CouponSortCode.MENU_PRICE, containsFriesAndCoke=False))
+                                  couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=False))
+    CATEGORY = CouponView(viewCode=CouponViewCode.CATEGORY, couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=None))
+    CATEGORY_WITHOUT_MENU = CouponView(viewCode=CouponViewCode.CATEGORY_WITHOUT_MENU, couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
     HIDDEN_APP_COUPONS_ONLY = CouponView(viewCode=CouponViewCode.HIDDEN_APP_COUPONS_ONLY,
-                                         couponfilter=CouponFilter(sortCode=CouponSortCode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
+                                         couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
     # Dummy item basically only used for holding default sortCode for users' favorites
-    FAVORITES = CouponView(viewCode=CouponViewCode.FAVORITES, couponfilter=CouponFilter(sortCode=CouponSortCode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=None))
+    FAVORITES = CouponView(viewCode=CouponViewCode.FAVORITES, couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
 
 
 def getAllCouponViews() -> list:
@@ -793,6 +786,13 @@ def sortCouponsByDiscount(couponList: List[Coupon], descending: bool = False) ->
     return sorted(couponList,
                   key=lambda x: 0 if x.getReducedPercentage() is None else x.getReducedPercentage(), reverse=descending)
 
+def sortCouponsByNew(couponList: List[Coupon], descending: bool = False) -> List[Coupon]:
+    """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
+    if isinstance(couponList, dict):
+        couponList = couponList.values()
+    return sorted(couponList,
+                  key=lambda x: x.isNewCoupon(), reverse=descending)
+
 
 def getCouponTitleMapping(coupons: Union[dict, list]) -> dict:
     """ Maps normalized coupon titles to coupons with the goal of being able to match coupons by title
@@ -972,6 +972,10 @@ def sortCouponsAsList(coupons: Union[list, dict], sortCode: Union[int, CouponSor
         coupons = sortCouponsByDiscount(coupons)
     elif sortMode == CouponSortModes.DISCOUNT_DESCENDING:
         coupons = sortCouponsByDiscount(coupons, descending=True)
+    elif sortMode == CouponSortModes.NEW:
+        coupons = sortCouponsByNew(coupons)
+    elif sortMode == CouponSortModes.NEW_DESCENDING:
+        coupons = sortCouponsByNew(coupons, descending=True)
     else:
         # This should never happen
         logging.warning("Developer mistake!! Unknown sortMode: " + str(sortMode))
