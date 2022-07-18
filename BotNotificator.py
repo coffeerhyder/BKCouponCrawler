@@ -14,7 +14,7 @@ from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCou
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
-DEBUGNOTIFICATOR = False
+DEBUGNOTIFICATOR = True
 
 
 def notifyUsersAboutNewCoupons(bkbot) -> None:
@@ -357,8 +357,10 @@ def cleanupChannel(bkbot):
     logging.info("Channel cleanup done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
 
-def deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc):
-    """ Deletes all channel messages which were previously flagged for deletion. """
+def deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc) -> int:
+    """ Deletes all channel messages which were previously flagged for deletion.
+     @:returns Number of deleted messages
+      """
     if len(infoDoc.messageIDsToDelete) > 0:
         initialNumberofMsgsToDelete = len(infoDoc.messageIDsToDelete)
         logging.info("Deleting " + str(initialNumberofMsgsToDelete) + " old messages...")
@@ -370,6 +372,9 @@ def deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc):
             index += 1
         # Update DB
         infoDoc.store(infoDB)
+        return initialNumberofMsgsToDelete
+    else:
+        return 0
 
 
 def nukeChannel(bkbot):
@@ -393,11 +398,15 @@ def nukeChannel(bkbot):
                 bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID)
             del channelDB[couponID]
     # Delete coupon overview messages
-    logging.info("Deleting information messages...")
     updateInfoDoc = False
+    hasLoggedDeletionOfCouponOverviewMessageIDs = False
     for couponType in BotAllowedCouponTypes:
         couponOverviewMessageIDs = infoDoc.getMessageIDsForCouponCategory(couponType)
         if len(couponOverviewMessageIDs) > 0:
+            if not hasLoggedDeletionOfCouponOverviewMessageIDs:
+                # Only print this logger once
+                logging.info("Deleting information messages...")
+                hasLoggedDeletionOfCouponOverviewMessageIDs = True
             bkbot.deleteMessages(chat_id=bkbot.getPublicChannelChatID(), messageIDs=couponOverviewMessageIDs)
             infoDoc.deleteCouponCategoryMessageIDs(couponType)
             updateInfoDoc = True
