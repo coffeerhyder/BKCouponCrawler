@@ -1,3 +1,4 @@
+import argparse
 import logging
 import math
 import sys
@@ -73,14 +74,33 @@ def cleanupCache(cacheDict: dict):
 
 
 class BKBot:
+    my_parser = argparse.ArgumentParser()
+    my_parser.add_argument('-fc', '--forcechannelupdatewithresend',
+                           help='Sofortiges Channelupdates mit löschen- und neu Einsenden aller Coupons.', type=bool,
+                           default=False)
+    my_parser.add_argument('-rc', '--resumechannelupdate',
+                           help='Channelupdate fortsetzen: Coupons ergänzen, die nicht rausgeschickt wurden und Couponübersicht erneuern. Nützlich um ein Channelupdate bei einem Abbruch genau an derselben Stelle fortzusetzen.',
+                           type=bool,
+                           default=False)
+    my_parser.add_argument('-fb', '--forcebatchprocess',
+                           help='Alle drei Aktionen ausführen, die eigentlich nur täglich 1x durchlaufen: Crawler, User Favoriten Benachrichtigungen rausschicken und Channelupdate mit Löschen- und neu Einsenden.',
+                           type=bool, default=False)
+    my_parser.add_argument('-un', '--usernotify',
+                           help='User benachrichtigen über abgelaufene favorisierte Coupons, die wieder zurück sind und neue Coupons (= Coupons, die seit dem letzten DB Update neu hinzu kamen).',
+                           type=bool, default=False)
+    my_parser.add_argument('-n', '--nukechannel', help='Alle Nachrichten im Channel automatisiert löschen (debug/dev Funktion)', type=bool, default=False)
+    my_parser.add_argument('-cc', '--cleanupchannel', help='Zu löschende alte Coupon-Posts aus dem Channel löschen.', type=bool, default=False)
+    my_parser.add_argument('-m', '--migrate', help='DB Migrationen ausführen falls verfügbar', type=bool, default=False)
+    my_parser.add_argument('-c', '--crawl', help='Crawler beim Start des Bots einmalig ausführen.', type=bool, default=False)
+    my_parser.add_argument('-mm', '--maintenancemode', help='Wartungsmodus - zeigt im Bot und Channel eine entsprechende Meldung. Deaktiviert alle Bot Funktionen.', type=bool,
+                           default=False)
+    args = my_parser.parse_args()
 
     def __init__(self):
         self.couponImageCache = {}
         self.couponImageQRCache = {}
         self.offerImageCache = {}
-        self.maintenanceMode = False
-        if 'maintenancemode' in sys.argv:
-            self.maintenanceMode = True
+        self.maintenanceMode = self.args.maintenancemode
         self.cfg = loadConfig()
         if self.cfg is None:
             raise Exception('Broken or missing config')
@@ -1363,29 +1383,29 @@ if __name__ == '__main__':
     bkbot.startBot()
     """ Check for special flag to force-run batch process immediately. """
     # First the ones which can be combined with others and need to be executed first
-    if 'crawl' in sys.argv:
+    if bkbot.args.crawl:
         bkbot.crawl()
     # Now the ones where only one is allowed
-    if 'forcechannelupdatewithresend' in sys.argv:
+    if bkbot.args.forcechannelupdatewithresend:
         bkbot.renewPublicChannel()
         bkbot.cleanupPublicChannel()
-    elif 'resumechannelupdate' in sys.argv:
+    elif bkbot.args.resumechannelupdate:
         bkbot.resumePublicChannelUpdate()
         bkbot.cleanupPublicChannel()
-    elif 'forcebatchprocess' in sys.argv:
+    elif bkbot.args.forcebatchprocess:
         # bkbot.crawl()
         # bkbot.notifyUsers()
         bkbot.batchProcess()
         # updatePublicChannel(bkbot, reSendAll=False)
         # schedule.every(10).seconds.do(bkbot.updatePublicChannel)
         # schedule.every(10).seconds.do(bkbot.notifyUsers)
-    elif 'nukechannel' in sys.argv:
+    elif bkbot.args.nukechannel:
         nukeChannel(bkbot)
-    elif 'cleanupchannel' in sys.argv:
+    elif bkbot.args.cleanupchannel:
         cleanupChannel(bkbot)
-    elif 'migrate' in sys.argv:
+    elif bkbot.args.migrate:
         bkbot.crawler.migrateDBs()
-    if 'usernotify' in sys.argv:
+    if bkbot.args.usernotify:
         bkbot.notifyUsers()
     # schedule.every(10).seconds.do(bkbot.startBot)
     while True:

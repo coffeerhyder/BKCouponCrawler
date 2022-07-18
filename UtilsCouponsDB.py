@@ -675,7 +675,7 @@ class User(Document):
 
     def hasRecentlyUsedBot(self) -> bool:
         currentTimestamp = getCurrentDate().timestamp()
-        if currentTimestamp - self.timestampLastTimeAccountUsed < 48 * 60 * 60:
+        if currentTimestamp - self.timestampLastTimeAccountUsed < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
             return True
         else:
             return False
@@ -836,7 +836,7 @@ USER_SETTINGS_ON_OFF = {
         "default": True
     },
     "displayCouponSortButton": {
-        "description": "Coupon sortieren Button zeigen (eigen. Sortierung wird auch übernommen, wenn deaktiviert)",
+        "description": "Coupon sortieren Button zeigen",
         "default": True
     },
     "displayFeedbackCodeGenerator": {

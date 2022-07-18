@@ -84,23 +84,53 @@ Siehe `config_extra_coupons.json`
 ### Mögliche Start-Parameter für `BKBot.py`:  
 Die meisten Parameter sind nur einzeln verwendbar.  
 
-Parameter | Beschreibung
---- | ---
-forcechannelupdatewithresend | Sofortiges Channelupdates mit löschen- und neu Einsenden aller Coupons.
-resumechannelupdate | Channelupdate fortsetzen: Coupons ergänzen, die nicht rausgeschickt wurden und Couponübersicht erneuern. Nützlich um ein Channelupdate bei einem Abbruch genau an derselben Stelle fortzusetzen.
-forcebatchprocess | Alle drei Aktionen ausführen, die eigentlich nur täglich 1x durchlaufen: Crawler, User Favoriten Benachrichtigungen rausschicken und Channelupdate mit Löschen- und neu Einsenden.
-usernotify | User benachrichtigen über abgelaufene favorisierte Coupons, die wieder zurück sind und neue Coupons (= Coupons, die seit dem letzten DB Update neu hinzu kamen).
-nukechannel | Alle Nachrichten im Channel automatisiert löschen (debug/dev Funktion für alle die zu faul sind, das von Hand zu tun ;) )
-cleanupchannel | Zu löschende alte Coupon-Posts aus dem Channel löschen
-migrate | DB Migrationen ausführen falls verfügbar
-crawl | Crawler beim Start des Bots einmalig ausführen
-maintenancemode | Wartungsmodus - zeigt im Bot und Channel eine entsprechende Meldung. Deaktiviert alle Bot Funktionen.
+```
+usage: BKBot.py [-h] [-fc FORCECHANNELUPDATEWITHRESEND]
+                [-rc RESUMECHANNELUPDATE] [-fb FORCEBATCHPROCESS]
+                [-un USERNOTIFY] [-n NUKECHANNEL] [-cc CLEANUPCHANNEL]
+                [-m MIGRATE] [-c CRAWL] [-mm MAINTENANCEMODE]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -fc FORCECHANNELUPDATEWITHRESEND, --forcechannelupdatewithresend FORCECHANNELUPDATEWITHRESEND
+                        Sofortiges Channelupdates mit löschen- und neu
+                        Einsenden aller Coupons.
+  -rc RESUMECHANNELUPDATE, --resumechannelupdate RESUMECHANNELUPDATE
+                        Channelupdate fortsetzen: Coupons ergänzen, die nicht
+                        rausgeschickt wurden und Couponübersicht erneuern.
+                        Nützlich um ein Channelupdate bei einem Abbruch genau
+                        an derselben Stelle fortzusetzen.
+  -fb FORCEBATCHPROCESS, --forcebatchprocess FORCEBATCHPROCESS
+                        Alle drei Aktionen ausführen, die eigentlich nur
+                        täglich 1x durchlaufen: Crawler, User Favoriten
+                        Benachrichtigungen rausschicken und Channelupdate mit
+                        Löschen- und neu Einsenden.
+  -un USERNOTIFY, --usernotify USERNOTIFY
+                        User benachrichtigen über abgelaufene favorisierte
+                        Coupons, die wieder zurück sind und neue Coupons (=
+                        Coupons, die seit dem letzten DB Update neu hinzu
+                        kamen).
+  -n NUKECHANNEL, --nukechannel NUKECHANNEL
+                        Alle Nachrichten im Channel automatisiert löschen
+                        (debug/dev Funktion)
+  -cc CLEANUPCHANNEL, --cleanupchannel CLEANUPCHANNEL
+                        Zu löschende alte Coupon-Posts aus dem Channel
+                        löschen.
+  -m MIGRATE, --migrate MIGRATE
+                        DB Migrationen ausführen falls verfügbar
+  -c CRAWL, --crawl CRAWL
+                        Crawler beim Start des Bots einmalig ausführen.
+  -mm MAINTENANCEMODE, --maintenancemode MAINTENANCEMODE
+                        Wartungsmodus - zeigt im Bot und Channel eine
+                        entsprechende Meldung. Deaktiviert alle Bot
+                        Funktionen.
+```
 
 ### Bot mit Systemstart starten (Linux)
 1. Sichergehen, dass BKBot.py ausführbar ist. Falls nötig: ``chmod a+b BKBot.py``.
 2. Per ``crontab -e`` in crontab wechseln.
 3. Folgendes hinzufügen:  
-```  
+```
 # Bot nach Reboot starten. Die Wartezeit wird benötigt, damit CouchDB genug Zeit hat zu starten.  
 @reboot sleep 45 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
 # Updates nachts automatisch ausführen
