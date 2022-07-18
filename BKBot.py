@@ -456,9 +456,11 @@ class BKBot:
             desiredPage = int(urlquery.args.get("p", 1))
             if desiredPage > paginationMax:
                 # Fallback - can happen if user leaves menu open for a long time, DB changes, user presses "next/previous page" button but max page number has changed in the meanwhile.
-                desiredPage = paginationMax
+                currentPage = paginationMax
+            else:
+                currentPage = desiredPage
             # Grab all items in desired range (= on desired page)
-            index = (desiredPage * maxCouponsPerPage - maxCouponsPerPage)
+            index = (currentPage * maxCouponsPerPage - maxCouponsPerPage)
             # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy button in the middle and add Easter Egg functionality :)
             desiredPageContainsAtLeastOneFavoriteCoupon = False
             while len(buttons) < maxCouponsPerPage and index < len(coupons):
@@ -474,26 +476,27 @@ class BKBot:
             # numberofCouponsOnCurrentPage = len(buttons)
             if paginationMax > 1:
                 # Add pagination navigation buttons if needed
-                menuText += "\nSeite " + str(desiredPage) + "/" + str(paginationMax)
+                menuText += "\nSeite " + str(currentPage) + "/" + str(paginationMax)
                 navigationButtons = []
-                if desiredPage > 1:
+                urlquery_callbackBack.args['a'] = 'dcs'
+                if currentPage > 1:
                     # Add button to go to previous page
-                    previousPage = desiredPage - 1
+                    previousPage = currentPage - 1
                     urlquery_callbackBack.args['p'] = previousPage
                     navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_LEFT, callback_data=urlquery_callbackBack.url))
                 else:
                     # Add dummy button for a consistent button layout
                     navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonPrevPage"))
-                navigationButtons.append(InlineKeyboardButton("Seite " + str(desiredPage) + "/" + str(paginationMax), callback_data="DummyButtonMiddle"))
-                if desiredPage < paginationMax:
+                navigationButtons.append(InlineKeyboardButton("Seite " + str(currentPage) + "/" + str(paginationMax), callback_data="DummyButtonMiddle"))
+                if currentPage < paginationMax:
                     # Add button to go to next page
-                    nextPage = desiredPage + 1
+                    nextPage = currentPage + 1
                     urlquery_callbackBack.args['p'] = nextPage
                     navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_RIGHT, callback_data=urlquery_callbackBack.url))
                 else:
                     # Add dummy button for a consistent button layout
                     # Easter egg: Trigger it if there are at least two pages available AND user is currently on the last page AND that page contains at least one user-favorited coupon.
-                    if desiredPageContainsAtLeastOneFavoriteCoupon and desiredPage > 1:
+                    if desiredPageContainsAtLeastOneFavoriteCoupon and currentPage > 1:
                         navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data=CallbackVars.EASTER_EGG))
                     else:
                         navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonNextPage"))
@@ -505,6 +508,7 @@ class BKBot:
                 currentSortMode = user.getSortModeForCouponView(couponView=view)
                 nextSortMode = user.getNextSortModeForCouponView(couponView=view)
                 urlquery_callbackBack.args['a'] = 'dcss'
+                urlquery_callbackBack.args['p'] = currentPage
                 buttons.append(
                     [InlineKeyboardButton(currentSortMode.text + ' | 🔃 | ' + nextSortMode.text, callback_data=urlquery_callbackBack.url)])
 
