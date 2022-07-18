@@ -3,6 +3,8 @@ from barcode.writer import ImageWriter
 from furl import furl, urllib
 from urllib.parse import urlparse, parse_qs
 
+from UtilsCouponsDB import CouponViews
+
 url = "?action=displaycoupons&which=favorites&page=3"
 o = urlparse(url)
 query = parse_qs(o.query)
@@ -48,9 +50,12 @@ print("furl url: " + urlquery.url)
 # with open('test.png', 'wb') as f:
 #     EAN13('240000902922', writer=ImageWriter()).write(f)
 
-f = open('somefile.png', 'wb')
+# f = open('somefile.png', 'wb')
 ean = EAN13(ean='100000011111', writer=ImageWriter())
-ean.save(filename='test22.png', options={'foreground': 'black', 'text': 'Test'})
+# ean.save(filename='test22.png', options={'foreground': 'black', 'text': 'Test'})
 
-a = "33"
-b = None
+allViews = CouponViews.__dict__
+
+print(str(CouponViews.__dict__))
+
+

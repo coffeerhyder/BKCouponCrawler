@@ -14,7 +14,7 @@ from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCou
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
-DEBUGNOTIFICATOR = True
+DEBUGNOTIFICATOR = False
 
 
 def notifyUsersAboutNewCoupons(bkbot) -> None:
@@ -124,7 +124,6 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info("Notifying " + str(len(usersNotify)) + " users about favorites/new coupons")
     index = -1
     dbUserUpdates = []
-    usersToDelete = []
     # TODO: Update auto deletion handling
     for userIDStr, postText in usersNotify.items():
         index += 1
@@ -141,16 +140,10 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
             # Almost certainly it will be "Forbidden: bot was blocked by the user"
             logging.info(botBlocked.message + " --> chat_id: " + userIDStr)
             user.botBlockedCounter += 1
-            if user.hasProbablyBlockedBotForLongerTime():
-                usersToDelete.append(user)
-            else:
-                dbUserUpdates.append(user)
+            dbUserUpdates.append(user)
     if len(dbUserUpdates) > 0:
         logging.info("Pushing DB updates for users who have blocked/unblocked bot: " + str(len(dbUserUpdates)))
         userDB.update(dbUserUpdates)
-    if len(usersToDelete) > 0:
-        logging.info("Deleting users who blocked bot for a longer time: " + str(len(usersToDelete)))
-        userDB.purge(usersToDelete)
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 

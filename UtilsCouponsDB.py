@@ -2,7 +2,6 @@ import logging
 import os
 import re
 from datetime import datetime
-from enum import Enum
 from io import BytesIO
 from typing import Union, List, Optional
 
@@ -100,7 +99,7 @@ class CouponView:
         self.couponfilter = couponfilter
         # self.defaultSortMode = defaultSortMode
 
-
+# TODO: Get rid of this
 class CouponViewCode:
     ALL = 0
     ALL_WITHOUT_MENU = 1
@@ -257,7 +256,7 @@ class Coupon(Document):
     def isNewCoupon(self) -> bool:
         """ Determines whether or not this coupon is considered 'new'. """
         if self.isNew is not None:
-            # isNew status is pre-given --> Preferably return that
+            # isNew status is pre-given --> Return that
             return self.isNew
         elif self.isNewUntilDate is not None:
             # Check if maybe coupon should be considered as new for X
@@ -502,7 +501,8 @@ class UserFavoritesInfo:
             return unavailableFavoritesText
 
 
-MAX_SECONDS_WITHOUT_USAGE = 6 * 30 * 24 * 60 * 60
+MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION = 6 * 30 * 24 * 60 * 60
+MAX_HOURS_ACTIVITY_TRACKING = 48
 
 
 class User(Document):
@@ -511,6 +511,7 @@ class User(Document):
             displayQR=BooleanField(default=True),
             displayBKWebsiteURLs=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
+            displayCouponSortButton=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
@@ -550,7 +551,7 @@ class User(Document):
         """ If this returns True, upper handling is allowed to delete this account as it looks like it has been abandoned by the user. """
         if self.hasProbablyBlockedBotForLongerTime():
             return True
-        elif getCurrentDate().timestamp() - self.timestampLastTimeAccountUsed > MAX_SECONDS_WITHOUT_USAGE:
+        elif getCurrentDate().timestamp() - self.timestampLastTimeAccountUsed > MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
             return True
         else:
             return False
@@ -604,8 +605,9 @@ class User(Document):
             return False
 
     def getPaybackCardNumber(self) -> Union[str, None]:
-        """ TODO: Can this be considered a workaround or is the mapping made in a stupid way that it does not return "None" for keys without defined defaults??!
-          doing User.paybackCard.paybackCardNumber directly would raise an AttributeError! """
+        """ Can this be considered a workaround or is the mapping made in a stupid way that it does not return "None" for keys without defined defaults??!
+          doing User.paybackCard.paybackCardNumber directly would raise an AttributeError!
+          Alternative would be to set empty String as default value. """
         if len(self.paybackCard) > 0:
             return self.paybackCard.paybackCardNumber
         else:
@@ -671,13 +673,19 @@ class User(Document):
     def setDefaultSortModeForCouponView(self, couponView: CouponView, sortMode: CouponSortMode):
         self.couponViewSortModes[str(couponView.viewCode)] = sortMode.getSortCode()
 
-    def updateActivityTimestamp(self) -> bool:
+    def hasRecentlyUsedBot(self) -> bool:
         currentTimestamp = getCurrentDate().timestamp()
-        if currentTimestamp - self.timestampLastTimeAccountUsed > 48 * 60 * 60:
-            self.timestampLastTimeAccountUsed = currentTimestamp
+        if currentTimestamp - self.timestampLastTimeAccountUsed < 48 * 60 * 60:
             return True
         else:
             return False
+
+    def updateActivityTimestamp(self) -> bool:
+        if self.hasRecentlyUsedBot():
+            return False
+        else:
+            self.timestampLastTimeAccountUsed = getCurrentDate().timestamp()
+            return True
 
     def resetSettings(self):
         dummyUser = User()
@@ -825,6 +833,10 @@ USER_SETTINGS_ON_OFF = {
     },
     "displayCouponCategoryPayback": {
         "description": "Payback Coupons/Karte im Hauptmenü zeigen",
+        "default": True
+    },
+    "displayCouponSortButton": {
+        "description": "Coupon sortieren Button zeigen (eigen. Sortierung wird auch übernommen, wenn deaktiviert)",
         "default": True
     },
     "displayFeedbackCodeGenerator": {

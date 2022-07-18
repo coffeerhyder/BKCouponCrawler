@@ -49,6 +49,8 @@ class UserStats:
         self.numberofUsersWhoFoundEasterEgg = 0
         self.numberofFavorites = 0
         self.numberofUsersWhoBlockedBot = 0
+        self.numberofUsersWhoAreEligableForAutoDeletion = 0
+        self.numberofUsersWhoRecentlyUsedBot= 0
         self.numberofUsersWhoAddedPaybackCard = 0
         for userID in usrDB:
             userTmp = User.load(usrDB, userID)
@@ -60,6 +62,10 @@ class UserStats:
             userTmp.getPaybackCardNumber()
             if userTmp.getPaybackCardNumber() is not None:
                 self.numberofUsersWhoAddedPaybackCard += 1
+            if userTmp.isEligableForAutoDeletion():
+                self.numberofUsersWhoAreEligableForAutoDeletion += 1
+            elif userTmp.hasRecentlyUsedBot():
+                self.numberofUsersWhoRecentlyUsedBot += 1
 
 
 class BKCrawler:
@@ -196,22 +202,39 @@ class BKCrawler:
         """ Migrate DBs from old to new version - leave this function empty if there is nothing to migrate. """
         # logging.info("Migrating DBs...")
         # logging.info("Migrate DBs done")
-        # 2022-01-16: Not required anymore
-        # userDB = self.getUsersDB()
+        if True:
+            # 2022-07-18: TODO: Do not execute this yet
+            return
+        userDB = self.getUserDB()
         # keysMapping = {"timestampExpire": "timestampExpireInternal", "dateFormattedExpire": "dateFormattedExpireInternal", "timestampExpire2": "timestampExpire", "dateFormattedExpire2": "dateFormattedExpire"}
-        # for userID in userDB:
-        #     user = User.load(userDB, userID)
-        #     needsUpdate = False
-        #     for couponData in user.favoriteCoupons.values():
-        #         for oldKey, newKey in keysMapping.items():
-        #             valueOfOldKey = couponData.get(oldKey)
-        #             if valueOfOldKey is not None:
-        #                 needsUpdate = True
-        #                 couponData[newKey] = valueOfOldKey
-        #                 del couponData[oldKey]
-        #     if needsUpdate:
-        #         user.store(userDB)
-        pass
+        for userID in userDB:
+            user = User.load(userDB, userID)
+            needsUpdate = False
+            # for couponData in user.favoriteCoupons.values():
+            #     for oldKey, newKey in keysMapping.items():
+            #         valueOfOldKey = couponData.get(oldKey)
+            #         if valueOfOldKey is not None:
+            #             needsUpdate = True
+            #             couponData[newKey] = valueOfOldKey
+            #             del couponData[oldKey]
+            if user.timestampLastTimeAccountUsed is None or user.timestampLastTimeAccountUsed == 0:
+                user.updateActivityTimestamp()
+                needsUpdate = True
+            if needsUpdate:
+                user.store(userDB)
+        return
+
+    def deleteInactiveUsers(self):
+        # TODO: Make use of this
+        userDB = self.getUserDB()
+        usersToDelete = []
+        for userID in userDB:
+            user = User.load(userDB, userID)
+            if user.isEligableForAutoDeletion() or True:
+                usersToDelete.append(user)
+        if len(usersToDelete) > 0:
+            logging.info("Deleting inactive users: " + str(len(usersToDelete)))
+            userDB.purge(docs=usersToDelete)
 
     def crawlAndProcessData(self):
         """ One function that does it all! Execute this every time you run the crawler. """
@@ -1256,7 +1279,6 @@ if __name__ == '__main__':
     # 2021-08-20: JokerGermany goodie:
     # crawler.setExportCSVs(True)
     # crawler.setCrawlOnlyBotCompatibleCoupons(False)
-    userDB = crawler.getUserDB()
-    print("Number of userIDs in DB: " + str(len(userDB)))
+    print("Number of userIDs in DB: " + str(len(crawler.getUserDB())))
     crawler.crawlAndProcessData()
     print("Crawler done!")

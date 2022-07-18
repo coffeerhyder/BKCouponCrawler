@@ -3,7 +3,7 @@ import math
 import sys
 import time
 import traceback
-from copy import copy, deepcopy
+from copy import deepcopy
 from typing import List, Tuple
 
 import schedule
@@ -23,7 +23,7 @@ from Helper import *
 from Crawler import BKCrawler, UserStats
 
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
-    USER_SETTINGS_ON_OFF, CouponSortModes, CouponViews, getNextSortMode, sortCouponsAsList
+    USER_SETTINGS_ON_OFF, CouponSortModes, CouponViews, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING
 from CouponCategory import CouponCategory, getCouponCategory
 from Helper import BotAllowedCouponTypes, CouponType
 from UtilsOffers import offerGetImagePath
@@ -251,8 +251,7 @@ class BKBot:
         self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
-        userDB = self.crawler.getUserDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         # Test code to update DB structure TODO: maybe make use of this
         # userDB = self.crawler.getUsersDB()
         # dummyUser = User()
@@ -309,11 +308,6 @@ class BKBot:
                 menuText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ im ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + ' verlinkt.'
             menuText += '</b>'
         self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
-        currentTimestamp = getCurrentDate().timestamp()
-        # Introduced: 2022-07-13, released: TODO and TODO: Delete all users with timestamp == 0 like 6 months later
-        if currentTimestamp - user.timestampLastTimeAccountUsed > 24 * 60 * 60 * 1000:
-            user.timestampLastTimeAccountUsed = currentTimestamp
-            user.store(db=userDB)
         return CallbackVars.MENU_MAIN
 
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
@@ -363,6 +357,9 @@ class BKBot:
         text += '\nAnzahl von Usern gesetzte Favoriten: ' + str(userStats.numberofFavorites)
         text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(userStats.numberofUsersWhoFoundEasterEgg)
         text += '\nAnzahl User, die den Bot geblockt haben: ' + str(userStats.numberofUsersWhoBlockedBot)
+        # TODO: Enable this once new user timestamp data migration has been done
+        # text += '\nAnzahl User, die demnächst automatisch gelöscht werden könnten: ' + str(userStats.numberofUsersWhoAreEligableForAutoDeletion)
+        text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoAreEligableForAutoDeletion)
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
@@ -370,7 +367,7 @@ class BKBot:
         text += '\nDein BetterKing Account:'
         text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
         text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
-        text += '\nBot zuletzt verwendet (auf 48h genau): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
+        text += f'\nBot zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
         text += '</pre>'
         if isinstance(msg, Message):
             self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
@@ -395,9 +392,7 @@ class BKBot:
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
-            view = None
             if mode == CouponDisplayMode.FAVORITES:
-                # TODO: Improve/define default sort mode stuff for this case
                 userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user, sortCoupons=False)
                 coupons = userFavorites.couponsAvailable
                 couponCategory = CouponCategory(coupons)
@@ -462,12 +457,12 @@ class BKBot:
             # Grab all items in desired range (= on desired page)
             index = (currentPage * maxCouponsPerPage - maxCouponsPerPage)
             # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy button in the middle and add Easter Egg functionality :)
-            desiredPageContainsAtLeastOneFavoriteCoupon = False
+            currentPageContainsAtLeastOneFavoriteCoupon = False
             while len(buttons) < maxCouponsPerPage and index < len(coupons):
                 coupon = coupons[index]
                 if user.isFavoriteCoupon(coupon) and highlightFavorites:
                     buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
-                    desiredPageContainsAtLeastOneFavoriteCoupon = True
+                    currentPageContainsAtLeastOneFavoriteCoupon = True
                 else:
                     buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
 
@@ -496,14 +491,14 @@ class BKBot:
                 else:
                     # Add dummy button for a consistent button layout
                     # Easter egg: Trigger it if there are at least two pages available AND user is currently on the last page AND that page contains at least one user-favorited coupon.
-                    if desiredPageContainsAtLeastOneFavoriteCoupon and currentPage > 1:
+                    if currentPageContainsAtLeastOneFavoriteCoupon and currentPage > 1:
                         navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data=CallbackVars.EASTER_EGG))
                     else:
                         navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonNextPage"))
                 buttons.append(navigationButtons)
             # Display sort button if it makes sense
             possibleSortModes = couponCategory.getSortModes()
-            if len(possibleSortModes) > 1:
+            if user.settings.displayCouponSortButton and len(possibleSortModes) > 1:
                 currentSortMode = user.getSortModeForCouponView(couponView=view)
                 nextSortMode = user.getNextSortModeForCouponView(couponView=view)
                 urlquery_callbackBack.args['a'] = 'dcss'
@@ -688,6 +683,10 @@ class BKBot:
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
+        userSortModes = user.couponViewSortModes
+        if userSortModes is not None and len(userSortModes) > 0:
+            menuText += "\n---"
+            menuText += f"\nEs gibt gespeicherte Coupon Sortierungen für {len(userSortModes)} Coupon Ansichten, die beim Klick auf den zurücksetzen Button ebenfalls gelöscht werden."
         if not user.hasDefaultSettings():
             keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen |" + SYMBOLS.STAR + " & PB Karte bleiben",
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
