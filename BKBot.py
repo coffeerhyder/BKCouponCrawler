@@ -390,7 +390,6 @@ class BKBot:
             saveUserToDB = False
             userDB = self.crawler.getUserDB()
             user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=False)
-            userOld = copy(user)
             if user.updateActivityTimestamp():
                 saveUserToDB = True
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
