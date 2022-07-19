@@ -1,7 +1,5 @@
 import argparse
-import logging
 import math
-import sys
 import time
 import traceback
 from copy import deepcopy
@@ -63,12 +61,14 @@ def generateCallbackRegEx(settings: dict):
     return settingsCallbackRegEx
 
 
+MAX_CACHE_AGE_SECONDS = 7 * 24 * 60 * 60
+
+
 def cleanupCache(cacheDict: dict):
     cacheDictCopy = cacheDict.copy()
-    maxCacheAgeSeconds = 7 * 24 * 60 * 60
     for cacheID, cacheData in cacheDictCopy.items():
         cacheItemAge = datetime.now().timestamp() - cacheData.timestampLastUsed
-        if cacheItemAge > maxCacheAgeSeconds:
+        if cacheItemAge > MAX_CACHE_AGE_SECONDS:
             logging.info("Deleting cache item " + str(cacheID) + " as it was last used before: " + str(cacheItemAge) + " seconds")
             del cacheDict[cacheID]
 
@@ -333,7 +333,8 @@ class BKBot:
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
         """ Send list containing all coupons with long titles linked to coupon channel to user. This may result in up to 10 messages being sent! """
         update.callback_query.answer()
-        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
+        activeCoupons = bkbot.crawler.getFilteredCoupons(
+            CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
                                                 channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore

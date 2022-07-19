@@ -140,6 +140,8 @@ class Coupon(Document):
     staticReducedPercent = FloatField()
     title = TextField()
     titleShortened = TextField()
+    timestampAddedToDB = FloatField(default=getCurrentDate().timestamp())
+    timestampLastModifiedDB = FloatField(default=0)
     timestampStart = FloatField()
     timestampExpireInternal = FloatField()  # Internal expire-date
     timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
