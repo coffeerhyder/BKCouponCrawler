@@ -15,6 +15,7 @@ class DATABASES:
     INFO_DB = 'info_db'
     COUPONS = 'coupons'
     COUPONS_HISTORY = 'coupons_history'
+    COUPONS_HISTORY_SIMPLE = 'coupons_history_simple'
     OFFERS = 'offers'
     PRODUCTS = 'products'
     PRODUCTS_HISTORY = 'products_history'

@@ -160,6 +160,8 @@ crawler = BKCrawler()
 crawler.setCrawlOnlyBotCompatibleCoupons(True)
 # History Datenbank aufbauen z.B. zur späteren Auswertung?
 crawler.setKeepHistory(True)
+# Simple History Datenbank aufbauen?
+crawler.setKeepSimpleHistoryDB(True)
 # CSV Export bei jedem Crawlvorgang (de-)aktivieren
 crawler.setExportCSVs(False)
 # Coupons crawlen
@@ -172,10 +174,8 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRIC
 
 # TODOs
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
-* Crawler: Zweite History DB einbauen und/oder bestehendes System entsprechend ändern
 * Start-Script prüfen
 * Handling mit Datumsangaben verbessern
-* Produktnamen-Handling für Payback Coupons generischer gestalten
 * isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern

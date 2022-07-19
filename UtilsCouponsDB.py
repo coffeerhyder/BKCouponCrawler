@@ -38,11 +38,12 @@ class CouponSortMode:
 
     def getSortCode(self) -> Union[int, None]:
         """ Returns position of current sort mode in array of all sort modes. """
-        allSortModes = getAllSortModes()
-        for i in range(len(allSortModes)):
-            sortModeTmp = allSortModes[i]
-            if sortModeTmp == self:
-                return i
+        sortModes = CouponSortModes.__dict__
+        index = 0
+        for sortMode in sortModes.values():
+            if sortMode == self:
+                return index
+            index += 1
         # This should never happen
         return None
 
@@ -60,7 +61,11 @@ class CouponSortModes:
 
 def getAllSortModes() -> list:
     # Important! The order of this will also determine the sort order which gets presented to the user!
-    return [CouponSortModes.PRICE, CouponSortModes.PRICE_DESCENDING, CouponSortModes.DISCOUNT_DESCENDING, CouponSortModes.DISCOUNT, CouponSortModes.NEW, CouponSortModes.NEW_DESCENDING, CouponSortModes.MENU_PRICE, CouponSortModes.TYPE_MENU_PRICE]
+    res = []
+    for obj in CouponSortModes.__dict__.values():
+        if isinstance(obj, CouponSortMode):
+            res.append(obj)
+    return res
 
 
 def getNextSortMode(currentSortMode: CouponSortMode) -> CouponSortMode:
@@ -94,42 +99,46 @@ class CouponView:
     def getFilter(self):
         return self.couponfilter
 
-    def __init__(self, viewCode: int, couponfilter: CouponFilter):
-        self.viewCode = viewCode
+    def __init__(self, couponfilter: CouponFilter):
         self.couponfilter = couponfilter
-        # self.defaultSortMode = defaultSortMode
 
-# TODO: Get rid of this
-class CouponViewCode:
-    ALL = 0
-    ALL_WITHOUT_MENU = 1
-    CATEGORY = 2
-    CATEGORY_WITHOUT_MENU = 3
-    HIDDEN_APP_COUPONS_ONLY = 4
-    FAVORITES = 5
+    def getViewCode(self) -> Union[int, None]:
+        """ Returns position of current sort mode in array of all sort modes. """
+        couponViews = CouponViews.__dict__
+        index = 0
+        for couponView in couponViews.values():
+            if couponView == self:
+                return index
+            index += 1
+        # This should never happen
+        return None
 
 
 class CouponViews:
-    ALL = CouponView(viewCode=CouponViewCode.ALL, couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
-    ALL_WITHOUT_MENU = CouponView(viewCode=CouponViewCode.ALL_WITHOUT_MENU,
-                                  couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=False))
-    CATEGORY = CouponView(viewCode=CouponViewCode.CATEGORY, couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=None))
-    CATEGORY_WITHOUT_MENU = CouponView(viewCode=CouponViewCode.CATEGORY_WITHOUT_MENU, couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
-    HIDDEN_APP_COUPONS_ONLY = CouponView(viewCode=CouponViewCode.HIDDEN_APP_COUPONS_ONLY,
-                                         couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
+    ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
+    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=False))
+    CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=None))
+    CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
+    HIDDEN_APP_COUPONS_ONLY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
     # Dummy item basically only used for holding default sortCode for users' favorites
-    FAVORITES = CouponView(viewCode=CouponViewCode.FAVORITES, couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
+    FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
 
 
 def getAllCouponViews() -> list:
-    return [CouponViews.ALL, CouponViews.ALL_WITHOUT_MENU, CouponViews.CATEGORY, CouponViews.CATEGORY_WITHOUT_MENU, CouponViews.HIDDEN_APP_COUPONS_ONLY]
+    res = []
+    for obj in CouponViews.__dict__.values():
+        if isinstance(obj, CouponView):
+            res.append(obj)
+    return res
 
 
-def getCouponViewByViewCode(viewCode: int) -> Union[CouponSortMode, None]:
-    for couponView in getAllCouponViews():
-        if couponView.viewCode == viewCode:
-            return couponView
-    return None
+def getCouponViewByIndex(index: int) -> Union[CouponSortMode, None]:
+    allCouponViews = getAllCouponViews()
+    if index < len(allCouponViews):
+        return allCouponViews[index]
+    else:
+        # Fallback
+        return allCouponViews[0]
 
 
 class Coupon(Document):
@@ -183,7 +192,10 @@ class Coupon(Document):
         return normalizeString(self.getTitle())
 
     def getTitle(self):
-        return self.title
+        if self.paybackMultiplicator is not None:
+            return f'{self.paybackMultiplicator}Fach auf jede Bestellung'
+        else:
+            return self.title
 
     def getTitleShortened(self):
         # TODO: Make use of this everywhere
@@ -660,7 +672,7 @@ class User(Document):
     def getSortModeForCouponView(self, couponView: CouponView) -> CouponSortMode:
         if self.couponViewSortModes is not None:
             # User has at least one custom sortCode for one CouponView
-            sortCode = self.couponViewSortModes.get(str(couponView.viewCode))
+            sortCode = self.couponViewSortModes.get(str(couponView.getViewCode()))
             if sortCode is not None:
                 return getSortModeBySortCode(sortCode=sortCode)
             else:
@@ -673,7 +685,7 @@ class User(Document):
         return getNextSortMode(currentSortMode=currentSortMode)
 
     def setDefaultSortModeForCouponView(self, couponView: CouponView, sortMode: CouponSortMode):
-        self.couponViewSortModes[str(couponView.viewCode)] = sortMode.getSortCode()
+        self.couponViewSortModes[str(couponView.getViewCode())] = sortMode.getSortCode()
 
     def hasRecentlyUsedBot(self) -> bool:
         currentTimestamp = getCurrentDate().timestamp()

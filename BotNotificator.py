@@ -124,7 +124,6 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info("Notifying " + str(len(usersNotify)) + " users about favorites/new coupons")
     index = -1
     dbUserUpdates = []
-    # TODO: Update auto deletion handling
     for userIDStr, postText in usersNotify.items():
         index += 1
         # isLastItem = index == len(usersNotify) - 1

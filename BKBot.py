@@ -123,6 +123,8 @@ class BKBot:
             raise Exception('Broken or missing config')
         self.crawler = BKCrawler()
         self.crawler.setExportCSVs(False)
+        self.crawler.setKeepHistoryDB(False)
+        self.crawler.setKeepSimpleHistoryDB(True)
         self.publicChannelName = self.cfg.get(Config.PUBLIC_CHANNEL_NAME)
         self.botName = self.cfg[Config.BOT_NAME]
         self.couchdb = self.crawler.couchdb
@@ -650,7 +652,7 @@ class BKBot:
             menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote!</b>'
             self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
             return CallbackVars.MENU_MAIN
-        prePhotosText = '<b>Es sind derzeit ' + str(len(activeOffers)) + ' Angebote verfügbar:</b>'
+        prePhotosText = f'<b>Es sind derzeit {len(activeOffers)} Angebote verfügbar:</b>'
         self.editOrSendMessage(update, text=prePhotosText, parse_mode='HTML')
         for offer in activeOffers:
             offerText = offer['title']
@@ -677,7 +679,7 @@ class BKBot:
     def botDisplayFeedbackCodes(self, update: Update, context: CallbackContext):
         """ 2021-07-15: New- and unfinished feature """
         numberOfFeedbackCodesToGenerate = 3
-        text = "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
+        text = f"\n<b>Hier sind {numberOfFeedbackCodesToGenerate} Feedback Codes für dich:</b>"
         for index in range(numberOfFeedbackCodesToGenerate):
             text += "\n" + generateFeedbackCode()
         text += "\nSchreibe einen Code deiner Wahl auf die Rückseite eines BK Kassenbons, um den gratis Artikel zu erhalten."

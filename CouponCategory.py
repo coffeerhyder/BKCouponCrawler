@@ -148,11 +148,11 @@ class CouponCategory:
             sortModes.append(CouponSortModes.TYPE_MENU_PRICE)
         return sortModes
 
-    def allowsSortModeCode(self, sortModeCode: int) -> bool:
+    def allowsSortMode(self, sortModeToCheckFor: CouponSortMode) -> bool:
         """ Checks if desired sortMode is currently allowed. """
         sortModes = self.getSortModes()
-        for sortMode in sortModes:
-            if sortMode.getSortCode() == sortModeCode:
+        for possibleSortMode in sortModes:
+            if possibleSortMode == sortModeToCheckFor:
                 return True
         return False
 
@@ -164,11 +164,11 @@ class CouponCategory:
         # Fallback/Rollover to first sort
         return possibleSortModes[0]
 
-    def getSortModeCode(self, desiredSortModeCode: int, fallbackSortModeCode: int) -> int:
-        if self.allowsSortModeCode(desiredSortModeCode):
-            return desiredSortModeCode
+    def getSortModeCode(self, desiredSortMode: CouponSortMode, fallbackSortMode: CouponSortMode) -> CouponSortMode:
+        if self.allowsSortMode(desiredSortMode):
+            return desiredSortMode
         else:
-            return fallbackSortModeCode
+            return fallbackSortMode
 
 
     def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:

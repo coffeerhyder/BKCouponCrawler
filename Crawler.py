@@ -77,7 +77,8 @@ class BKCrawler:
         # Init DB
         self.couchdb = couchdb.Server(self.cfg[Config.DB_URL])
         self.cachedAvailableCouponCategories = {}
-        self.keepHistory = False
+        self.keepHistoryDB = False
+        self.keepSimpleHistoryDB = False
         self.crawlOnlyBotCompatibleCoupons = True
         self.storeCouponAPIDataAsJson = False
         self.exportCSVs = False
@@ -105,6 +106,9 @@ class BKCrawler:
         if DATABASES.COUPONS_HISTORY not in self.couchdb:
             logging.info("Creating missing DB: " + DATABASES.COUPONS_HISTORY)
             self.couchdb.create(DATABASES.COUPONS_HISTORY)
+        if DATABASES.COUPONS_HISTORY_SIMPLE not in self.couchdb:
+            logging.info("Creating missing DB: " + DATABASES.COUPONS_HISTORY_SIMPLE)
+            self.couchdb.create(DATABASES.COUPONS_HISTORY_SIMPLE)
         if DATABASES.PRODUCTS not in self.couchdb:
             logging.info("Creating missing DB: " + DATABASES.PRODUCTS)
             self.couchdb.create(DATABASES.PRODUCTS)
@@ -145,9 +149,15 @@ class BKCrawler:
         self.updateCache(couponDB)
         self.updateCachedMissingPaperCouponsInfo(couponDB)
 
-    def setKeepHistory(self, keepHistory: bool):
+    def setKeepHistoryDB(self, keepHistory: bool):
         """ Enable this if you want the crawler to maintain a history of past coupons/offers and update it on every crawl process. """
-        self.keepHistory = keepHistory
+        self.keepHistoryDB = keepHistory
+
+    def setKeepSimpleHistoryDB(self, keepSimpleHistoryDB: bool):
+        """ Enable this if you want the crawler to maintain a simple history of past coupons and update it on every crawl process.
+         Simple means that of every couponID, only the latest version will be kept.
+         """
+        self.keepSimpleHistoryDB = keepSimpleHistoryDB
 
     def setCrawlOnlyBotCompatibleCoupons(self, crawlOnlyBotCompatibleCoupons: bool):
         """ Enabling this will speedup the crawl process!
@@ -516,7 +526,7 @@ class BKCrawler:
                 break
 
         # Update history if needed
-        if self.keepHistory:
+        if self.keepHistoryDB:
             timestampHistoryDBUpdateStart = datetime.now().timestamp()
             logging.info("Updating history DB products2")
             dbHistoryProducts2 = self.couchdb[DATABASES.PRODUCTS2_HISTORY]
@@ -530,7 +540,6 @@ class BKCrawler:
          This will only add VALID coupons to DB! """
         # First prepare extra coupons config because manual steps are involved to make this work
         PaperCouponHelper.main()
-        extraCouponData = loadJson(Paths.extraCouponConfigPath)
         extraCouponsToAdd = self.getValidExtraCoupons()
         if immediatelyAddToDB and len(extraCouponsToAdd) > 0:
             # Add items to DB
@@ -713,11 +722,11 @@ class BKCrawler:
         else:
             # Add all crawled coupons to DB
             couponsToAddToDB = crawledCouponsDict
+        logging.info("Number of crawled coupons: " + str(len(couponsToAddToDB)))
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         couponDB = self.getCouponDB()
         self.addCouponsToDB(couponDB=couponDB, couponsToAddToDB=couponsToAddToDB)
-        logging.info("Number of crawled coupons: " + str(len(couponsToAddToDB)))
         self.updateCachedMissingPaperCouponsInfo(couponDB)
         # Cleanup DB
         deleteCouponDocs = {}
@@ -821,7 +830,7 @@ class BKCrawler:
         # 2021-04-20: Not required at this moment!
         dbProducts = self.couchdb[DATABASES.PRODUCTS]
         dbProductsHistory = None
-        if self.keepHistory:
+        if self.keepHistoryDB:
             dbProductsHistory = self.couchdb[DATABASES.PRODUCTS_HISTORY]
         host = 'api.burgerking.de'
         conn = HTTP20Connection(host)
@@ -867,7 +876,7 @@ class BKCrawler:
             if uniqueID in dbProducts:
                 del dbProducts[uniqueID]
             dbProducts[uniqueID] = product
-            if self.keepHistory:
+            if self.keepHistoryDB:
                 # Update history DB
                 self.updateHistoryEntry(dbProductsHistory, uniqueID, product)
         # Done! Now do some logging ...
@@ -1037,7 +1046,7 @@ class BKCrawler:
         else:
             return None
 
-    def addCouponsToDB(self, couponDB: Database, couponsToAddToDB) -> bool:
+    def addCouponsToDB(self, couponDB: Database, couponsToAddToDB: Union[dict, List[Coupon]]) -> bool:
         if isinstance(couponsToAddToDB, dict):
             couponsToAddToDB = list(couponsToAddToDB.values())
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
@@ -1096,16 +1105,7 @@ class BKCrawler:
                 newCouponIDs.append(crawledCoupon.id)
         logging.info('Pushing ' + str(len(dbUpdates)) + ' coupon DB updates')
         couponDB.update(dbUpdates)
-        logging.info("Number of crawled coupons: " + str(len(couponsToAddToDB)))
         self.updateCachedMissingPaperCouponsInfo(couponDB)
-        # Update history if needed
-        if self.keepHistory:
-            timestampHistoryDBUpdateStart = datetime.now().timestamp()
-            logging.info("Updating history DB: coupons")
-            dbHistoryCoupons = self.couchdb[DATABASES.COUPONS_HISTORY]
-            for itemID, coupon in couponsToAddToDB.items():
-                self.updateHistoryEntry(dbHistoryCoupons, itemID, coupon)
-            logging.info("Time it took to update coupons history DB: " + getFormattedPassedTime(timestampHistoryDBUpdateStart))
         logging.info("Coupons new IDs: " + str(numberofCouponsNew))
         if len(newCouponIDs) > 0:
             logging.info("New IDs: " + str(newCouponIDs))
@@ -1113,8 +1113,38 @@ class BKCrawler:
         if len(updatedCouponIDs) > 0:
             logging.info("Coupons updated IDs: " + str(updatedCouponIDs))
         logging.info("Coupons flagged as new: " + str(numberofCouponsFlaggedAsNew))
-        if numberofCouponsUpdated > 0 or numberofCouponsFlaggedAsNew > 0:
+        if numberofCouponsUpdated > 0 or numberofCouponsFlaggedAsNew > 0 or True:
+            # Update history DB(s) if needed
+            if self.keepHistoryDB:
+                timestampHistoryDBUpdateStart = datetime.now().timestamp()
+                logging.info("Updating history DB: coupons")
+                dbHistoryCoupons = self.couchdb[DATABASES.COUPONS_HISTORY]
+                for coupon in couponsToAddToDB:
+                    self.updateHistoryEntry(dbHistoryCoupons, coupon.uniqueID, coupon)
+                logging.info("Time it took to update coupons history DB: " + getFormattedPassedTime(timestampHistoryDBUpdateStart))
+            if self.keepSimpleHistoryDB:
+                self.updateSimpleHistoryDB(couponDB)
             # DB was updated
+            return True
+        else:
+            # DB was not updated
+            return False
+
+    def updateSimpleHistoryDB(self, couponDB: Database) -> bool:
+        dbUpdates = []
+        simpleHistoryDB = self.couchdb[DATABASES.COUPONS_HISTORY_SIMPLE]
+        for couponID in couponDB:
+            coupon = Coupon.load(db=couponDB, id=couponID)
+            existingCoupon = Coupon.load(simpleHistoryDB, coupon.id)
+            if existingCoupon is None:
+                dbUpdates.append(coupon)
+            elif hasChanged(existingCoupon, coupon, ignoreKeys=['_rev']):
+                # Important: We need the "_rev" value to be able to update/overwrite existing documents!
+                coupon["_rev"] = existingCoupon.rev
+                dbUpdates.append(coupon)
+        if len(dbUpdates) > 0:
+            # Update DB
+            simpleHistoryDB.update(dbUpdates)
             return True
         else:
             # DB was not updated
@@ -1284,9 +1314,9 @@ if __name__ == '__main__':
     crawler = BKCrawler()
     crawler.setCrawlOnlyBotCompatibleCoupons(True)
     crawler.setExportCSVs(False)
-    crawler.setKeepHistory(False)
+    crawler.setKeepHistoryDB(False)
+    crawler.setKeepSimpleHistoryDB(False)
 
-    # 2021-08-20: JokerGermany goodie:
     # crawler.setExportCSVs(True)
     # crawler.setCrawlOnlyBotCompatibleCoupons(False)
     print("Number of userIDs in DB: " + str(len(crawler.getUserDB())))
