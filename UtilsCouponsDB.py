@@ -263,7 +263,7 @@ class Coupon(Document):
             try:
                 enforceIsNewOverrideUntilDate = datetime.strptime(self.isNewUntilDate + ' 23:59:59',
                                                                   '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
-                if enforceIsNewOverrideUntilDate.timestamp() > datetime.now().timestamp():
+                if enforceIsNewOverrideUntilDate.timestamp() > getCurrentDate().timestamp():
                     return True
                 else:
                     return False
