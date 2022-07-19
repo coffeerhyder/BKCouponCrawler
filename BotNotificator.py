@@ -10,7 +10,7 @@ from telegram.error import BadRequest, Unauthorized
 from BotUtils import getBotImpressum
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes
 
-from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortMode, CouponSortModes
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortModes
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """

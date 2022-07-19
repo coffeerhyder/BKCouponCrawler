@@ -73,6 +73,23 @@ def cleanupCache(cacheDict: dict):
             del cacheDict[cacheID]
 
 
+def getUserFromDB(userDB: Database, userID: Union[str, int], addIfNew: bool, updateUsageTimestamp: bool) -> Union[User, None]:
+    """ Returns user from given DB. Adds it to DB if wished and it doesn't exist. """
+    user = User.load(userDB, str(userID))
+    if user is not None:
+        # Store a rough timestamp of when user used bot last time
+        if updateUsageTimestamp and user.updateActivityTimestamp():
+            user.store(userDB)
+    elif addIfNew:
+        """ New user? --> Add userID to DB if wished. """
+        # Add user to DB for the first time
+        logging.info('Storing new userID: ' + str(userID))
+        user = User(id=str(userID))
+        user.store(userDB)
+
+    return user
+
+
 class BKBot:
     my_parser = argparse.ArgumentParser()
     my_parser.add_argument('-fc', '--forcechannelupdatewithresend',
@@ -371,7 +388,7 @@ class BKBot:
         couponDB = self.getBotCoupons()
         userDB = self.crawler.getUserDB()
         userStats = UserStats(userDB)
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         text = '<b>Hallo <s>Nerd</s> ' + update.effective_user.first_name + '</b>'
         text += '\n<pre>'
         text += 'Anzahl User im Bot: ' + str(len(userDB))
@@ -407,7 +424,7 @@ class BKBot:
         try:
             saveUserToDB = False
             userDB = self.crawler.getUserDB()
-            user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=False)
+            user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=False)
             if user.updateActivityTimestamp():
                 saveUserToDB = True
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
@@ -576,7 +593,7 @@ class BKBot:
         if query is not None:
             query.answer()
         userDB = self.crawler.getUserDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.easterEggCounter += 1
         user.store(db=userDB)
 
@@ -817,7 +834,7 @@ class BKBot:
         uniqueCouponID = re.search(PATTERN.PLU_TOGGLE_FAV, update.callback_query.data).group(1)
         query = update.callback_query
         userDB = self.crawler.getUserDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         query.answer()
 
         if uniqueCouponID in user.favoriteCoupons:
@@ -921,7 +938,7 @@ class BKBot:
         settingKey = update.callback_query.data
         userDB = self.crawler.getUserDB()
         dummyUser = User()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         if user.settings.get(settingKey, dummyUser.settings[settingKey]):
             user.settings[settingKey] = False
         else:
@@ -932,7 +949,7 @@ class BKBot:
     def botResetSettings(self, update: Update, context: CallbackContext):
         """ Resets users' settings to default """
         userDB = self.crawler.getUserDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.resetSettings()
         # Update DB
         user.store(userDB)
@@ -942,7 +959,7 @@ class BKBot:
     def botDeleteUnavailableFavoriteCoupons(self, update: Update, context: CallbackContext):
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
         userDB = self.crawler.getUserDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
 
@@ -961,7 +978,7 @@ class BKBot:
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
         elif userInput.isdecimal() and len(userInput) == 10:
             userDB = self.crawler.getUserDB()
-            user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+            user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
             text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.'
@@ -976,7 +993,7 @@ class BKBot:
         """ Deletes Payback card from users account if his answer is matching his Payback card number. """
         # Validate input
         userDB = self.crawler.getUserDB()
-        user = self.getUserFromDB(userDB, userID=update.effective_user.id, addIfNew=False, updateUsageTimestamp=True)
+        user = getUserFromDB(userDB, userID=update.effective_user.id, addIfNew=False, updateUsageTimestamp=True)
         userInput = None if update.message is None else update.message.text
         if userInput is None:
             self.editOrSendMessage(update, text='Antworte mit deiner Payback Kartennummer <b>' + user.getPaybackCardNumber() + '</b>, um diese zu löschen.',
@@ -1339,23 +1356,7 @@ class BKBot:
 
     def getUser(self, userID: Union[int, str], addIfNew: bool = False, updateUsageTimestamp: bool = False) -> User:
         """ Wrapper. Only call this if you do not wish to write to the userDB in the calling methods otherwise you're wasting resources! """
-        return self.getUserFromDB(self.crawler.getUserDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
-
-    def getUserFromDB(self, userDB: Database, userID: Union[str, int], addIfNew: bool, updateUsageTimestamp: bool) -> Union[User, None]:
-        """ Returns user from given DB. Adds it to DB if wished and it doesn't exist. """
-        user = User.load(userDB, str(userID))
-        if user is not None:
-            # Store a rough timestamp of when user used bot last time
-            if updateUsageTimestamp and user.updateActivityTimestamp():
-                user.store(userDB)
-        elif addIfNew:
-            """ New user? --> Add userID to DB if wished. """
-            # Add user to DB for the first time
-            logging.info('Storing new userID: ' + str(userID))
-            user = User(id=str(userID))
-            user.store(userDB)
-
-        return user
+        return getUserFromDB(self.crawler.getUserDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
 
 
 class ImageCache:

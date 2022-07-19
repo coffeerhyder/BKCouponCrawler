@@ -531,7 +531,6 @@ class BKCrawler:
         # First prepare extra coupons config because manual steps are involved to make this work
         PaperCouponHelper.main()
         extraCouponData = loadJson(Paths.extraCouponConfigPath)
-        extraCouponsJson = extraCouponData["extra_coupons"]
         extraCouponsToAdd = self.getValidExtraCoupons()
         if immediatelyAddToDB and len(extraCouponsToAdd) > 0:
             # Add items to DB

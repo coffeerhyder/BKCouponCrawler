@@ -2,7 +2,6 @@ import os
 import random
 import re
 from datetime import datetime, timedelta
-from enum import Enum
 from re import Pattern
 from typing import Union
 

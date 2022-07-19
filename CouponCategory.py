@@ -152,14 +152,14 @@ class CouponCategory:
         """ Checks if desired sortMode is currently allowed. """
         sortModes = self.getSortModes()
         for sortMode in sortModes:
-            if sortMode.sortCode == sortModeCode:
+            if sortMode.getSortCode() == sortModeCode:
                 return True
         return False
 
     def getNextPossibleSortMode(self, sortMode: CouponSortMode) -> CouponSortMode:
         possibleSortModes = self.getSortModes()
         for possibleSortMode in possibleSortModes:
-            if possibleSortMode.sortCode > sortMode.sortCode:
+            if possibleSortMode.getSortCode() > sortMode.getSortCode():
                 return possibleSortMode
         # Fallback/Rollover to first sort
         return possibleSortModes[0]
