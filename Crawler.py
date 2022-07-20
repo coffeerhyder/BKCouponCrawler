@@ -213,36 +213,31 @@ class BKCrawler:
         """ Migrate DBs from old to new version - leave this function empty if there is nothing to migrate. """
         # logging.info("Migrating DBs...")
         # logging.info("Migrate DBs done")
+        migrationActionRequired = False
+        if not migrationActionRequired:
+            return
         userDB = self.getUserDB()
         # keysMapping = {"timestampExpire": "timestampExpireInternal", "dateFormattedExpire": "dateFormattedExpireInternal", "timestampExpire2": "timestampExpire", "dateFormattedExpire2": "dateFormattedExpire"}
+
+        # for userID in userDB:
+        #     user = User.load(userDB, userID)
+        # for couponData in user.favoriteCoupons.values():
+        #     for oldKey, newKey in keysMapping.items():
+        #         valueOfOldKey = couponData.get(oldKey)
+        #         if valueOfOldKey is not None:
+        #             needsUpdate = True
+        #             couponData[newKey] = valueOfOldKey
+        #             del couponData[oldKey]
+        # if needsUpdate:
+        #     user.store(userDB)
+
+        # timestamp migration/introduction 2022-07-20
         dummyActivityTimestampSeconds = getCurrentDate().timestamp() - 3 * 24 * 60 * 60
         for userID in userDB:
             user = User.load(userDB, userID)
-            needsUpdate = False
-            # for couponData in user.favoriteCoupons.values():
-            #     for oldKey, newKey in keysMapping.items():
-            #         valueOfOldKey = couponData.get(oldKey)
-            #         if valueOfOldKey is not None:
-            #             needsUpdate = True
-            #             couponData[newKey] = valueOfOldKey
-            #             del couponData[oldKey]
             user.timestampLastTimeAccountUsed = dummyActivityTimestampSeconds
-            needsUpdate = True
-            if needsUpdate:
-                user.store(userDB)
+            user.store(userDB)
         return
-
-    def deleteInactiveUsers(self):
-        # TODO: Make use of this
-        userDB = self.getUserDB()
-        usersToDelete = []
-        for userID in userDB:
-            user = User.load(userDB, userID)
-            if user.isEligableForAutoDeletion():
-                usersToDelete.append(user)
-        if len(usersToDelete) > 0:
-            logging.info("Deleting inactive users: " + str(len(usersToDelete)))
-            userDB.purge(docs=usersToDelete)
 
     def crawlAndProcessData(self):
         """ One function that does it all! Execute this every time you run the crawler. """
@@ -543,7 +538,7 @@ class BKCrawler:
         if immediatelyAddToDB and len(extraCouponsToAdd) > 0:
             # Add items to DB
             couponDB = self.getCouponDB()
-            dbWasUpdated = self.addCouponsToDB(couponDB=couponDB,couponsToAddToDB=extraCouponsToAdd)
+            dbWasUpdated = self.addCouponsToDB(couponDB=couponDB, couponsToAddToDB=extraCouponsToAdd)
             if dbWasUpdated:
                 # Important!
                 self.downloadProductiveCouponDBImagesAndCreateQRCodes()
@@ -1149,6 +1144,9 @@ class BKCrawler:
             # DB was not updated
             return False
 
+    def deleteInactiveUsers(self):
+        deleteInactiveUsers(userDB=self.getUserDB())
+
     def getCouponDB(self):
         return self.couchdb[DATABASES.COUPONS]
 
@@ -1226,6 +1224,20 @@ class BKCrawler:
     def getBotCoupons(self) -> dict:
         """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
         return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.PRICE.getSortCode()))
+
+
+def deleteInactiveUsers(userDB: Database):
+    usersToDelete = []
+    for userID in userDB:
+        user = User.load(userDB, userID)
+        # passedSecondsSinceLastUsage = getCurrentDate().timestamp() - user.timestampLastTimeAccountUsed
+        # secondsUntilAutoDeletion = MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - passedSecondsSinceLastUsage
+        # print("Time until auto deletion for " + userID + ": " + str(timedelta(seconds=secondsUntilAutoDeletion)))
+        if user.isEligableForAutoDeletion():
+            usersToDelete.append(user)
+    if len(usersToDelete) > 0:
+        logging.info("Deleting inactive users: " + str(len(usersToDelete)))
+        userDB.purge(docs=usersToDelete)
 
 
 def getCouponByID(coupons: List[Coupon], couponID: str) -> Union[Coupon, None]:

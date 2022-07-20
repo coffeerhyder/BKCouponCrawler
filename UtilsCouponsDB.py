@@ -545,7 +545,7 @@ class User(Document):
             paybackCardNumber=TextField(),
             addedDate=DateTimeField()
         ))
-    couponViewSortModes = DictField()
+    couponViewSortModes = DictField(default={})
     # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
     timestampLastTimeAccountUsed = FloatField(default=getCurrentDate().timestamp())
 
@@ -634,6 +634,9 @@ class User(Document):
         return file.getvalue()
 
     def addPaybackCard(self, paybackCardNumber: str):
+        if self.paybackCard is None or len(self.paybackCard) == 0:
+            """ Workaround for Document bug/misbehavior. """
+            self['paybackCard'] = {}
         self.paybackCard.paybackCardNumber = paybackCardNumber
         self.paybackCard.addedDate = datetime.now()
 
@@ -671,20 +674,27 @@ class User(Document):
 
     def getSortModeForCouponView(self, couponView: CouponView) -> CouponSortMode:
         if self.couponViewSortModes is not None:
-            # User has at least one custom sortCode for one CouponView
+            # User has at least one custom sortCode for one CouponView.
             sortCode = self.couponViewSortModes.get(str(couponView.getViewCode()))
             if sortCode is not None:
+                # User has saved SortMode for this CouponView.
                 return getSortModeBySortCode(sortCode=sortCode)
             else:
+                # User does not have saved SortMode for this CouponView --> Return default
                 return getSortModeBySortCode(sortCode=couponView.couponfilter.sortCode)
-        # User has no saved sortCode --> Return default
-        return getSortModeBySortCode(sortCode=couponView.couponfilter.sortCode)
+        else:
+            # User has no saved sortCode --> Return default
+            return getSortModeBySortCode(sortCode=couponView.couponfilter.sortCode)
 
     def getNextSortModeForCouponView(self, couponView: CouponView) -> CouponSortMode:
         currentSortMode = self.getSortModeForCouponView(couponView=couponView)
         return getNextSortMode(currentSortMode=currentSortMode)
 
-    def setDefaultSortModeForCouponView(self, couponView: CouponView, sortMode: CouponSortMode):
+    def setCustomSortModeForCouponView(self, couponView: CouponView, sortMode: CouponSortMode):
+        if self.couponViewSortModes is None or len(self.couponViewSortModes) == 0:
+            """ Workaround for stupid Document bug/misbehavior. """
+            self["couponViewSortModes"] = {}
+            # self.couponViewSortModes = {} --> This does not work
         self.couponViewSortModes[str(couponView.getViewCode())] = sortMode.getSortCode()
 
     def hasRecentlyUsedBot(self) -> bool:

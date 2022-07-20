@@ -477,7 +477,7 @@ class BKBot:
                 saveUserToDB = True
                 nextSortMode = user.getNextSortModeForCouponView(couponView=view)
                 coupons = sortCouponsAsList(coupons, nextSortMode)
-                user.setDefaultSortModeForCouponView(couponView=view, sortMode=nextSortMode)
+                user.setCustomSortModeForCouponView(couponView=view, sortMode=nextSortMode)
             else:
                 coupons = sortCouponsAsList(coupons, user.getSortModeForCouponView(couponView=view))
             # Build bot menu
@@ -1103,6 +1103,7 @@ class BKBot:
         """ Runs all processes which should only run once per day. """
         self.crawl()
         self.renewPublicChannel()
+        self.crawler.deleteInactiveUsers()
         self.batchProcessAutoDeleteUsersUnavailableFavorites()
         self.notifyUsers()
         self.cleanupPublicChannel()
