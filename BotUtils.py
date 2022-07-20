@@ -2,7 +2,7 @@ from telegram import InlineKeyboardMarkup
 
 from Helper import SYMBOLS
 
-VERSION = '1.8.0'
+VERSION = '1.8.1'
 
 """ Place static stuff into this class. """
 
