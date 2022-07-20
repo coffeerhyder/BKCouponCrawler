@@ -213,12 +213,14 @@ class BKCrawler:
         """ Migrate DBs from old to new version - leave this function empty if there is nothing to migrate. """
         # logging.info("Migrating DBs...")
         # logging.info("Migrate DBs done")
+        migrationActionRequired = False
+        if not migrationActionRequired:
+            return
         userDB = self.getUserDB()
         # keysMapping = {"timestampExpire": "timestampExpireInternal", "dateFormattedExpire": "dateFormattedExpireInternal", "timestampExpire2": "timestampExpire", "dateFormattedExpire2": "dateFormattedExpire"}
-        dummyActivityTimestampSeconds = getCurrentDate().timestamp() - 3 * 24 * 60 * 60
-        for userID in userDB:
-            user = User.load(userDB, userID)
-            needsUpdate = False
+
+        # for userID in userDB:
+        #     user = User.load(userDB, userID)
             # for couponData in user.favoriteCoupons.values():
             #     for oldKey, newKey in keysMapping.items():
             #         valueOfOldKey = couponData.get(oldKey)
@@ -226,10 +228,15 @@ class BKCrawler:
             #             needsUpdate = True
             #             couponData[newKey] = valueOfOldKey
             #             del couponData[oldKey]
+            # if needsUpdate:
+            #     user.store(userDB)
+
+        # timestamp migration/introduction 2022-07-20
+        dummyActivityTimestampSeconds = getCurrentDate().timestamp() - 3 * 24 * 60 * 60
+        for userID in userDB:
+            user = User.load(userDB, userID)
             user.timestampLastTimeAccountUsed = dummyActivityTimestampSeconds
-            needsUpdate = True
-            if needsUpdate:
-                user.store(userDB)
+            user.store(userDB)
         return
 
     def deleteInactiveUsers(self):
