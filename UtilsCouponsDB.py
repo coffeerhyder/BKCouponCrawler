@@ -38,9 +38,9 @@ class CouponSortMode:
 
     def getSortCode(self) -> Union[int, None]:
         """ Returns position of current sort mode in array of all sort modes. """
-        sortModes = CouponSortModes.__dict__
+        sortModes = getAllSortModes()
         index = 0
-        for sortMode in sortModes.values():
+        for sortMode in sortModes:
             if sortMode == self:
                 return index
             index += 1
@@ -88,7 +88,7 @@ def getNextSortMode(currentSortMode: CouponSortMode) -> CouponSortMode:
 def getSortModeBySortCode(sortCode: int) -> CouponSortMode:
     allSortModes = getAllSortModes()
     if sortCode < len(allSortModes):
-        return getAllSortModes()[sortCode]
+        return allSortModes[sortCode]
     else:
         # Fallback
         return allSortModes[0]
@@ -104,9 +104,9 @@ class CouponView:
 
     def getViewCode(self) -> Union[int, None]:
         """ Returns position of current sort mode in array of all sort modes. """
-        couponViews = CouponViews.__dict__
+        couponViews = getAllCouponViews()
         index = 0
-        for couponView in couponViews.values():
+        for couponView in couponViews:
             if couponView == self:
                 return index
             index += 1

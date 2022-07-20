@@ -599,7 +599,7 @@ class BKBot:
         user.easterEggCounter += 1
         user.store(db=userDB)
 
-        text = "🥚<b>Glückwunsch! Du hast ein Easter Egg gefunden!</b>"
+        text = "🥚<b>Glückwunsch! Du hast das Easter Egg gefunden!</b>"
         text += "\nKlicke <a href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">HIER</a>, um es anzusehen ;)"
         text += "\nDrücke /start, um das Menü neu zu laden."
         self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode="html", disable_web_page_preview=True)

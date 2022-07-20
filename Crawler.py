@@ -238,7 +238,7 @@ class BKCrawler:
         usersToDelete = []
         for userID in userDB:
             user = User.load(userDB, userID)
-            if user.isEligableForAutoDeletion() or True:
+            if user.isEligableForAutoDeletion():
                 usersToDelete.append(user)
         if len(usersToDelete) > 0:
             logging.info("Deleting inactive users: " + str(len(usersToDelete)))
@@ -1113,7 +1113,7 @@ class BKCrawler:
         if len(updatedCouponIDs) > 0:
             logging.info("Coupons updated IDs: " + str(updatedCouponIDs))
         logging.info("Coupons flagged as new: " + str(numberofCouponsFlaggedAsNew))
-        if numberofCouponsUpdated > 0 or numberofCouponsFlaggedAsNew > 0 or True:
+        if numberofCouponsUpdated > 0 or numberofCouponsFlaggedAsNew > 0:
             # Update history DB(s) if needed
             if self.keepHistoryDB:
                 timestampHistoryDBUpdateStart = datetime.now().timestamp()
