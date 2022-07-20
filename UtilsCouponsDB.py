@@ -2,7 +2,6 @@ import logging
 import os
 import re
 from datetime import datetime
-from enum import Enum
 from io import BytesIO
 from typing import Union, List, Optional
 
@@ -18,6 +17,130 @@ from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, nor
     formatPrice
 
 
+class CouponFilter(BaseModel):
+    """ removeDuplicates: Enable to filter duplicated coupons for same products - only returns cheapest of all
+     If the same product is available as paper- and app coupon, App coupon is preferred."""
+    activeOnly: Optional[bool] = True
+    containsFriesAndCoke: Optional[Union[bool, None]] = None
+    removeDuplicates: Optional[
+        bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
+    allowedCouponTypes: Optional[Union[List[int], None]] = None  # None = allow all sources!
+    isNew: Optional[Union[bool, None]] = None
+    isHidden: Optional[Union[bool, None]] = None
+    sortCode: Optional[Union[None, int]]
+
+
+class CouponSortMode:
+
+    def __init__(self, text: str, isDescending: bool = False):
+        self.text = text
+        self.isDescending = isDescending
+
+    def getSortCode(self) -> Union[int, None]:
+        """ Returns position of current sort mode in array of all sort modes. """
+        sortModes = getAllSortModes()
+        index = 0
+        for sortMode in sortModes:
+            if sortMode == self:
+                return index
+            index += 1
+        # This should never happen
+        return None
+
+
+class CouponSortModes:
+    PRICE = CouponSortMode("Preis " + SYMBOLS.ARROW_UP)
+    PRICE_DESCENDING = CouponSortMode("Preis " + SYMBOLS.ARROW_DOWN, isDescending=True)
+    DISCOUNT = CouponSortMode("Rabatt " + SYMBOLS.ARROW_UP)
+    DISCOUNT_DESCENDING = CouponSortMode("Rabatt " + SYMBOLS.ARROW_DOWN, isDescending=True)
+    NEW = CouponSortMode("Neue Coupons " + SYMBOLS.ARROW_UP)
+    NEW_DESCENDING = CouponSortMode("Neue Coupons " + SYMBOLS.ARROW_DOWN, isDescending=True)
+    MENU_PRICE = CouponSortMode("Menü_Preis")
+    TYPE_MENU_PRICE = CouponSortMode("Typ_Menü_Preis")
+
+
+def getAllSortModes() -> list:
+    # Important! The order of this will also determine the sort order which gets presented to the user!
+    res = []
+    for obj in CouponSortModes.__dict__.values():
+        if isinstance(obj, CouponSortMode):
+            res.append(obj)
+    return res
+
+
+def getNextSortMode(currentSortMode: CouponSortMode) -> CouponSortMode:
+    allSortModes = getAllSortModes()
+    if currentSortMode is None:
+        return allSortModes[0]
+    for index in range(len(allSortModes)):
+        sortMode = allSortModes[index]
+        if sortMode == currentSortMode:
+            if index == (len(allSortModes) - 1):
+                # Last sortMode in list --> Return first
+                return allSortModes[0]
+            else:
+                # Return next sortMode
+                return allSortModes[index + 1]
+    # Fallback, should not be needed
+    return currentSortMode
+
+
+def getSortModeBySortCode(sortCode: int) -> CouponSortMode:
+    allSortModes = getAllSortModes()
+    if sortCode < len(allSortModes):
+        return allSortModes[sortCode]
+    else:
+        # Fallback
+        return allSortModes[0]
+
+
+class CouponView:
+
+    def getFilter(self):
+        return self.couponfilter
+
+    def __init__(self, couponfilter: CouponFilter):
+        self.couponfilter = couponfilter
+
+    def getViewCode(self) -> Union[int, None]:
+        """ Returns position of current sort mode in array of all sort modes. """
+        couponViews = getAllCouponViews()
+        index = 0
+        for couponView in couponViews:
+            if couponView == self:
+                return index
+            index += 1
+        # This should never happen
+        return None
+
+
+class CouponViews:
+    ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
+    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=False))
+    CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=None))
+    CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
+    HIDDEN_APP_COUPONS_ONLY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
+    # Dummy item basically only used for holding default sortCode for users' favorites
+    FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
+
+
+def getAllCouponViews() -> list:
+    res = []
+    for obj in CouponViews.__dict__.values():
+        if isinstance(obj, CouponView):
+            res.append(obj)
+    return res
+
+
+def getCouponViewByIndex(index: int) -> Union[CouponSortMode, None]:
+    allCouponViews = getAllCouponViews()
+    if index < len(allCouponViews):
+        return allCouponViews[index]
+    else:
+        # Fallback
+        return allCouponViews[0]
+
+
 class Coupon(Document):
     plu = TextField()
     uniqueID = TextField()
@@ -26,6 +149,8 @@ class Coupon(Document):
     staticReducedPercent = FloatField()
     title = TextField()
     titleShortened = TextField()
+    timestampAddedToDB = FloatField(default=getCurrentDate().timestamp())
+    timestampLastModifiedDB = FloatField(default=0)
     timestampStart = FloatField()
     timestampExpireInternal = FloatField()  # Internal expire-date
     timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
@@ -67,7 +192,10 @@ class Coupon(Document):
         return normalizeString(self.getTitle())
 
     def getTitle(self):
-        return self.title
+        if self.paybackMultiplicator is not None:
+            return f'{self.paybackMultiplicator}Fach auf jede Bestellung'
+        else:
+            return self.title
 
     def getTitleShortened(self):
         # TODO: Make use of this everywhere
@@ -142,14 +270,14 @@ class Coupon(Document):
     def isNewCoupon(self) -> bool:
         """ Determines whether or not this coupon is considered 'new'. """
         if self.isNew is not None:
-            # isNew status is pre-given --> Preferably return that
+            # isNew status is pre-given --> Return that
             return self.isNew
         elif self.isNewUntilDate is not None:
             # Check if maybe coupon should be considered as new for X
             try:
                 enforceIsNewOverrideUntilDate = datetime.strptime(self.isNewUntilDate + ' 23:59:59',
                                                                   '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
-                if enforceIsNewOverrideUntilDate.timestamp() > datetime.now().timestamp():
+                if enforceIsNewOverrideUntilDate.timestamp() > getCurrentDate().timestamp():
                     return True
                 else:
                     return False
@@ -194,18 +322,28 @@ class Coupon(Document):
         else:
             return fallback
 
+    def getReducedPercentage(self) -> Union[float, None]:
+        priceCompare = self.getPriceCompare()
+        if self.paybackMultiplicator is not None:
+            # 0.5 points per euro (= base discount of 0.5% without higher multiplicator)
+            return 0.5 * self.paybackMultiplicator
+        elif self.price is not None and priceCompare is not None:
+            return (1 - (self.price / priceCompare)) * 100
+        elif self.staticReducedPercent is not None:
+            return self.staticReducedPercent
+        else:
+            return None
+
     def getReducedPercentageFormatted(self, fallback=None) -> Union[str, None]:
         """ Returns price reduction in percent if bothb the original price and the reduced/coupon-price are available.
          E.g. "-39%" """
-        priceCompare = self.getPriceCompare()
-        if self.price is not None and priceCompare is not None:
-            return '-' + f'{(1 - (self.price / priceCompare)) * 100:2.0f}'.replace('.', ',') + '%'
-        elif self.staticReducedPercent is not None:  # Sometimes we don't have a compare-price but the reduce amount is pre-given via App-API.
-            return '-' + f'{self.staticReducedPercent:2.0f}' + '%'
-        elif self.paybackMultiplicator is not None:
-            # 0.5 points per euro (= base discount of 0.5% without multiplicator)
-            paybackReducedPercent = (0.5 * self.paybackMultiplicator)
-            return '-' + f'{paybackReducedPercent:2.1f}' + '%'
+        reducedPercentage = self.getReducedPercentage()
+        if reducedPercentage is not None:
+            if self.paybackMultiplicator is not None:
+                # Add one decimal point for low percentage reducements such as Payback coupons as those will often only get us like 2.5% discount.
+                return '-' + f'{reducedPercentage:2.1f}' + '%'
+            else:
+                return '-' + f'{reducedPercentage:2.0f}' + '%'
         else:
             return fallback
 
@@ -377,12 +515,17 @@ class UserFavoritesInfo:
             return unavailableFavoritesText
 
 
+MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION = 6 * 30 * 24 * 60 * 60
+MAX_HOURS_ACTIVITY_TRACKING = 48
+
+
 class User(Document):
     settings = DictField(
         Mapping.build(
             displayQR=BooleanField(default=True),
             displayBKWebsiteURLs=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
+            displayCouponSortButton=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
@@ -402,9 +545,27 @@ class User(Document):
             paybackCardNumber=TextField(),
             addedDate=DateTimeField()
         ))
+    couponViewSortModes = DictField()
+    # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
+    timestampLastTimeAccountUsed = FloatField(default=getCurrentDate().timestamp())
 
     def hasProbablyBlockedBot(self) -> bool:
         if self.botBlockedCounter > 0:
+            return True
+        else:
+            return False
+
+    def hasProbablyBlockedBotForLongerTime(self) -> bool:
+        if self.botBlockedCounter >= 30:
+            return True
+        else:
+            return False
+
+    def isEligableForAutoDeletion(self):
+        """ If this returns True, upper handling is allowed to delete this account as it looks like it has been abandoned by the user. """
+        if self.hasProbablyBlockedBotForLongerTime():
+            return True
+        elif getCurrentDate().timestamp() - self.timestampLastTimeAccountUsed > MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
             return True
         else:
             return False
@@ -417,6 +578,10 @@ class User(Document):
                 continue
             elif settingValue != settingInfo['default']:
                 return False
+
+        if self.couponViewSortModes is not None and len(self.couponViewSortModes) > 0:
+            # User has used/saved custom sort modes
+            return False
 
         return True
 
@@ -454,8 +619,9 @@ class User(Document):
             return False
 
     def getPaybackCardNumber(self) -> Union[str, None]:
-        """ TODO: Can this be considered a workaround or is the mapping made in a stupid way that it does not return "None" for keys without defined defaults??!
-          doing User.paybackCard.paybackCardNumber directly would raise an AttributeError! """
+        """ Can this be considered a workaround or is the mapping made in a stupid way that it does not return "None" for keys without defined defaults??!
+          doing User.paybackCard.paybackCardNumber directly would raise an AttributeError!
+          Alternative would be to set empty String as default value. """
         if len(self.paybackCard) > 0:
             return self.paybackCard.paybackCardNumber
         else:
@@ -475,7 +641,7 @@ class User(Document):
         dummyUser = User()
         self.paybackCard = dummyUser.paybackCard
 
-    def getUserFavoritesInfo(self, couponsFromDB: Union[dict, Document]) -> UserFavoritesInfo:
+    def getUserFavoritesInfo(self, couponsFromDB: Union[dict, Document], sortCoupons: bool) -> UserFavoritesInfo:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
         Coupons from DB are required to get current dataset of available favorites.
@@ -496,14 +662,49 @@ class User(Document):
         # Sort all coupon arrays by price
         if self.settings.hideDuplicates:
             availableFavoriteCoupons = removeDuplicatedCoupons(availableFavoriteCoupons)
-        availableFavoriteCoupons = sortCouponsByPrice(availableFavoriteCoupons)
-        unavailableFavoriteCoupons = sortCouponsByPrice(unavailableFavoriteCoupons)
+        if sortCoupons:
+            favoritesFilter = CouponViews.FAVORITES.getFilter()
+            availableFavoriteCoupons = sortCouponsAsList(availableFavoriteCoupons, favoritesFilter.sortCode)
+            unavailableFavoriteCoupons = sortCouponsAsList(unavailableFavoriteCoupons, favoritesFilter.sortCode)
         return UserFavoritesInfo(favoritesAvailable=availableFavoriteCoupons,
                                  favoritesUnavailable=unavailableFavoriteCoupons)
+
+    def getSortModeForCouponView(self, couponView: CouponView) -> CouponSortMode:
+        if self.couponViewSortModes is not None:
+            # User has at least one custom sortCode for one CouponView
+            sortCode = self.couponViewSortModes.get(str(couponView.getViewCode()))
+            if sortCode is not None:
+                return getSortModeBySortCode(sortCode=sortCode)
+            else:
+                return getSortModeBySortCode(sortCode=couponView.couponfilter.sortCode)
+        # User has no saved sortCode --> Return default
+        return getSortModeBySortCode(sortCode=couponView.couponfilter.sortCode)
+
+    def getNextSortModeForCouponView(self, couponView: CouponView) -> CouponSortMode:
+        currentSortMode = self.getSortModeForCouponView(couponView=couponView)
+        return getNextSortMode(currentSortMode=currentSortMode)
+
+    def setDefaultSortModeForCouponView(self, couponView: CouponView, sortMode: CouponSortMode):
+        self.couponViewSortModes[str(couponView.getViewCode())] = sortMode.getSortCode()
+
+    def hasRecentlyUsedBot(self) -> bool:
+        currentTimestamp = getCurrentDate().timestamp()
+        if currentTimestamp - self.timestampLastTimeAccountUsed < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
+            return True
+        else:
+            return False
+
+    def updateActivityTimestamp(self) -> bool:
+        if self.hasRecentlyUsedBot():
+            return False
+        else:
+            self.timestampLastTimeAccountUsed = getCurrentDate().timestamp()
+            return True
 
     def resetSettings(self):
         dummyUser = User()
         self.settings = dummyUser.settings
+        self.couponViewSortModes = {}
 
 
 class InfoEntry(Document):
@@ -573,13 +774,6 @@ class ChannelCoupon(Document):
         return self.channelMessageID_image
 
 
-class CouponSortMode(Enum):
-    PRICE = 0
-    PRICE_DESCENDING = 1
-    MENU_PRICE = 2
-    SOURCE_MENU_PRICE = 3
-
-
 def getCouponsTotalPrice(coupons: List[Coupon]) -> float:
     """ Returns the total summed price of a list of coupons. """
     totalSum = 0
@@ -599,29 +793,27 @@ def getCouponsSeparatedByType(coupons: dict) -> dict:
     return couponsSeparatedByType
 
 
-def sortCouponsByPrice(couponList: Union[List[Coupon], dict], descending: bool = False) -> List[Coupon]:
+def sortCouponsByPrice(couponList: List[Coupon], descending: bool = False) -> List[Coupon]:
     """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
     if isinstance(couponList, dict):
         couponList = couponList.values()
-    if descending:
-        return sorted(couponList,
-                      key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1), reverse=True)
-    else:
-        return sorted(couponList,
-                      key=lambda x: -1 if x.get(Coupon.price.name, -1) is None else x.get(Coupon.price.name, -1))
+    return sorted(couponList,
+                  key=lambda x: -1 if x.getPrice() is None else x.getPrice(), reverse=descending)
 
 
-class CouponFilter(BaseModel):
-    """ removeDuplicates: Enable to filter duplicated coupons for same products - only returns cheapest of all
-     If the same product is available as paper- and app coupon, App coupon is preferred."""
-    activeOnly: Optional[bool] = True
-    containsFriesAndCoke: Optional[Union[bool, None]] = None
-    removeDuplicates: Optional[
-        bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
-    allowedCouponTypes: Optional[Union[List[int], None]] = None  # None = allow all sources!
-    isNew: Optional[Union[bool, None]] = None
-    isHidden: Optional[Union[bool, None]] = None
-    sortMode: Optional[Union[None, CouponSortMode]]
+def sortCouponsByDiscount(couponList: List[Coupon], descending: bool = False) -> List[Coupon]:
+    """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
+    if isinstance(couponList, dict):
+        couponList = couponList.values()
+    return sorted(couponList,
+                  key=lambda x: 0 if x.getReducedPercentage() is None else x.getReducedPercentage(), reverse=descending)
+
+def sortCouponsByNew(couponList: List[Coupon], descending: bool = False) -> List[Coupon]:
+    """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
+    if isinstance(couponList, dict):
+        couponList = couponList.values()
+    return sorted(couponList,
+                  key=lambda x: x.isNewCoupon(), reverse=descending)
 
 
 def getCouponTitleMapping(coupons: Union[dict, list]) -> dict:
@@ -655,6 +847,10 @@ USER_SETTINGS_ON_OFF = {
     },
     "displayCouponCategoryPayback": {
         "description": "Payback Coupons/Karte im Hauptmenü zeigen",
+        "default": True
+    },
+    "displayCouponSortButton": {
+        "description": "Coupon sortieren Button zeigen",
         "default": True
     },
     "displayFeedbackCodeGenerator": {
@@ -695,7 +891,7 @@ if DISPLAY_BETA_SETTING:
     }
 
 
-def removeDuplicatedCoupons(coupons: Union[list, dict]) -> dict:
+def removeDuplicatedCoupons(coupons: Union[List[Coupon], dict]) -> dict:
     couponTitleMappingTmp = getCouponTitleMapping(coupons)
     # Now clean our mapping: Sometimes one product may be available twice with multiple prices -> We want exactly one mapping per title
     couponsWithoutDuplicates = {}
@@ -721,7 +917,7 @@ def removeDuplicatedCoupons(coupons: Union[list, dict]) -> dict:
         for coupon in couponsForDuplicateRemoval:
             if firstPrice is None:
                 firstPrice = coupon.getPrice()
-            elif coupon.getPrice() is not None and coupon.getPrice() != firstPrice:
+            elif coupon.getPrice() != firstPrice:
                 isDifferentPrices = True
             if coupon.type == CouponType.APP:
                 appCoupon = coupon
@@ -739,3 +935,74 @@ def removeDuplicatedCoupons(coupons: Union[list, dict]) -> dict:
     numberofRemovedDuplicates = len(coupons) - len(couponsWithoutDuplicates)
     logging.debug("Number of removed duplicates: " + str(numberofRemovedDuplicates))
     return couponsWithoutDuplicates
+
+
+def sortCoupons(coupons: Union[list, dict], sortCode: Union[int, CouponSortMode]) -> dict:
+    coupons = sortCouponsAsList(coupons, sortCode)
+    filteredAndSortedCouponsDict = {}
+    for coupon in coupons:
+        filteredAndSortedCouponsDict[coupon.id] = coupon
+    return filteredAndSortedCouponsDict
+
+
+def sortCouponsAsList(coupons: Union[list, dict], sortCode: Union[int, CouponSortMode]) -> dict:
+    if isinstance(coupons, dict):
+        coupons = list(coupons.values())
+    if isinstance(sortCode, CouponSortMode):
+        sortMode = sortCode
+    else:
+        sortMode = getSortModeBySortCode(sortCode)
+    if sortMode == CouponSortModes.TYPE_MENU_PRICE:
+        couponsWithoutFriesOrCoke = []
+        couponsWithFriesOrCoke = []
+        allContainedCouponTypes = []
+        for coupon in coupons:
+            if coupon.type not in allContainedCouponTypes:
+                allContainedCouponTypes.append(coupon.type)
+            if coupon.isContainsFriesOrCoke():
+                couponsWithFriesOrCoke.append(coupon)
+            else:
+                couponsWithoutFriesOrCoke.append(coupon)
+        couponsWithoutFriesOrCoke = sortCouponsByPrice(couponsWithoutFriesOrCoke)
+        couponsWithFriesOrCoke = sortCouponsByPrice(couponsWithFriesOrCoke)
+        # Merge them together again.
+        coupons = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
+        # App coupons(source == 0) > Paper coupons
+        allContainedCouponTypes.sort()
+        # Separate sorted coupons by type
+        couponsSeparatedByType = {}
+        for couponType in allContainedCouponTypes:
+            couponsTmp = list(filter(lambda x: x.type == couponType, coupons))
+            couponsSeparatedByType[couponType] = couponsTmp
+        # Put our list sorted by type together again -> Sort done
+        coupons = []
+        for allCouponsOfOneSourceType in couponsSeparatedByType.values():
+            coupons += allCouponsOfOneSourceType
+    elif sortMode == CouponSortModes.MENU_PRICE:
+        couponsWithoutFriesOrCoke = []
+        couponsWithFriesOrCoke = []
+        for coupon in coupons:
+            if coupon.isContainsFriesOrCoke():
+                couponsWithFriesOrCoke.append(coupon)
+            else:
+                couponsWithoutFriesOrCoke.append(coupon)
+        couponsWithoutFriesOrCoke = sortCouponsByPrice(couponsWithoutFriesOrCoke)
+        couponsWithFriesOrCoke = sortCouponsByPrice(couponsWithFriesOrCoke)
+        # Merge them together again.
+        coupons = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
+    elif sortMode == CouponSortModes.PRICE:
+        coupons = sortCouponsByPrice(coupons)
+    elif sortMode == CouponSortModes.PRICE_DESCENDING:
+        coupons = sortCouponsByPrice(coupons, descending=True)
+    elif sortMode == CouponSortModes.DISCOUNT:
+        coupons = sortCouponsByDiscount(coupons)
+    elif sortMode == CouponSortModes.DISCOUNT_DESCENDING:
+        coupons = sortCouponsByDiscount(coupons, descending=True)
+    elif sortMode == CouponSortModes.NEW:
+        coupons = sortCouponsByNew(coupons)
+    elif sortMode == CouponSortModes.NEW_DESCENDING:
+        coupons = sortCouponsByNew(coupons, descending=True)
+    else:
+        # This should never happen
+        logging.warning("Developer mistake!! Unknown sortMode: " + str(sortMode))
+    return coupons

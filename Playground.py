@@ -3,6 +3,8 @@ from barcode.writer import ImageWriter
 from furl import furl, urllib
 from urllib.parse import urlparse, parse_qs
 
+from UtilsCouponsDB import CouponViews
+
 url = "?action=displaycoupons&which=favorites&page=3"
 o = urlparse(url)
 query = parse_qs(o.query)
@@ -35,9 +37,9 @@ print("furl url: " + urlquery.url)
 # Coupons crawlen
 # crawler.crawlAndProcessData()
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
-# activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+# activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.PRICE.getSortCode()))
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
-# activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=CouponType.APP, containsFriesAndCoke=None, isHidden=True))
+# activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRICE, allowedCouponTypes=CouponType.APP, containsFriesAndCoke=None, isHidden=True))
 # crawler.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=False)
 
 
@@ -48,7 +50,12 @@ print("furl url: " + urlquery.url)
 # with open('test.png', 'wb') as f:
 #     EAN13('240000902922', writer=ImageWriter()).write(f)
 
-f = open('somefile.png', 'wb')
+# f = open('somefile.png', 'wb')
 ean = EAN13(ean='100000011111', writer=ImageWriter())
-ean.save(filename='test22.png', options={'foreground': 'black', 'text': 'Test'})
+# ean.save(filename='test22.png', options={'foreground': 'black', 'text': 'Test'})
+
+allViews = CouponViews.__dict__
+
+print(str(CouponViews.__dict__))
+
 

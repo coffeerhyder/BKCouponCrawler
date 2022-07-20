@@ -10,7 +10,7 @@ from telegram.error import BadRequest, Unauthorized
 from BotUtils import getBotImpressum
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes
 
-from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponSortMode, CouponFilter, sortCouponsByPrice, getCouponTitleMapping
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortModes
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
@@ -23,8 +23,8 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     """
     logging.info("Checking for pending new coupons notifications")
     timestampStart = datetime.now().timestamp()
-    userDB = bkbot.crawler.getUsersDB()
-    allNewCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.PRICE))
+    userDB = bkbot.crawler.getUserDB()
+    allNewCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, isNew=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortModes.PRICE))
     if len(allNewCoupons) == 0:
         logging.info("No new coupons available to notify about")
         return
@@ -124,8 +124,6 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info("Notifying " + str(len(usersNotify)) + " users about favorites/new coupons")
     index = -1
     dbUserUpdates = []
-    usersToDelete = []
-    deleteBlockedUsersAfterDays = 30
     for userIDStr, postText in usersNotify.items():
         index += 1
         # isLastItem = index == len(usersNotify) - 1
@@ -141,27 +139,18 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
             # Almost certainly it will be "Forbidden: bot was blocked by the user"
             logging.info(botBlocked.message + " --> chat_id: " + userIDStr)
             user.botBlockedCounter += 1
-            if user.botBlockedCounter >= deleteBlockedUsersAfterDays:
-                usersToDelete.append(user)
-            else:
-                dbUserUpdates.append(user)
+            dbUserUpdates.append(user)
     if len(dbUserUpdates) > 0:
         logging.info("Pushing DB updates for users who have blocked/unblocked bot: " + str(len(dbUserUpdates)))
         userDB.update(dbUserUpdates)
-    if len(usersToDelete) > 0:
-        logging.info("Deleting users who blocked bot for >= " + str(deleteBlockedUsersAfterDays) + " days: " + str(len(usersToDelete)))
-        userDB.purge(usersToDelete)
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 
 class ChannelUpdateMode(Enum):
     """ Different modes that can be used to perform a channel update """
-    # Dummy entry: This mode would only work if TG bots were able to delete messages older than 48 hours!
-    # UPDATE = 1  # Deprecated
-    # Delete- and re-send all coupons into our channel
-    RESEND_ALL = 2
+    RESEND_ALL = 1
     # This will only re-send all items older than X hours - can be used to resume channel update if it was e.g. interrupted due to a connection loss
-    RESUME_CHANNEL_UPDATE = 3
+    RESUME_CHANNEL_UPDATE = 2
 
 
 def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
@@ -182,7 +171,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Update channel info and DB
     channelInfoDoc.timestampLastChannelUpdate = getCurrentDate().timestamp()
     channelInfoDoc.store(channelInfoDB)
-    activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+    activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortModes.TYPE_MENU_PRICE))
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
@@ -300,8 +289,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         # Add detailed information about added coupons. Limit the max. number of that so our information message doesn't get too big.
         infoText += '\n<b>' + SYMBOLS.NEW + ' ' + str(len(newCoupons)) + ' Coupons hinzugefügt:</b>'
         infoText += bkbot.getNewCouponsTextWithChannelHyperlinks(newCoupons, 10)
-    if updateMode == ChannelUpdateMode.RESEND_ALL or updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE:
-        infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
+    infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
     if DEBUGNOTIFICATOR:
         infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!!' + SYMBOLS.WARNING + '</b>'
     if bkbot.maintenanceMode:
@@ -315,12 +303,17 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + missingPaperCouponsText
         infoText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.'
         infoText += '</b>'
-    # Add 'useful links' text
+    # Add 'useful links text'
     infoText += '\n<b>------</b>'
     infoText += '\n<b>Nützliche Links</b>:'
+    infoText += '\n<b>BK</b>:'
     infoText += '\n•<a href=\"' + URLs.BK_SPAR_KINGS + '\">Spar Kings</a>'
     infoText += '\n•<a href=\"' + URLs.BK_KING_FINDER + '\">KING Finder</a>'
-    infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to Forum Thread</a>'
+    infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to BetterKing Forum Thread</a>'
+    infoText += '\n•<a href=\"' + URLs.BK_WUERGER_KING + '\">Würger King</a> (' + '<a href=\"' + URLs.BK_WUERGER_KING_SOURCE + '\">source</a>' + ')'
+    infoText += '\n<b>McDonalds</b>'
+    infoText += '\n•<a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a>'
+    infoText += '\n•<a href=\"' + URLs.MCD_COCKBOT + '\">t.me/gimmecockbot</a>'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"
@@ -356,8 +349,10 @@ def cleanupChannel(bkbot):
     logging.info("Channel cleanup done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
 
-def deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc):
-    """ Deletes all channel messages which were previously flagged for deletion. """
+def deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc) -> int:
+    """ Deletes all channel messages which were previously flagged for deletion.
+     @:returns Number of deleted messages
+      """
     if len(infoDoc.messageIDsToDelete) > 0:
         initialNumberofMsgsToDelete = len(infoDoc.messageIDsToDelete)
         logging.info("Deleting " + str(initialNumberofMsgsToDelete) + " old messages...")
@@ -369,6 +364,9 @@ def deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc):
             index += 1
         # Update DB
         infoDoc.store(infoDB)
+        return initialNumberofMsgsToDelete
+    else:
+        return 0
 
 
 def nukeChannel(bkbot):
@@ -392,17 +390,21 @@ def nukeChannel(bkbot):
                 bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID)
             del channelDB[couponID]
     # Delete coupon overview messages
-    logging.info("Deleting information messages...")
     updateInfoDoc = False
+    hasLoggedDeletionOfCouponOverviewMessageIDs = False
     for couponType in BotAllowedCouponTypes:
         couponOverviewMessageIDs = infoDoc.getMessageIDsForCouponCategory(couponType)
         if len(couponOverviewMessageIDs) > 0:
+            if not hasLoggedDeletionOfCouponOverviewMessageIDs:
+                # Only print this logger once
+                logging.info("Deleting information messages...")
+                hasLoggedDeletionOfCouponOverviewMessageIDs = True
             bkbot.deleteMessages(chat_id=bkbot.getPublicChannelChatID(), messageIDs=couponOverviewMessageIDs)
             infoDoc.deleteCouponCategoryMessageIDs(couponType)
             updateInfoDoc = True
     # Delete coupon information message
     if infoDoc.informationMessageID is not None:
-        logging.info("Deleting channel overview message")
+        logging.info("Deleting channel overview message: " + infoDoc.informationMessageID)
         bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=infoDoc.informationMessageID)
         infoDoc.informationMessageID = None
         updateInfoDoc = True

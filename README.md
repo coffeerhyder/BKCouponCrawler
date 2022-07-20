@@ -84,23 +84,53 @@ Siehe `config_extra_coupons.json`
 ### Mögliche Start-Parameter für `BKBot.py`:  
 Die meisten Parameter sind nur einzeln verwendbar.  
 
-Parameter | Beschreibung
---- | ---
-forcechannelupdatewithresend | Sofortiges Channelupdates mit löschen- und neu Einsenden aller Coupons.
-resumechannelupdate | Channelupdate fortsetzen: Coupons ergänzen, die nicht rausgeschickt wurden und Couponübersicht erneuern. Nützlich um ein Channelupdate bei einem Abbruch genau an derselben Stelle fortzusetzen.
-forcebatchprocess | Alle drei Aktionen ausführen, die eigentlich nur täglich 1x durchlaufen: Crawler, User Favoriten Benachrichtigungen rausschicken und Channelupdate mit Löschen- und neu Einsenden.
-usernotify | User benachrichtigen über abgelaufene favorisierte Coupons, die wieder zurück sind und neue Coupons (= Coupons, die seit dem letzten DB Update neu hinzu kamen).
-nukechannel | Alle Nachrichten im Channel automatisiert löschen (debug/dev Funktion für alle die zu faul sind, das von Hand zu tun ;) )
-cleanupchannel | Zu löschende alte Coupon-Posts aus dem Channel löschen
-migrate | DB Migrationen ausführen falls verfügbar
-crawl | Crawler beim Start des Bots einmalig ausführen
-maintenancemode | Wartungsmodus - zeigt im Bot und Channel eine entsprechende Meldung. Deaktiviert alle Bot Funktionen.
+```
+usage: BKBot.py [-h] [-fc FORCECHANNELUPDATEWITHRESEND]
+                [-rc RESUMECHANNELUPDATE] [-fb FORCEBATCHPROCESS]
+                [-un USERNOTIFY] [-n NUKECHANNEL] [-cc CLEANUPCHANNEL]
+                [-m MIGRATE] [-c CRAWL] [-mm MAINTENANCEMODE]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -fc FORCECHANNELUPDATEWITHRESEND, --forcechannelupdatewithresend FORCECHANNELUPDATEWITHRESEND
+                        Sofortiges Channelupdates mit löschen- und neu
+                        Einsenden aller Coupons.
+  -rc RESUMECHANNELUPDATE, --resumechannelupdate RESUMECHANNELUPDATE
+                        Channelupdate fortsetzen: Coupons ergänzen, die nicht
+                        rausgeschickt wurden und Couponübersicht erneuern.
+                        Nützlich um ein Channelupdate bei einem Abbruch genau
+                        an derselben Stelle fortzusetzen.
+  -fb FORCEBATCHPROCESS, --forcebatchprocess FORCEBATCHPROCESS
+                        Alle drei Aktionen ausführen, die eigentlich nur
+                        täglich 1x durchlaufen: Crawler, User Favoriten
+                        Benachrichtigungen rausschicken und Channelupdate mit
+                        Löschen- und neu Einsenden.
+  -un USERNOTIFY, --usernotify USERNOTIFY
+                        User benachrichtigen über abgelaufene favorisierte
+                        Coupons, die wieder zurück sind und neue Coupons (=
+                        Coupons, die seit dem letzten DB Update neu hinzu
+                        kamen).
+  -n NUKECHANNEL, --nukechannel NUKECHANNEL
+                        Alle Nachrichten im Channel automatisiert löschen
+                        (debug/dev Funktion)
+  -cc CLEANUPCHANNEL, --cleanupchannel CLEANUPCHANNEL
+                        Zu löschende alte Coupon-Posts aus dem Channel
+                        löschen.
+  -m MIGRATE, --migrate MIGRATE
+                        DB Migrationen ausführen falls verfügbar
+  -c CRAWL, --crawl CRAWL
+                        Crawler beim Start des Bots einmalig ausführen.
+  -mm MAINTENANCEMODE, --maintenancemode MAINTENANCEMODE
+                        Wartungsmodus - zeigt im Bot und Channel eine
+                        entsprechende Meldung. Deaktiviert alle Bot
+                        Funktionen.
+```
 
 ### Bot mit Systemstart starten (Linux)
 1. Sichergehen, dass BKBot.py ausführbar ist. Falls nötig: ``chmod a+b BKBot.py``.
 2. Per ``crontab -e`` in crontab wechseln.
 3. Folgendes hinzufügen:  
-```  
+```
 # Bot nach Reboot starten. Die Wartezeit wird benötigt, damit CouchDB genug Zeit hat zu starten.  
 @reboot sleep 45 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
 # Updates nachts automatisch ausführen
@@ -130,24 +160,22 @@ crawler = BKCrawler()
 crawler.setCrawlOnlyBotCompatibleCoupons(True)
 # History Datenbank aufbauen z.B. zur späteren Auswertung?
 crawler.setKeepHistory(True)
+# Simple History Datenbank aufbauen?
+crawler.setKeepSimpleHistoryDB(True)
 # CSV Export bei jedem Crawlvorgang (de-)aktivieren
 crawler.setExportCSVs(False)
 # Coupons crawlen
 crawler.crawlAndProcessData()
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
-activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortModes.TYPE_MENU_PRICE))
 # Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
-activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=CouponType.APP, containsFriesAndCoke=None, isHidden=True))
+activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRICE, allowedCouponTypes=CouponType.APP, containsFriesAndCoke=None, isHidden=True))
 ```
 
 # TODOs
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
-* Crawler: Zweite History DB einbauen und/oder bestehendes System entsprechend ändern
-* Bot: Beliebige Sortierung einbauen und letzte Sortierung speichern
 * Start-Script prüfen
 * Handling mit Datumsangaben verbessern
-* Fragen, ob der Betreiber von pbcp.de lust hat, die Coupons hier zu zeigen: pbcp.de/partner/burger-king
-* Produktnamen-Handling für Payback Coupons generischer gestalten
 * isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
@@ -266,7 +294,9 @@ Ja: Würger King: wurgerking.wfr.moe
 Quellcode: github.com/WebFreak001/WurgerKing
 
 Gibt es sowas auch für McDonalds/KFC/...?
-Mir ist kein solches Projekt bekannt.
+McDonalds:
+Coupons: mccoupon.deals
+Gratis Getränke: t.me/gimmecockbot
 ```
 
 ### Test Cases
@@ -319,13 +349,14 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
 * http://www.fastfood-forum.net/wbb3/upload/index.php/Board/9-Burger-King/
 
-### Ähnliche Projekte auf GitHub (teilweise veraltet)
+### Ähnliche Projekte (teilweise veraltet)
 * https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
 * https://github.com/reteps/burger-king-api-wrapper
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
 * https://bk.eris.cc/ --> https://gist.github.com/printfuck
 * https://t.me/gimmecockbot (https://t.me/freecokebot)
 * https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
+* [pbcp.de/partner/burger-king](https://pbcp.de/partner/burger-king)
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot

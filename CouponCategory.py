@@ -1,12 +1,12 @@
 from typing import Union, List
 
 from Helper import SYMBOLS, formatDateGerman, BotAllowedCouponTypes, CouponType, formatPrice
-from UtilsCouponsDB import Coupon, CouponSortMode
+from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
 
 
 class CouponCategory:
 
-    def __init__(self, parameter: Union[CouponType, int, List]):
+    def __init__(self, parameter: Union[CouponType, int, dict, List]):
         self.coupons = None
         self.mainCouponType = None
         self.couponTypes = set()
@@ -20,6 +20,8 @@ class CouponCategory:
         self.numberofCouponsNew = 0
         self.numberofCouponsWithFriesOrCoke = 0
         self.totalPrice = 0
+        if isinstance(parameter, dict):
+            parameter = list(parameter.values())
         if isinstance(parameter, list):
             self.coupons = parameter
             mainCouponType = self.coupons[0].type
@@ -129,24 +131,45 @@ class CouponCategory:
             return True
 
     def isEligableForSort(self):
-        if self.numberofCouponsTotal == 1:
-            return False
-        else:
+        if len(self.getSortModes()) > 1:
             return True
+        else:
+            return False
 
     def getSortModes(self) -> List:
         """ Returns all SortModes which make sense for this set of coupons. """
-        if not self.isEligableForSort():
-            return []
         sortModes = []
         if self.totalPrice > 0:
-            sortModes.append(CouponSortMode.PRICE)
-            sortModes.append(CouponSortMode.PRICE_DESCENDING)
+            sortModes.append(CouponSortModes.PRICE)
+            sortModes.append(CouponSortModes.PRICE_DESCENDING)
         if self.numberofCouponsTotal != self.numberofCouponsWithFriesOrCoke:
-            sortModes.append(CouponSortMode.MENU_PRICE)
+            sortModes.append(CouponSortModes.MENU_PRICE)
         if len(self.couponTypes) > 1:
-            sortModes.append(CouponSortMode.SOURCE_MENU_PRICE)
+            sortModes.append(CouponSortModes.TYPE_MENU_PRICE)
         return sortModes
+
+    def allowsSortMode(self, sortModeToCheckFor: CouponSortMode) -> bool:
+        """ Checks if desired sortMode is currently allowed. """
+        sortModes = self.getSortModes()
+        for possibleSortMode in sortModes:
+            if possibleSortMode == sortModeToCheckFor:
+                return True
+        return False
+
+    def getNextPossibleSortMode(self, sortMode: CouponSortMode) -> CouponSortMode:
+        possibleSortModes = self.getSortModes()
+        for possibleSortMode in possibleSortModes:
+            if possibleSortMode.getSortCode() > sortMode.getSortCode():
+                return possibleSortMode
+        # Fallback/Rollover to first sort
+        return possibleSortModes[0]
+
+    def getSortModeCode(self, desiredSortMode: CouponSortMode, fallbackSortMode: CouponSortMode) -> CouponSortMode:
+        if self.allowsSortMode(desiredSortMode):
+            return desiredSortMode
+        else:
+            return fallbackSortMode
+
 
     def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:
         if self.mainCouponType == CouponType.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
@@ -222,12 +245,15 @@ class CouponCategory:
         return None
 
 
-def getCouponCategory(coupons: List[Coupon]) -> CouponCategory:
+def getCouponCategory(coupons: Union[List[Coupon], dict]) -> CouponCategory:
     """ Returns CouponCategory for given list of coupons.Assumes that this list only contains coupons of one
     category. """
+    if isinstance(coupons, dict):
+        coupons = list(coupons.values())
     mainCouponType = coupons[0].type
     category = CouponCategory(parameter=mainCouponType)
     for coupon in coupons:
         category.updateWithCouponInfo(coupon)
     return category
+
 

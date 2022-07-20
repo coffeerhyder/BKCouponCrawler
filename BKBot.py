@@ -1,8 +1,8 @@
-import logging
+import argparse
 import math
-import sys
 import time
 import traceback
+from copy import deepcopy
 from typing import List, Tuple
 
 import schedule
@@ -21,10 +21,10 @@ from BaseUtils import *
 from Helper import *
 from Crawler import BKCrawler, UserStats
 
-from UtilsCouponsDB import Coupon, User, ChannelCoupon, CouponSortMode, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
-    USER_SETTINGS_ON_OFF
+from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
+    USER_SETTINGS_ON_OFF, CouponSortModes, CouponViews, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING
 from CouponCategory import CouponCategory, getCouponCategory
-from Helper import BotAllowedCouponTypes, CouponType, formatPrice
+from Helper import BotAllowedCouponTypes, CouponType
 from UtilsOffers import offerGetImagePath
 
 
@@ -43,6 +43,10 @@ class CouponCallbackVars:
     FAVORITES = "?a=dcs&m=" + CouponDisplayMode.FAVORITES + "&cs="
 
 
+class CallbackPattern:
+    DISPLAY_COUPONS = '.*a=dcs.*'
+
+
 def generateCallbackRegEx(settings: dict):
     # Generates one CallBack RegEx for a set of settings.
     settingsCallbackRegEx = '^'
@@ -57,30 +61,70 @@ def generateCallbackRegEx(settings: dict):
     return settingsCallbackRegEx
 
 
+MAX_CACHE_AGE_SECONDS = 7 * 24 * 60 * 60
+
+
 def cleanupCache(cacheDict: dict):
     cacheDictCopy = cacheDict.copy()
-    maxCacheAgeSeconds = 7 * 24 * 60 * 60
     for cacheID, cacheData in cacheDictCopy.items():
         cacheItemAge = datetime.now().timestamp() - cacheData.timestampLastUsed
-        if cacheItemAge > maxCacheAgeSeconds:
+        if cacheItemAge > MAX_CACHE_AGE_SECONDS:
             logging.info("Deleting cache item " + str(cacheID) + " as it was last used before: " + str(cacheItemAge) + " seconds")
             del cacheDict[cacheID]
 
 
+def getUserFromDB(userDB: Database, userID: Union[str, int], addIfNew: bool, updateUsageTimestamp: bool) -> Union[User, None]:
+    """ Returns user from given DB. Adds it to DB if wished and it doesn't exist. """
+    user = User.load(userDB, str(userID))
+    if user is not None:
+        # Store a rough timestamp of when user used bot last time
+        if updateUsageTimestamp and user.updateActivityTimestamp():
+            user.store(userDB)
+    elif addIfNew:
+        """ New user? --> Add userID to DB if wished. """
+        # Add user to DB for the first time
+        logging.info('Storing new userID: ' + str(userID))
+        user = User(id=str(userID))
+        user.store(userDB)
+
+    return user
+
+
 class BKBot:
+    my_parser = argparse.ArgumentParser()
+    my_parser.add_argument('-fc', '--forcechannelupdatewithresend',
+                           help='Sofortiges Channelupdates mit löschen- und neu Einsenden aller Coupons.', type=bool,
+                           default=False)
+    my_parser.add_argument('-rc', '--resumechannelupdate',
+                           help='Channelupdate fortsetzen: Coupons ergänzen, die nicht rausgeschickt wurden und Couponübersicht erneuern. Nützlich um ein Channelupdate bei einem Abbruch genau an derselben Stelle fortzusetzen.',
+                           type=bool,
+                           default=False)
+    my_parser.add_argument('-fb', '--forcebatchprocess',
+                           help='Alle drei Aktionen ausführen, die eigentlich nur täglich 1x durchlaufen: Crawler, User Favoriten Benachrichtigungen rausschicken und Channelupdate mit Löschen- und neu Einsenden.',
+                           type=bool, default=False)
+    my_parser.add_argument('-un', '--usernotify',
+                           help='User benachrichtigen über abgelaufene favorisierte Coupons, die wieder zurück sind und neue Coupons (= Coupons, die seit dem letzten DB Update neu hinzu kamen).',
+                           type=bool, default=False)
+    my_parser.add_argument('-n', '--nukechannel', help='Alle Nachrichten im Channel automatisiert löschen (debug/dev Funktion)', type=bool, default=False)
+    my_parser.add_argument('-cc', '--cleanupchannel', help='Zu löschende alte Coupon-Posts aus dem Channel löschen.', type=bool, default=False)
+    my_parser.add_argument('-m', '--migrate', help='DB Migrationen ausführen falls verfügbar', type=bool, default=False)
+    my_parser.add_argument('-c', '--crawl', help='Crawler beim Start des Bots einmalig ausführen.', type=bool, default=False)
+    my_parser.add_argument('-mm', '--maintenancemode', help='Wartungsmodus - zeigt im Bot und Channel eine entsprechende Meldung. Deaktiviert alle Bot Funktionen.', type=bool,
+                           default=False)
+    args = my_parser.parse_args()
 
     def __init__(self):
         self.couponImageCache = {}
         self.couponImageQRCache = {}
         self.offerImageCache = {}
-        self.maintenanceMode = False
-        if 'maintenancemode' in sys.argv:
-            self.maintenanceMode = True
+        self.maintenanceMode = self.args.maintenancemode
         self.cfg = loadConfig()
         if self.cfg is None:
             raise Exception('Broken or missing config')
         self.crawler = BKCrawler()
         self.crawler.setExportCSVs(False)
+        self.crawler.setKeepHistoryDB(False)
+        self.crawler.setKeepSimpleHistoryDB(True)
         self.publicChannelName = self.cfg.get(Config.PUBLIC_CHANNEL_NAME)
         self.botName = self.cfg[Config.BOT_NAME]
         self.couchdb = self.crawler.couchdb
@@ -99,7 +143,7 @@ class BKBot:
                     # Main menu
                     # CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),  # E.g. "back" button on error -> Go back to main menu
                     CallbackQueryHandler(self.botDisplayAllCouponsListWithFullTitles, pattern='^' + CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES + '$'),
-                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
+                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
                     CallbackQueryHandler(self.botDisplayCouponsWithImagesFavorites, pattern='^' + CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES + '$'),
                     CallbackQueryHandler(self.botDisplayOffers, pattern='^' + CallbackVars.MENU_OFFERS + '$'),
                     CallbackQueryHandler(self.botDisplayFeedbackCodes, pattern='^' + CallbackVars.MENU_FEEDBACK_CODES + '$'),
@@ -108,7 +152,7 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$')
                 ],
                 CallbackVars.MENU_OFFERS: [
-                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
+                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
                     # Back to main menu
                     CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),
                 ],
@@ -118,7 +162,7 @@ class BKBot:
                 ],
                 CallbackVars.MENU_DISPLAY_COUPON: [
                     # Back to last coupons menu
-                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern='.*a=dcs.*'),
+                    CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
                     # Display single coupon
                     CallbackQueryHandler(self.botDisplaySingleCoupon, pattern='.*a=dc.*'),
                     # Back to main menu
@@ -246,7 +290,7 @@ class BKBot:
         self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
-        user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         # Test code to update DB structure TODO: maybe make use of this
         # userDB = self.crawler.getUsersDB()
         # dummyUser = User()
@@ -308,7 +352,8 @@ class BKBot:
     def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
         """ Send list containing all coupons with long titles linked to coupon channel to user. This may result in up to 10 messages being sent! """
         update.callback_query.answer()
-        activeCoupons = bkbot.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortMode=CouponSortMode.SOURCE_MENU_PRICE))
+        activeCoupons = bkbot.crawler.getFilteredCoupons(
+            CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
                                                 channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
@@ -343,22 +388,28 @@ class BKBot:
     def botDisplayStats(self, update: Update, context: CallbackContext):
         msg = self.editOrSendMessage(update, text='Statistiken werden geladen...')
         couponDB = self.getBotCoupons()
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         userStats = UserStats(userDB)
-        activeOffers = self.crawler.getOffersActive()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
-        text = '<b>Hallo Nerd</b>'
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        text = '<b>Hallo <s>Nerd</s> ' + update.effective_user.first_name + '</b>'
         text += '\n<pre>'
         text += 'Anzahl User im Bot: ' + str(len(userDB))
         text += '\nAnzahl von Usern gesetzte Favoriten: ' + str(userStats.numberofFavorites)
         text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(userStats.numberofUsersWhoFoundEasterEgg)
         text += '\nAnzahl User, die den Bot geblockt haben: ' + str(userStats.numberofUsersWhoBlockedBot)
+        # TODO: Enable this once new user timestamp data migration has been done
+        # text += '\nAnzahl User, die demnächst automatisch gelöscht werden könnten: ' + str(userStats.numberofUsersWhoAreEligableForAutoDeletion)
+        text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoAreEligableForAutoDeletion)
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
-        text += '\nAnzahl Aufrufe Easter-Egg von dir: ' + str(user.easterEggCounter)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
-        text += '\nAnzahl gültige Angebote: ' + str(len(activeOffers))
+        text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
+        text += '\n---'
+        text += '\nDein BetterKing Account:'
+        text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
+        text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
+        text += f'\nBot zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
         text += '</pre>'
-        if isinstance(msg, Message) and not True:
+        if isinstance(msg, Message):
             self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
         else:
             self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode='html', disable_web_page_preview=True)
@@ -368,65 +419,152 @@ class BKBot:
         """ Displays all coupons in a pre selected mode """
         # Important! This is required so that we can e.g. jump from "Category 'App coupons' page 2 display single coupon" back into "Category 'App coupons' page 2"
         callbackVar += "&cb=" + urllib.parse.quote(callbackVar)
-        urlQuery = furl(callbackVar)
-        urlinfo = urlQuery.args
+        urlquery = furl(callbackVar)
+        urlinfo = urlquery.args
         mode = urlinfo["m"]
+        action = urlinfo.get('a')
         try:
-            coupons = None
-            menuText = None
-            user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+            saveUserToDB = False
+            userDB = self.crawler.getUserDB()
+            user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=False)
+            if user.updateActivityTimestamp():
+                saveUserToDB = True
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
             displayHiddenCouponsWithinOtherCategories = None if (
                     user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
-            if mode == CouponDisplayMode.ALL:
-                # Display all coupons
-                coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponTypes=None, containsFriesAndCoke=None, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                couponCategoryDummy = CouponCategory(coupons)
-                menuText = couponCategoryDummy.getCategoryInfoText(withMenu=None, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
-            elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
-                # Display all coupons without menu
-                coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=None, containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                couponCategoryDummy = CouponCategory(coupons)
-                menuText = couponCategoryDummy.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
-            elif mode == CouponDisplayMode.CATEGORY:
-                # Display all coupons of a particular category
-                couponSrc = int(urlinfo['cs'])
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.MENU_PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=None,
-                                                               isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                couponCategory = CouponCategory(coupons)
-                menuText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
-            elif mode == CouponDisplayMode.CATEGORY_WITHOUT_MENU:
-                # Display all coupons of a particular category without menu
-                couponSrc = int(urlinfo['cs'])
-                coupons = self.getFilteredCoupons(
-                    CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=[couponSrc], containsFriesAndCoke=False, isHidden=displayHiddenCouponsWithinOtherCategories, removeDuplicates=user.settings.hideDuplicates))
-                couponCategory = CouponCategory(coupons)
-                menuText = couponCategory.getCategoryInfoText(withMenu=False, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
-            elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
-                # Display all hidden App coupons (ONLY)
-                coupons = self.getFilteredCoupons(CouponFilter(sortMode=CouponSortMode.PRICE, allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True, removeDuplicates=user.settings.hideDuplicates))
-                couponCategoryDummy = CouponCategory(coupons)
-                menuText = couponCategoryDummy.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
-            elif mode == CouponDisplayMode.FAVORITES:
-                userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user)
+            if mode == CouponDisplayMode.FAVORITES:
+                userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user, sortCoupons=False)
                 coupons = userFavorites.couponsAvailable
+                couponCategory = CouponCategory(coupons)
+                view = CouponViews.FAVORITES
+                # When displaying only favorites we do not need the highlight symbol -> Gives us one character more of space in our buttons :)
                 highlightFavorites = False
-            self.displayCouponsAsButtons(update, user, coupons, menuText, urlQuery, highlightFavorites=highlightFavorites)
+            else:
+                if mode == CouponDisplayMode.ALL:
+                    # Display all coupons
+                    view = CouponViews.ALL
+                elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
+                    # Display all coupons without menu
+                    view = CouponViews.ALL_WITHOUT_MENU
+                elif mode == CouponDisplayMode.CATEGORY:
+                    # Display all coupons of a particular category
+                    view = CouponViews.CATEGORY
+                    couponSrc = int(urlinfo['cs'])
+                    view.getFilter().allowedCouponTypes = [couponSrc]
+                elif mode == CouponDisplayMode.CATEGORY_WITHOUT_MENU:
+                    # Display all coupons of a particular category without menu
+                    view = CouponViews.CATEGORY_WITHOUT_MENU
+                    couponSrc = int(urlinfo['cs'])
+                    view.getFilter().allowedCouponTypes = [couponSrc]
+                elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
+                    # Display all hidden App coupons (ONLY)
+                    view = CouponViews.HIDDEN_APP_COUPONS_ONLY
+                    displayHiddenCouponsWithinOtherCategories = True
+                else:
+                    raise BetterBotException("WTF developer mistake")
+                couponFilter = deepcopy(view.getFilter())
+                # First we only want to filter coupons. Sort them later according to user preference.
+                couponFilter.sortCode = None
+                coupons = self.getFilteredCoupons(couponFilter)
+                couponCategory = CouponCategory(coupons)
+                menuText = couponCategory.getCategoryInfoText(withMenu=couponFilter.containsFriesAndCoke, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
+            if len(coupons) == 0:
+                # This should never happen
+                raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
+                                         InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=urlquery.url)]]))
+            if action == 'dcss':
+                # Change sort of coupons
+                saveUserToDB = True
+                nextSortMode = user.getNextSortModeForCouponView(couponView=view)
+                coupons = sortCouponsAsList(coupons, nextSortMode)
+                user.setDefaultSortModeForCouponView(couponView=view, sortMode=nextSortMode)
+            else:
+                coupons = sortCouponsAsList(coupons, user.getSortModeForCouponView(couponView=view))
+            # Build bot menu
+            query = update.callback_query
+            if query is not None:
+                query.answer()
+            urlquery_callbackBack = furl(urlquery.args["cb"])
+            buttons = []
+            maxCouponsPerPage = 20
+            paginationMax = math.ceil(len(coupons) / maxCouponsPerPage)
+            desiredPage = int(urlquery.args.get("p", 1))
+            if desiredPage > paginationMax:
+                # Fallback - can happen if user leaves menu open for a long time, DB changes, user presses "next/previous page" button but max page number has changed in the meanwhile.
+                currentPage = paginationMax
+            else:
+                currentPage = desiredPage
+            # Grab all items in desired range (= on desired page)
+            index = (currentPage * maxCouponsPerPage - maxCouponsPerPage)
+            # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy button in the middle and add Easter Egg functionality :)
+            currentPageContainsAtLeastOneFavoriteCoupon = False
+            while len(buttons) < maxCouponsPerPage and index < len(coupons):
+                coupon = coupons[index]
+                if user.isFavoriteCoupon(coupon) and highlightFavorites:
+                    buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
+                    currentPageContainsAtLeastOneFavoriteCoupon = True
+                else:
+                    buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
+
+                buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
+                index += 1
+            # numberofCouponsOnCurrentPage = len(buttons)
+            if paginationMax > 1:
+                # Add pagination navigation buttons if needed
+                menuText += "\nSeite " + str(currentPage) + "/" + str(paginationMax)
+                navigationButtons = []
+                urlquery_callbackBack.args['a'] = 'dcs'
+                if currentPage > 1:
+                    # Add button to go to previous page
+                    previousPage = currentPage - 1
+                    urlquery_callbackBack.args['p'] = previousPage
+                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_LEFT, callback_data=urlquery_callbackBack.url))
+                else:
+                    # Add dummy button for a consistent button layout
+                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonPrevPage"))
+                navigationButtons.append(InlineKeyboardButton("Seite " + str(currentPage) + "/" + str(paginationMax), callback_data="DummyButtonMiddle"))
+                if currentPage < paginationMax:
+                    # Add button to go to next page
+                    nextPage = currentPage + 1
+                    urlquery_callbackBack.args['p'] = nextPage
+                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_RIGHT, callback_data=urlquery_callbackBack.url))
+                else:
+                    # Add dummy button for a consistent button layout
+                    # Easter egg: Trigger it if there are at least two pages available AND user is currently on the last page AND that page contains at least one user-favorited coupon.
+                    if currentPageContainsAtLeastOneFavoriteCoupon and currentPage > 1:
+                        navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data=CallbackVars.EASTER_EGG))
+                    else:
+                        navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonNextPage"))
+                buttons.append(navigationButtons)
+            # Display sort button if it makes sense
+            possibleSortModes = couponCategory.getSortModes()
+            if user.settings.displayCouponSortButton and len(possibleSortModes) > 1:
+                currentSortMode = user.getSortModeForCouponView(couponView=view)
+                nextSortMode = user.getNextSortModeForCouponView(couponView=view)
+                urlquery_callbackBack.args['a'] = 'dcss'
+                urlquery_callbackBack.args['p'] = currentPage
+                buttons.append(
+                    [InlineKeyboardButton(currentSortMode.text + ' | 🔃 | ' + nextSortMode.text, callback_data=urlquery_callbackBack.url)])
+
+            buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
+            reply_markup = InlineKeyboardMarkup(buttons)
+            self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
+            if saveUserToDB:
+                # User document has changed -> Update DB
+                user.store(db=userDB)
             return CallbackVars.MENU_DISPLAY_COUPON
         except BetterBotException as botError:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_MAIN
 
-    def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None) -> Tuple[UserFavoritesInfo, str]:
+    def getUserFavoritesAndUserSpecificMenuText(self, user: User, coupons: Union[dict, None] = None, sortCoupons: bool = False) -> Tuple[UserFavoritesInfo, str]:
         if len(user.favoriteCoupons) == 0:
             raise BetterBotException('<b>Du hast noch keine Favoriten!</b>', InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
         else:
             if coupons is None:
                 # Perform DB request if not already done before
                 coupons = self.getBotCoupons()
-            userFavoritesInfo = user.getUserFavoritesInfo(coupons)
+            userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=sortCoupons)
             if len(userFavoritesInfo.couponsAvailable) == 0:
                 # Edge case
                 errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar:</b>'
@@ -452,77 +590,16 @@ class BKBot:
                 menuText += '\n' + SYMBOLS.INFORMATION + 'In den Einstellungen kannst du abgelaufene Favoriten löschen oder dich benachrichtigen lassen, sobald diese wieder verfügbar sind.'
             return userFavoritesInfo, menuText
 
-    def displayCouponsAsButtons(self, update: Update, user: Union[User, None], coupons: list, menuText: str, urlquery, highlightFavorites: bool):
-        if len(coupons) == 0:
-            # This should never happen
-            raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
-                                     InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=urlquery.url)]]))
-        query = update.callback_query
-        if query is not None:
-            query.answer()
-        urlquery_callbackBack = furl(urlquery.args["cb"])
-        buttons = []
-        maxCouponsPerPage = 20
-        paginationMax = math.ceil(len(coupons) / maxCouponsPerPage)
-        desiredPage = int(urlquery.args.get("p", 1))
-        if desiredPage > paginationMax:
-            # Fallback - can happen if user leaves menu open for a long time, DB changes and user presses old "next/previous page" button
-            desiredPage = paginationMax
-        # Grab all items in desired range (= on desired page)
-        index = (desiredPage * maxCouponsPerPage - maxCouponsPerPage)
-        # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy middle page overview button which usually does not do anything with Easter Egg functionality
-        desiredPageContainsAtLeastOneFavoriteCoupon = False
-        while len(buttons) < maxCouponsPerPage and index < len(coupons):
-            coupon = coupons[index]
-            if user.isFavoriteCoupon(coupon) and highlightFavorites:
-                buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
-                desiredPageContainsAtLeastOneFavoriteCoupon = True
-            else:
-                buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
-
-            buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
-            index += 1
-        if paginationMax > 1:
-            # Add pagination navigation buttons if needed
-            menuText += "\nSeite " + str(desiredPage) + "/" + str(paginationMax)
-            navigationButtons = []
-            if desiredPage > 1:
-                # Add button to go to previous page
-                lastPage = desiredPage - 1
-                urlquery_callbackBack.args['p'] = lastPage
-                navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_LEFT, callback_data=urlquery_callbackBack.url))
-            else:
-                # Add dummy button for a consistent button layout
-                navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonPrevPage"))
-            navigationButtons.append(InlineKeyboardButton("Seite " + str(desiredPage) + "/" + str(paginationMax), callback_data="DummyButtonMiddle"))
-            if desiredPage < paginationMax:
-                # Add button to go to next page
-                nextPage = desiredPage + 1
-                urlquery_callbackBack.args['p'] = nextPage
-                navigationButtons.append(InlineKeyboardButton(SYMBOLS.ARROW_RIGHT, callback_data=urlquery_callbackBack.url))
-            else:
-                # Add dummy button for a consistent button layout
-                # Easter egg: Trigger it if there are at least two pages available AND user is currently on the last page AND that page contains at least one user-favorited coupon.
-                if desiredPageContainsAtLeastOneFavoriteCoupon and desiredPage > 1:
-                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data=CallbackVars.EASTER_EGG))
-                else:
-                    navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonNextPage"))
-            buttons.append(navigationButtons)
-        buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
-        reply_markup = InlineKeyboardMarkup(buttons)
-        self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
-        return CallbackVars.MENU_DISPLAY_COUPON
-
     def botDisplayEasterEgg(self, update: Update, context: CallbackContext):
         query = update.callback_query
         if query is not None:
             query.answer()
-        userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        userDB = self.crawler.getUserDB()
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.easterEggCounter += 1
         user.store(db=userDB)
 
-        text = "🥚<b>Glückwunsch! Du hast ein Easter Egg gefunden!</b>"
+        text = "🥚<b>Glückwunsch! Du hast das Easter Egg gefunden!</b>"
         text += "\nKlicke <a href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">HIER</a>, um es anzusehen ;)"
         text += "\nDrücke /start, um das Menü neu zu laden."
         self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode="html", disable_web_page_preview=True)
@@ -530,7 +607,8 @@ class BKBot:
 
     def botDisplayCouponsWithImagesFavorites(self, update: Update, context: CallbackContext):
         try:
-            userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(user=self.getUser(userID=update.effective_user.id, addIfNew=True))
+            userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(
+                user=self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True), sortCoupons=True)
         except BetterBotException as botError:
             self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_DISPLAY_COUPON
@@ -553,7 +631,7 @@ class BKBot:
     def displayCouponsWithImages(self, update: Update, context: CallbackContext, coupons: list, msgText: str):
         self.sendMessage(chat_id=update.effective_message.chat_id, text=msgText, parse_mode='HTML')
         index = 0
-        user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
+        user = User.load(self.crawler.getUserDB(), str(update.effective_user.id))
         showCouponIndexText = False
         for coupon in coupons:
             if showCouponIndexText:
@@ -574,7 +652,7 @@ class BKBot:
             menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote!</b>'
             self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
             return CallbackVars.MENU_MAIN
-        prePhotosText = '<b>Es sind derzeit ' + str(len(activeOffers)) + ' Angebote verfügbar:</b>'
+        prePhotosText = f'<b>Es sind derzeit {len(activeOffers)} Angebote verfügbar:</b>'
         self.editOrSendMessage(update, text=prePhotosText, parse_mode='HTML')
         for offer in activeOffers:
             offerText = offer['title']
@@ -601,7 +679,7 @@ class BKBot:
     def botDisplayFeedbackCodes(self, update: Update, context: CallbackContext):
         """ 2021-07-15: New- and unfinished feature """
         numberOfFeedbackCodesToGenerate = 3
-        text = "\n<b>Hier sind " + str(numberOfFeedbackCodesToGenerate) + " Feedback Codes für dich:</b>"
+        text = f"\n<b>Hier sind {numberOfFeedbackCodesToGenerate} Feedback Codes für dich:</b>"
         for index in range(numberOfFeedbackCodesToGenerate):
             text += "\n" + generateFeedbackCode()
         text += "\nSchreibe einen Code deiner Wahl auf die Rückseite eines BK Kassenbons, um den gratis Artikel zu erhalten."
@@ -615,7 +693,7 @@ class BKBot:
         return CallbackVars.MENU_FEEDBACK_CODES
 
     def botDisplayMenuSettings(self, update: Update, context: CallbackContext):
-        user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         return self.displaySettings(update, context, user)
 
     def displaySettings(self, update: Update, context: CallbackContext, user: User):
@@ -645,12 +723,16 @@ class BKBot:
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
+        userSortModes = user.couponViewSortModes
+        if userSortModes is not None and len(userSortModes) > 0:
+            menuText += "\n---"
+            menuText += f"\nEs gibt gespeicherte Coupon Sortierungen für {len(userSortModes)} Coupon Ansichten, die beim Klick auf den zurücksetzen Button ebenfalls gelöscht werden."
         if not user.hasDefaultSettings():
             keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen |" + SYMBOLS.STAR + " & PB Karte bleiben",
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
-            userFavoritesInfo = user.getUserFavoritesInfo(self.getBotCoupons())
+            userFavoritesInfo = user.getUserFavoritesInfo(self.getBotCoupons(), sortCoupons=True)
             if len(userFavoritesInfo.couponsUnavailable) > 0:
                 keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavoritesInfo.couponsUnavailable)) + ")?*²",
                                                       callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
@@ -670,7 +752,7 @@ class BKBot:
         uniqueCouponID = callbackArgs['plu']
         callbackBack = callbackArgs['cb']
         coupon = Coupon.load(self.crawler.getCouponDB(), uniqueCouponID)
-        user = User.load(self.crawler.getUsersDB(), str(update.effective_user.id))
+        user = User.load(self.crawler.getUserDB(), str(update.effective_user.id))
         # Send coupon image in chat
         self.displayCouponWithImage(update, context, coupon, user)
         # Post user-menu into chat
@@ -690,7 +772,7 @@ class BKBot:
         return self.botUserDeleteAccountSTART(update, context, CallbackVars.GENERIC_BACK)
 
     def botUserDeleteAccountSTART(self, update: Update, context: CallbackContext, callbackBackButton: str):
-        user = self.getUser(userID=update.effective_user.id, addIfNew=False)
+        user = self.getUser(userID=update.effective_user.id)
         if user is None:
             menuText = SYMBOLS.WARNING + 'Es existiert kein Benutzer mit der ID ' + str(update.effective_user.id) + ' in der Datenbank.'
             menuText += '\nMit /start meldest du dich erstmalig an.'
@@ -706,7 +788,7 @@ class BKBot:
         """ Deletes users' account from DB. """
         userInput = None if update.message is None else update.message.text
         if userInput is not None and userInput == str(update.effective_user.id):
-            userDB = self.crawler.getUsersDB()
+            userDB = self.crawler.getUserDB()
             # Delete user from DB
             del userDB[str(update.effective_user.id)]
             menuText = SYMBOLS.CONFIRM + 'Dein BetterKing Account wurde vernichtet!'
@@ -753,8 +835,8 @@ class BKBot:
         """ Toggles coupon favorite state and edits reply_markup accordingly so user gets to see the new state of this setting. """
         uniqueCouponID = re.search(PATTERN.PLU_TOGGLE_FAV, update.callback_query.data).group(1)
         query = update.callback_query
-        userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        userDB = self.crawler.getUserDB()
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         query.answer()
 
         if uniqueCouponID in user.favoriteCoupons:
@@ -856,9 +938,9 @@ class BKBot:
         """ Toggles pre-selected setting via settingKey. """
         update.callback_query.answer()
         settingKey = update.callback_query.data
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         dummyUser = User()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         if user.settings.get(settingKey, dummyUser.settings[settingKey]):
             user.settings[settingKey] = False
         else:
@@ -868,8 +950,8 @@ class BKBot:
 
     def botResetSettings(self, update: Update, context: CallbackContext):
         """ Resets users' settings to default """
-        userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        userDB = self.crawler.getUserDB()
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.resetSettings()
         # Update DB
         user.store(userDB)
@@ -878,8 +960,8 @@ class BKBot:
 
     def botDeleteUnavailableFavoriteCoupons(self, update: Update, context: CallbackContext):
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
-        userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+        userDB = self.crawler.getUserDB()
+        user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
 
@@ -897,8 +979,8 @@ class BKBot:
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
         elif userInput.isdecimal() and len(userInput) == 10:
-            userDB = self.crawler.getUsersDB()
-            user = self.getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True)
+            userDB = self.crawler.getUserDB()
+            user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
             text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.'
@@ -912,8 +994,8 @@ class BKBot:
     def botDeletePaybackCard(self, update: Update, context: CallbackContext):
         """ Deletes Payback card from users account if his answer is matching his Payback card number. """
         # Validate input
-        userDB = self.crawler.getUsersDB()
-        user = self.getUserFromDB(userDB, userID=update.effective_user.id, addIfNew=False)
+        userDB = self.crawler.getUserDB()
+        user = getUserFromDB(userDB, userID=update.effective_user.id, addIfNew=False, updateUsageTimestamp=True)
         userInput = None if update.message is None else update.message.text
         if userInput is None:
             self.editOrSendMessage(update, text='Antworte mit deiner Payback Kartennummer <b>' + user.getPaybackCardNumber() + '</b>, um diese zu löschen.',
@@ -932,7 +1014,7 @@ class BKBot:
         return CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD
 
     def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
-        user = self.getUser(userID=update.effective_user.id, addIfNew=True)
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         return self.displayPaybackCard(update, context, user)
 
     def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
@@ -953,7 +1035,7 @@ class BKBot:
 
     def batchProcessAutoDeleteUsersUnavailableFavorites(self):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
-        userDB = self.crawler.getUsersDB()
+        userDB = self.crawler.getUserDB()
         users = []
         for userIDStr in userDB:
             user = User.load(userDB, userIDStr)
@@ -1274,20 +1356,9 @@ class BKBot:
             """ Typically this means that this message has already been deleted """
             logging.warning("Failed to delete message with message_id: " + str(messageID))
 
-    def getUser(self, userID: Union[int, str], addIfNew: bool = False) -> User:
+    def getUser(self, userID: Union[int, str], addIfNew: bool = False, updateUsageTimestamp: bool = False) -> User:
         """ Wrapper. Only call this if you do not wish to write to the userDB in the calling methods otherwise you're wasting resources! """
-        return self.getUserFromDB(self.crawler.getUsersDB(), userID, addIfNew=addIfNew)
-
-    def getUserFromDB(self, userDB: Database, userID: Union[str, int], addIfNew: bool) -> Union[User, None]:
-        """ Returns user from given DB. Adds it to DB if wished and it doesn't exist. """
-        user = User.load(userDB, str(userID))
-        if user is None and addIfNew:
-            """ New user? --> Add userID to DB if wished. """
-            # Add user to DB for the first time
-            logging.info('Storing new userID: ' + str(userID))
-            user = User(id=str(userID))
-            user.store(userDB)
-        return user
+        return getUserFromDB(self.crawler.getUserDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
 
 
 class ImageCache:
@@ -1316,29 +1387,29 @@ if __name__ == '__main__':
     bkbot.startBot()
     """ Check for special flag to force-run batch process immediately. """
     # First the ones which can be combined with others and need to be executed first
-    if 'crawl' in sys.argv:
+    if bkbot.args.crawl:
         bkbot.crawl()
     # Now the ones where only one is allowed
-    if 'forcechannelupdatewithresend' in sys.argv:
+    if bkbot.args.forcechannelupdatewithresend:
         bkbot.renewPublicChannel()
         bkbot.cleanupPublicChannel()
-    elif 'resumechannelupdate' in sys.argv:
+    elif bkbot.args.resumechannelupdate:
         bkbot.resumePublicChannelUpdate()
         bkbot.cleanupPublicChannel()
-    elif 'forcebatchprocess' in sys.argv:
+    elif bkbot.args.forcebatchprocess:
         # bkbot.crawl()
         # bkbot.notifyUsers()
         bkbot.batchProcess()
         # updatePublicChannel(bkbot, reSendAll=False)
         # schedule.every(10).seconds.do(bkbot.updatePublicChannel)
         # schedule.every(10).seconds.do(bkbot.notifyUsers)
-    elif 'nukechannel' in sys.argv:
+    elif bkbot.args.nukechannel:
         nukeChannel(bkbot)
-    elif 'cleanupchannel' in sys.argv:
+    elif bkbot.args.cleanupchannel:
         cleanupChannel(bkbot)
-    elif 'migrate' in sys.argv:
+    elif bkbot.args.migrate:
         bkbot.crawler.migrateDBs()
-    if 'usernotify' in sys.argv:
+    if bkbot.args.usernotify:
         bkbot.notifyUsers()
     # schedule.every(10).seconds.do(bkbot.startBot)
     while True:

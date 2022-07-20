@@ -1,8 +1,6 @@
-import logging
 import os
 from datetime import datetime
 
-import BotUtils
 import Helper
 from Helper import saveJson, getTimezone, loadJson
 
@@ -86,7 +84,7 @@ def getActivePaperCouponInfo() -> dict:
     """ Load file which contains some extra data which can be useful to correctly determine the "CouponType" and expire date of paper coupons. """
     for paperIdentifier, paperData in loadPaperCouponConfigFile().items():
         validuntil = datetime.strptime(paperData['expire_date'] + ' 23:59:59', '%Y-%m-%d %H:%M:%S').astimezone(getTimezone()).timestamp()
-        if validuntil > datetime.now().timestamp():
+        if validuntil > Helper.getCurrentDate().timestamp():
             newPaperData = paperData
             newPaperData['expire_timestamp'] = validuntil
             paperCouponInfo[paperIdentifier] = newPaperData

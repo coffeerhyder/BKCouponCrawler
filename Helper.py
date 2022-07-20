@@ -2,7 +2,6 @@ import os
 import random
 import re
 from datetime import datetime, timedelta
-from enum import Enum
 from re import Pattern
 from typing import Union
 
@@ -16,6 +15,7 @@ class DATABASES:
     INFO_DB = 'info_db'
     COUPONS = 'coupons'
     COUPONS_HISTORY = 'coupons_history'
+    COUPONS_HISTORY_SIMPLE = 'coupons_history_simple'
     OFFERS = 'offers'
     PRODUCTS = 'products'
     PRODUCTS_HISTORY = 'products_history'
@@ -33,6 +33,10 @@ class URLs:
     BK_SPAR_KINGS = 'https://www.burgerking.de/sparkings'
     BK_KING_FINDER = 'https://www.burgerking.de/store-locator'
     NGB_FORUM_THREAD = 'https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/'
+    BK_WUERGER_KING = 'https://wurgerking.wfr.moe/'
+    BK_WUERGER_KING_SOURCE = 'https://github.com/WebFreak001/WurgerKing'
+    MCD_MCCOUPON_DEALS = 'https://www.mccoupon.deals/'
+    MCD_COCKBOT = 'https://t.me/gimmecockbot'
 
 
 def loadConfig(fallback: str = None):
@@ -241,6 +245,8 @@ class SYMBOLS:
     ARROW_LEFT = '⬅'
     ARROW_UP_RIGHT = '↗'
     ARROW_DOWN = '⬇'
+    ARROW_UP = '⬆'
+    ARROWS_CLOCKWISE_VERTICAL = '🔃'
     STAR = '⭐'
     HEART = '❤'
     BEER = '🍺'
