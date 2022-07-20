@@ -215,7 +215,7 @@ class BKCrawler:
         # logging.info("Migrate DBs done")
         userDB = self.getUserDB()
         # keysMapping = {"timestampExpire": "timestampExpireInternal", "dateFormattedExpire": "dateFormattedExpireInternal", "timestampExpire2": "timestampExpire", "dateFormattedExpire2": "dateFormattedExpire"}
-        dummyActivityTimestampSeconds = getCurrentDate().timestamp() - 60 * 60 * 60
+        dummyActivityTimestampSeconds = getCurrentDate().timestamp() - 3 * 24 * 60 * 60
         for userID in userDB:
             user = User.load(userDB, userID)
             needsUpdate = False
@@ -226,9 +226,8 @@ class BKCrawler:
             #             needsUpdate = True
             #             couponData[newKey] = valueOfOldKey
             #             del couponData[oldKey]
-            if user.timestampLastTimeAccountUsed is None or user.timestampLastTimeAccountUsed == 0:
-                user.timestampLastTimeAccountUsed = dummyActivityTimestampSeconds
-                needsUpdate = True
+            user.timestampLastTimeAccountUsed = dummyActivityTimestampSeconds
+            needsUpdate = True
             if needsUpdate:
                 user.store(userDB)
         return

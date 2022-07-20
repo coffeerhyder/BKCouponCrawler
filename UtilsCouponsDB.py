@@ -688,11 +688,14 @@ class User(Document):
         self.couponViewSortModes[str(couponView.getViewCode())] = sortMode.getSortCode()
 
     def hasRecentlyUsedBot(self) -> bool:
-        currentTimestamp = getCurrentDate().timestamp()
-        if currentTimestamp - self.timestampLastTimeAccountUsed < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
-            return True
-        else:
+        if self.timestampLastTimeAccountUsed == 0:
             return False
+        else:
+            currentTimestamp = getCurrentDate().timestamp()
+            if currentTimestamp - self.timestampLastTimeAccountUsed < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
+                return True
+            else:
+                return False
 
     def updateActivityTimestamp(self) -> bool:
         if self.hasRecentlyUsedBot():
