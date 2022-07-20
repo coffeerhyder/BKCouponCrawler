@@ -143,6 +143,7 @@ class BKCrawler:
             logging.info("Creating missing filepath: " + getPathImagesProducts())
             os.makedirs(getPathImagesProducts())
         # Do this here so manually added coupons will get added on application start without extra crawl process
+        self.migrateDBs()
         self.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=True)
         # Make sure that our cache gets filled on init
         couponDB = self.getCouponDB()
@@ -248,7 +249,6 @@ class BKCrawler:
         """ One function that does it all! Execute this every time you run the crawler. """
         try:
             timestampStart = datetime.now().timestamp()
-            self.migrateDBs()
             self.crawl()
             if self.exportCSVs:
                 self.couponCsvExport()
