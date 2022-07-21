@@ -396,7 +396,7 @@ class BKBot:
         text += 'Anzahl User im Bot: ' + str(len(userDB))
         text += '\nAnzahl von Usern gesetzte Favoriten: ' + str(userStats.numberofFavorites)
         text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(userStats.numberofUsersWhoFoundEasterEgg)
-        text += '\nAnzahl User, die den Bot geblockt haben: ' + str(userStats.numberofUsersWhoBlockedBot)
+        text += '\nAnzahl User, die den Bot geblockt haben: ' + str(userStats.numberofUsersWhoProbablyBlockedBot)
         # TODO: Enable this once new user timestamp data migration has been done
         # text += '\nAnzahl User, die demnächst automatisch gelöscht werden könnten: ' + str(userStats.numberofUsersWhoAreEligableForAutoDeletion)
         text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoRecentlyUsedBot)

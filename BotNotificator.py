@@ -119,20 +119,22 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         logging.info("No users available who want to be notified on new coupons")
         return
     if len(dbUserFavoritesUpdates) > 0:
-        logging.info("Auto updated favorites of " + str(len(dbUserFavoritesUpdates)) + " users")
+        logging.info(f"Auto updated favorites of {len(dbUserFavoritesUpdates)} users")
         userDB.update(list(dbUserFavoritesUpdates))
-    logging.info("Notifying " + str(len(usersNotify)) + " users about favorites/new coupons")
-    index = -1
+    logging.info(f"Notifying {len(usersNotify)} users about favorites/new coupons")
+    position = 0
     dbUserUpdates = []
     for userIDStr, postText in usersNotify.items():
-        index += 1
+        position += 1
         # isLastItem = index == len(usersNotify) - 1
-        logging.info("Sending user notification " + str(index + 1) + "/" + str(len(usersNotify)) + " to user: " + userIDStr)
+        logging.info("Sending user notification " + str(position) + "/" + str(len(usersNotify)) + " to user: " + userIDStr)
         user = User.load(userDB, userIDStr)
         try:
             bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
             if user.botBlockedCounter > 0:
-                """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time. """
+                """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
+                This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
+                """
                 user.updateActivityTimestamp(force=True)
                 dbUserUpdates.append(user)
         except Unauthorized as botBlocked:

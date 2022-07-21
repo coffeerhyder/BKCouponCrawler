@@ -48,7 +48,7 @@ class UserStats:
     def __init__(self, usrDB: Database):
         self.numberofUsersWhoFoundEasterEgg = 0
         self.numberofFavorites = 0
-        self.numberofUsersWhoBlockedBot = 0
+        self.numberofUsersWhoProbablyBlockedBot = 0
         self.numberofUsersWhoAreEligableForAutoDeletion = 0
         self.numberofUsersWhoRecentlyUsedBot = 0
         self.numberofUsersWhoAddedPaybackCard = 0
@@ -58,8 +58,7 @@ class UserStats:
                 self.numberofUsersWhoFoundEasterEgg += 1
             self.numberofFavorites += len(userTmp.favoriteCoupons)
             if userTmp.hasProbablyBlockedBot():
-                self.numberofUsersWhoBlockedBot += 1
-            userTmp.getPaybackCardNumber()
+                self.numberofUsersWhoProbablyBlockedBot += 1
             if userTmp.getPaybackCardNumber() is not None:
                 self.numberofUsersWhoAddedPaybackCard += 1
             if userTmp.isEligableForAutoDeletion():

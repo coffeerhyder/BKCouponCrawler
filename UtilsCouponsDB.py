@@ -119,7 +119,8 @@ class CouponViews:
     ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=False))
     CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=None))
     CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
-    HIDDEN_APP_COUPONS_ONLY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
+    HIDDEN_APP_COUPONS_ONLY = CouponView(
+        couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
     # Dummy item basically only used for holding default sortCode for users' favorites
     FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
 
@@ -572,6 +573,7 @@ class User(Document):
         if self.hasProbablyBlockedBotForLongerTime():
             return True
         elif getCurrentDate().timestamp() - self.timestampLastTimeAccountUsed > MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
+            # Looks like user hasn't used bot for a loong time
             return True
         else:
             return False
@@ -837,6 +839,7 @@ def sortCouponsByDiscount(couponList: List[Coupon], descending: bool = False) ->
         couponList = couponList.values()
     return sorted(couponList,
                   key=lambda x: 0 if x.getReducedPercentage() is None else x.getReducedPercentage(), reverse=descending)
+
 
 def sortCouponsByNew(couponList: List[Coupon], descending: bool = False) -> List[Coupon]:
     """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""
