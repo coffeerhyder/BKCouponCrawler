@@ -714,15 +714,15 @@ class User(Document):
                 return False
 
     def updateActivityTimestamp(self, force: bool = False) -> bool:
-        if self.hasRecentlyUsedBot() and not force:
-            return False
-        else:
+        if force or not self.hasRecentlyUsedBot():
             self.timestampLastTimeAccountUsed = getCurrentDate().timestamp()
             # Reset this as user is active and is not about to be auto deleted
             self.timesInformedAboutUpcomingAutoAccountDeletion = 0
             # Reset this because user is using bot so it's obviously not blocked (anymore)
             self.botBlockedCounter = 0
             return True
+        else:
+            return False
 
     def allowWarningAboutUpcomingAutoAccountDeletion(self) -> bool:
         currentTimestampSeconds = getCurrentDate().timestamp()
