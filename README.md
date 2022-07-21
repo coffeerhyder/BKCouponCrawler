@@ -173,8 +173,10 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRIC
 ```
 
 # TODOs
+* User X Wochen vor auto Löschung darüber informieren (sofern sie den Bot nicht geblockt haben)
+* Bei jedem Activity Update "blocked Bot" und (zukündtige) "Warned User" Felder zurücksetzen
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
-* Start-Script prüfen
+* Start-Script prüfen: Evtl. längeres Sleep Statement, damit der Autostart auch nach OS Updates zuverlässig funktioniert?!
 * Handling mit Datumsangaben verbessern
 * isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
