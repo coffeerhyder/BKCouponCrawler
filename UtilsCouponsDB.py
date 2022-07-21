@@ -516,7 +516,11 @@ class UserFavoritesInfo:
 
 
 MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION = 6 * 30 * 24 * 60 * 60
+# X time before account would get deleted, we can inform the user about upcoming auto account deletion
+SECONDS_ISSUE_WARNING_BEFORE_AUTO_ACCOUNT_DELETION = MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - 4 * 24 * 60 * 60
 MAX_HOURS_ACTIVITY_TRACKING = 48
+MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION = 1
+MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING = 3 * 24 * 60 * 60
 
 
 class User(Document):
@@ -548,6 +552,8 @@ class User(Document):
     couponViewSortModes = DictField(default={})
     # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
     timestampLastTimeAccountUsed = FloatField(default=getCurrentDate().timestamp())
+    timesInformedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
+    timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
 
     def hasProbablyBlockedBot(self) -> bool:
         if self.botBlockedCounter > 0:
@@ -707,12 +713,23 @@ class User(Document):
             else:
                 return False
 
-    def updateActivityTimestamp(self) -> bool:
-        if self.hasRecentlyUsedBot():
+    def updateActivityTimestamp(self, force: bool = False) -> bool:
+        if self.hasRecentlyUsedBot() and not force:
             return False
         else:
             self.timestampLastTimeAccountUsed = getCurrentDate().timestamp()
+            # Reset this as user is active and is not about to be auto deleted
+            self.timesInformedAboutUpcomingAutoAccountDeletion = 0
+            # Reset this because user is using bot so it's obviously not blocked (anymore)
+            self.botBlockedCounter = 0
             return True
+
+    def allowWarningAboutUpcomingAutoAccountDeletion(self) -> bool:
+        currentTimestampSeconds = getCurrentDate().timestamp()
+        if currentTimestampSeconds - self.timestampLastTimeAccountUsed >= SECONDS_ISSUE_WARNING_BEFORE_AUTO_ACCOUNT_DELETION and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING:
+            return True
+        else:
+            return False
 
     def resetSettings(self):
         dummyUser = User()

@@ -132,7 +132,7 @@ optional arguments:
 3. Folgendes hinzufügen:  
 ```
 # Bot nach Reboot starten. Die Wartezeit wird benötigt, damit CouchDB genug Zeit hat zu starten.  
-@reboot sleep 45 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
+@reboot sleep 180 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
 # Updates nachts automatisch ausführen
 00 03 * * * root /usr/bin/apt update -q -y >> /var/log/apt/automaticupdates.log
 30 03 * * * root /usr/bin/apt upgrade -q -y >> /var/log/apt/automaticupdates.log
@@ -174,7 +174,6 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRIC
 
 # TODOs
 * User X Wochen vor auto Löschung darüber informieren (sofern sie den Bot nicht geblockt haben)
-* Bei jedem Activity Update "blocked Bot" und (zukündtige) "Warned User" Felder zurücksetzen
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Start-Script prüfen: Evtl. längeres Sleep Statement, damit der Autostart auch nach OS Updates zuverlässig funktioniert?!
 * Handling mit Datumsangaben verbessern
