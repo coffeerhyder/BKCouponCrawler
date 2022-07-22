@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from BotUtils import getImageBasePath
 from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponTypes, \
     CouponType, \
-    formatPrice
+    formatPrice, getFormattedPassedTime
 
 
 class CouponFilter(BaseModel):
@@ -728,10 +728,32 @@ class User(Document):
 
     def allowWarningAboutUpcomingAutoAccountDeletion(self) -> bool:
         currentTimestampSeconds = getCurrentDate().timestamp()
-        if currentTimestampSeconds - self.timestampLastTimeAccountUsed >= SECONDS_ISSUE_WARNING_BEFORE_AUTO_ACCOUNT_DELETION and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING:
+        if currentTimestampSeconds - self.timestampLastTimeAccountUsed >= SECONDS_ISSUE_WARNING_BEFORE_AUTO_ACCOUNT_DELETION and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and self.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
             return True
         else:
             return False
+
+    def getWarningAboutUpcomingAccountDeletion(self) -> Union[str, None]:
+        """
+        Gets message to send to user if this account is about to be auto deleted soon.
+        This will alspo increment the counter of the number of warnings.
+        Save this User instance to DB after calling this function!
+        """
+        # TODO: Add functionality and make use of this
+        currentTimestampSeconds = getCurrentDate().timestamp()
+        timestampSecondsUntilAccountDeletion = MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - (currentTimestampSeconds - self.timestampLastTimeAccountUsed)
+        if timestampSecondsUntilAccountDeletion >= SECONDS_ISSUE_WARNING_BEFORE_AUTO_ACCOUNT_DELETION and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and self.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+            text = '<b>Achtung!</b>'
+            text += f'\nDein Account wird in {getFormattedPassedTime(timestampSecondsUntilAccountDeletion)} gelöscht!'
+            thisNumberOfWarning = self.timesInformedAboutUpcomingAutoAccountDeletion + 1
+            if thisNumberOfWarning < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+                text += f'\nDies ist Warnung {thisNumberOfWarning}/{MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION}.'
+            else:
+                text += '\nDies ist die letzte Warnung!'
+
+            return text
+        else:
+            return None
 
     def resetSettings(self):
         dummyUser = User()
