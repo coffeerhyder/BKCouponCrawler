@@ -7,7 +7,6 @@ from typing import Union
 from telegram import InputMediaPhoto
 from telegram.error import BadRequest, Unauthorized
 
-from BKBot import BKBot
 from BotUtils import getBotImpressum
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes
 
@@ -18,7 +17,7 @@ WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 DEBUGNOTIFICATOR = False
 
 
-def notifyUsersAboutNewCoupons(bkbot: BKBot) -> None:
+def notifyUsersAboutNewCoupons(bkbot) -> None:
     """
     Notifies user about new coupons and users' expired favorite coupons that are back (well = also new coupons).
     """
@@ -149,7 +148,7 @@ def notifyUsersAboutNewCoupons(bkbot: BKBot) -> None:
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 
-def notifyUsersAboutUpcomingAccountDeletion(bkbot: BKBot) -> None:
+def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
     userDB = bkbot.crawler.getUserDB()
     for userID in userDB:
         user = User.load(db=userDB, id=userID)
