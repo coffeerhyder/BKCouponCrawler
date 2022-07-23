@@ -267,8 +267,13 @@ Eine Liste der fehlenden Coupons findest du in der Coupon-Übersicht im Channel.
 Generell gilt: Sind weniger als 46 Papiercoupons aufgeführt, fehlen welche -> Schaut in das verlinkte Papiercoupon PDF Dokument.
 
 Welche Daten speichert der Bot?
-Deine Benutzer-ID und deine Einstellungen.
+Deine Benutzer-ID, deine Einstellungen und alle 48 Stunden einen Zeitstempel der letzten Bot verwendung.
 Diese Daten werden nicht ausgewertet und du kannst sie jederzeit mit dem Befehl '/tschau' endgültig aus der Datenbank löschen.
+Der Zeitstempel dient nur dazu, inaktive Accounts nach 6 Monaten automatisch löschen zu können.
+
+Kann der Bot meine Telefonnummer sehen?
+Nein das können Bots standardmäßig nur, wenn du es erlaubst.
+Selbst wenn du dies tust: Der Bot speichert ausschließlich die oben genannten Daten.
 
 Meine BK Filiale verlangt original Papier-/App Coupons, wie kann ich die aus dem Channel dennoch verwenden?
 Es gibt mehrere Möglichkeiten:
@@ -296,8 +301,9 @@ Quellcode: github.com/WebFreak001/WurgerKing
 
 Gibt es sowas auch für McDonalds/KFC/...?
 McDonalds:
-Coupons: mccoupon.deals
-Gratis Getränke: t.me/gimmecockbot
+•mccoupon.deals | Gratis Getränke & Coupons
+•t.me/gimmecockbot | Gratis Getränke
+•mcbroken.com | Wo funktioniert die Eismaschine?
 ```
 
 ### Test Cases
@@ -358,6 +364,7 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * https://t.me/gimmecockbot (https://t.me/freecokebot)
 * https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
 * [pbcp.de/partner/burger-king](https://pbcp.de/partner/burger-king)
+* https://mcbroken.com/
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot

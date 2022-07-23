@@ -983,7 +983,7 @@ class BKBot:
             user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
-            text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.'
+            text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde eingetragen.'
             self.sendMessage(chat_id=update.effective_user.id, text=text)
             return self.displayPaybackCard(update=update, context=context, user=user)
         else:
@@ -1004,7 +1004,7 @@ class BKBot:
         elif userInput == user.getPaybackCardNumber():
             user.deletePaybackCard()
             user.store(userDB)
-            text = SYMBOLS.CONFIRM + 'Payback Karte ' + userInput + ' wurde erfolgreich gelöscht.'
+            text = SYMBOLS.CONFIRM + 'Payback Karte ' + userInput + ' wurde gelöscht.'
             self.editOrSendMessage(update, text=text,
                                    parse_mode='HTML',
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))

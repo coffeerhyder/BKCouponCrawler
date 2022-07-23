@@ -10,11 +10,12 @@ from telegram.error import BadRequest, Unauthorized
 from BotUtils import getBotImpressum
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes
 
-from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortModes
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortModes, \
+    MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER, MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING, MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
-DEBUGNOTIFICATOR = False
+DEBUGNOTIFICATOR = True
 
 
 def notifyUsersAboutNewCoupons(bkbot) -> None:
@@ -152,6 +153,18 @@ def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
     userDB = bkbot.crawler.getUserDB()
     for userID in userDB:
         user = User.load(db=userDB, id=userID)
+        currentTimestampSeconds = getCurrentDate().timestamp()
+        secondsUntilAccountDeletion = user.getSecondsUntilAccountDeletion()
+        if secondsUntilAccountDeletion >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+            text = '<b>Achtung!</b>'
+            text += f'\nDein Account wird in {getFormattedPassedTime(secondsUntilAccountDeletion)} gelöscht!'
+            thisNumberOfWarning = user.timesInformedAboutUpcomingAutoAccountDeletion + 1
+            if thisNumberOfWarning < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+                text += f'\nDies ist Warnung {thisNumberOfWarning}/{MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION}.'
+            else:
+                text += '\nDies ist die letzte Warnung!'
+            # TODO: Send message to user
+            user.store(db=userDB)
 
     pass
 
@@ -322,8 +335,9 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to BetterKing Forum Thread</a>'
     infoText += '\n•<a href=\"' + URLs.BK_WUERGER_KING + '\">Würger King</a> (' + '<a href=\"' + URLs.BK_WUERGER_KING_SOURCE + '\">source</a>' + ')'
     infoText += '\n<b>McDonalds</b>'
-    infoText += '\n•<a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a>'
-    infoText += '\n•<a href=\"' + URLs.MCD_COCKBOT + '\">t.me/gimmecockbot</a>'
+    infoText += '\n•<a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a> | Gratis Getränke & Coupons'
+    infoText += '\n•<a href=\"' + URLs.MCD_COCKBOT + '\">t.me/gimmecockbot</a> | Gratis Getränke'
+    infoText += '\n•<a href=\"' + URLs.MCD_MCBROKEN + '\">mcbroken.com</a> | Wo funktioniert die Eismaschine?'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"
