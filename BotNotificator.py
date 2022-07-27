@@ -322,10 +322,8 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += '</b>'
     missingPaperCouponsText = bkbot.crawler.getMissingPaperCouponsText()
     if missingPaperCouponsText is not None:
-        infoText += '\n<b>'
-        infoText += SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + missingPaperCouponsText
-        infoText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.'
-        infoText += '</b>'
+        infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: </b>' + missingPaperCouponsText
+        infoText += '\n<b>Vollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.</b>'
     # Add 'useful links text'
     infoText += '\n<b>------</b>'
     infoText += '\n<b>Nützliche Links</b>:'
