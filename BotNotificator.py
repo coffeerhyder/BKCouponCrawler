@@ -142,6 +142,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
             # Almost certainly it will be "Forbidden: bot was blocked by the user"
             logging.info(botBlocked.message + " --> User blocked bot --> chat_id: " + userIDStr)
             user.botBlockedCounter += 1
+            user.timestampLastTimeBlockedBot = getCurrentDate().timestamp()
             dbUserUpdates.append(user)
     if len(dbUserUpdates) > 0:
         logging.info("Pushing DB updates for users who have blocked/unblocked bot: " + str(len(dbUserUpdates)))
@@ -151,22 +152,36 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
 
 def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
     userDB = bkbot.crawler.getUserDB()
+    numberOfMessagesSent = 0
     for userID in userDB:
         user = User.load(db=userDB, id=userID)
         currentTimestampSeconds = getCurrentDate().timestamp()
+        timePassedSinceLastUsage = currentTimestampSeconds - user.timestampLastTimeAccountUsed
         secondsUntilAccountDeletion = user.getSecondsUntilAccountDeletion()
-        if secondsUntilAccountDeletion >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+        if timePassedSinceLastUsage >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and currentTimestampSeconds - user.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
             text = '<b>Achtung!</b>'
             text += f'\nDein Account wird in {getFormattedPassedTime(secondsUntilAccountDeletion)} gelöscht!'
-            thisNumberOfWarning = user.timesInformedAboutUpcomingAutoAccountDeletion + 1
-            if thisNumberOfWarning < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
-                text += f'\nDies ist Warnung {thisNumberOfWarning}/{MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION}.'
+            user.timesInformedAboutUpcomingAutoAccountDeletion += 1
+            user.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion = getCurrentDate().timestamp()
+            if user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+                text += f'\nDies ist Warnung {user.timesInformedAboutUpcomingAutoAccountDeletion}/{MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION}.'
             else:
                 text += '\nDies ist die letzte Warnung!'
-            # TODO: Send message to user
+            try:
+                bkbot.sendMessage(chat_id=user.id, text=text, parse_mode='HTML', disable_web_page_preview=True)
+                if user.botBlockedCounter > 0:
+                    """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
+                    This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
+                    """
+                    user.updateActivityTimestamp(force=True)
+            except Unauthorized as botBlocked:
+                # Almost certainly it will be "Forbidden: bot was blocked by the user"
+                logging.info(botBlocked.message + " --> User blocked bot --> chat_id: " + user.id)
+                user.botBlockedCounter += 1
+                user.timestampLastTimeBlockedBot = getCurrentDate().timestamp()
             user.store(db=userDB)
-
-    pass
+            numberOfMessagesSent += 1
+    logging.info('Number of users informed about account deletion: ' + str(numberOfMessagesSent))
 
 
 class ChannelUpdateMode(Enum):

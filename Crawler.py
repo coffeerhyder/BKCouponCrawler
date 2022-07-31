@@ -1229,9 +1229,6 @@ def deleteInactiveUsers(userDB: Database):
     usersToDelete = []
     for userID in userDB:
         user = User.load(userDB, userID)
-        # passedSecondsSinceLastUsage = getCurrentDate().timestamp() - user.timestampLastTimeAccountUsed
-        # secondsUntilAutoDeletion = MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - passedSecondsSinceLastUsage
-        # print("Time until auto deletion for " + userID + ": " + str(timedelta(seconds=secondsUntilAutoDeletion)))
         if user.isEligableForAutoDeletion():
             usersToDelete.append(user)
     if len(usersToDelete) > 0:

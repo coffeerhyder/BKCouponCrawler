@@ -14,7 +14,7 @@ from telegram.ext import Updater, CommandHandler, CallbackContext, ConversationH
 from telegram.utils.helpers import DEFAULT_NONE
 from telegram.utils.types import ODVInput, FileInput
 
-from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel
+from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion
 from BotUtils import *
 from BaseUtils import *
 
@@ -1126,6 +1126,7 @@ class BKBot:
         """ Notify users about expired favorite coupons that are back or new coupons depending on their settings. """
         try:
             notifyUsersAboutNewCoupons(self)
+            notifyUsersAboutUpcomingAccountDeletion(self)
         except Exception:
             # This should never happen
             traceback.print_exc()
@@ -1375,15 +1376,12 @@ class ImageCache:
 
 if __name__ == '__main__':
     bkbot = BKBot()
-    # schedule.every().day.do(bkbot.crawl)
-    """ We could even choose the same time here as schedule will run jobs that were "missed" because the job before was taking too long ;) """
     if bkbot.getPublicChannelName() is None:
-        schedule.every().day.at("00:01").do(bkbot.batchProcessWithoutChannelUpdate)
+        schedule.every().day.at('00:02').do(bkbot.batchProcessWithoutChannelUpdate)
     else:
-        schedule.every().day.at("00:01").do(bkbot.batchProcess)
+        schedule.every().day.at('00:02').do(bkbot.batchProcess)
+
     schedule.every(21).days.do(bkbot.cleanupCaches)
-    # schedule.every().day.at("00:02").do(bkbot.renewPublicChannel)
-    # schedule.every().day.at("00:03").do(bkbot.notifyUsers)
     """ Always run bot first. """
     bkbot.startBot()
     """ Check for special flag to force-run batch process immediately. """
@@ -1412,7 +1410,6 @@ if __name__ == '__main__':
         bkbot.crawler.migrateDBs()
     if bkbot.args.usernotify:
         bkbot.notifyUsers()
-    # schedule.every(10).seconds.do(bkbot.startBot)
     while True:
         schedule.run_pending()
         time.sleep(1)
