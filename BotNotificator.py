@@ -53,7 +53,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         # Check if user wants to be notified about favorites that are back
         if user.isAllowSendFavoritesNotification():
             # Collect users favorite coupons that are currently new --> Those ones are 'Favorites that are back'
-            userFavoritesInfo = user.getUserFavoritesInfo(allNewCoupons)
+            userFavoritesInfo = user.getUserFavoritesInfo(allNewCoupons, sortCoupons=True)
             for coupon in userFavoritesInfo.couponsAvailable:
                 userNewFavoriteCoupons[coupon.id] = coupon
             """ Smart-update users favorites: Try to look for new coupons with the same product this was we can update users' favorite
