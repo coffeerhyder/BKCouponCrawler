@@ -10,7 +10,8 @@ from telegram.error import BadRequest, Unauthorized
 from BotUtils import getBotImpressum
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes
 
-from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortModes
+from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortModes, \
+    MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER, MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING, MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
@@ -119,31 +120,68 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         logging.info("No users available who want to be notified on new coupons")
         return
     if len(dbUserFavoritesUpdates) > 0:
-        logging.info("Auto updated favorites of " + str(len(dbUserFavoritesUpdates)) + " users")
+        logging.info(f"Auto updated favorites of {len(dbUserFavoritesUpdates)} users")
         userDB.update(list(dbUserFavoritesUpdates))
-    logging.info("Notifying " + str(len(usersNotify)) + " users about favorites/new coupons")
-    index = -1
+    logging.info(f"Notifying {len(usersNotify)} users about favorites/new coupons")
+    position = 0
     dbUserUpdates = []
     for userIDStr, postText in usersNotify.items():
-        index += 1
+        position += 1
         # isLastItem = index == len(usersNotify) - 1
-        logging.info("Sending user notification " + str(index + 1) + "/" + str(len(usersNotify)) + " to user: " + userIDStr)
+        logging.info("Sending user notification " + str(position) + "/" + str(len(usersNotify)) + " to user: " + userIDStr)
         user = User.load(userDB, userIDStr)
         try:
             bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
             if user.botBlockedCounter > 0:
-                """ User had blocked but at some point of time but unblocked it --> Reset this counter so upper handling will not delete user at some point of time. """
-                user.botBlockedCounter = 0
+                """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
+                This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
+                """
+                user.updateActivityTimestamp(force=True)
                 dbUserUpdates.append(user)
         except Unauthorized as botBlocked:
             # Almost certainly it will be "Forbidden: bot was blocked by the user"
-            logging.info(botBlocked.message + " --> chat_id: " + userIDStr)
+            logging.info(botBlocked.message + " --> User blocked bot --> chat_id: " + userIDStr)
             user.botBlockedCounter += 1
+            user.timestampLastTimeBlockedBot = getCurrentDate().timestamp()
             dbUserUpdates.append(user)
     if len(dbUserUpdates) > 0:
         logging.info("Pushing DB updates for users who have blocked/unblocked bot: " + str(len(dbUserUpdates)))
         userDB.update(dbUserUpdates)
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
+
+
+def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
+    userDB = bkbot.crawler.getUserDB()
+    numberOfMessagesSent = 0
+    for userID in userDB:
+        user = User.load(db=userDB, id=userID)
+        currentTimestampSeconds = getCurrentDate().timestamp()
+        timePassedSinceLastUsage = currentTimestampSeconds - user.timestampLastTimeAccountUsed
+        secondsUntilAccountDeletion = user.getSecondsUntilAccountDeletion()
+        if timePassedSinceLastUsage >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and currentTimestampSeconds - user.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+            text = '<b>Achtung!</b>'
+            text += f'\nDein Account wird in {getFormattedPassedTime(secondsUntilAccountDeletion)} gelöscht!'
+            user.timesInformedAboutUpcomingAutoAccountDeletion += 1
+            user.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion = getCurrentDate().timestamp()
+            if user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+                text += f'\nDies ist Warnung {user.timesInformedAboutUpcomingAutoAccountDeletion}/{MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION}.'
+            else:
+                text += '\nDies ist die letzte Warnung!'
+            try:
+                bkbot.sendMessage(chat_id=user.id, text=text, parse_mode='HTML', disable_web_page_preview=True)
+                if user.botBlockedCounter > 0:
+                    """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
+                    This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
+                    """
+                    user.updateActivityTimestamp(force=True)
+            except Unauthorized as botBlocked:
+                # Almost certainly it will be "Forbidden: bot was blocked by the user"
+                logging.info(botBlocked.message + " --> User blocked bot --> chat_id: " + user.id)
+                user.botBlockedCounter += 1
+                user.timestampLastTimeBlockedBot = getCurrentDate().timestamp()
+            user.store(db=userDB)
+            numberOfMessagesSent += 1
+    logging.info('Number of users informed about account deletion: ' + str(numberOfMessagesSent))
 
 
 class ChannelUpdateMode(Enum):
@@ -299,10 +337,8 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += '</b>'
     missingPaperCouponsText = bkbot.crawler.getMissingPaperCouponsText()
     if missingPaperCouponsText is not None:
-        infoText += '\n<b>'
-        infoText += SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: ' + missingPaperCouponsText
-        infoText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.'
-        infoText += '</b>'
+        infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: </b>' + missingPaperCouponsText
+        infoText += '\n<b>Vollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.</b>'
     # Add 'useful links text'
     infoText += '\n<b>------</b>'
     infoText += '\n<b>Nützliche Links</b>:'
@@ -312,8 +348,9 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to BetterKing Forum Thread</a>'
     infoText += '\n•<a href=\"' + URLs.BK_WUERGER_KING + '\">Würger King</a> (' + '<a href=\"' + URLs.BK_WUERGER_KING_SOURCE + '\">source</a>' + ')'
     infoText += '\n<b>McDonalds</b>'
-    infoText += '\n•<a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a>'
-    infoText += '\n•<a href=\"' + URLs.MCD_COCKBOT + '\">t.me/gimmecockbot</a>'
+    infoText += '\n•<a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a> | Gratis Getränke & Coupons'
+    infoText += '\n•<a href=\"' + URLs.MCD_COCKBOT + '\">t.me/gimmecockbot</a> | Gratis Getränke'
+    infoText += '\n•<a href=\"' + URLs.MCD_MCBROKEN + '\">mcbroken.com</a> | Wo funktioniert die Eismaschine?'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"

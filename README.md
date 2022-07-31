@@ -132,7 +132,7 @@ optional arguments:
 3. Folgendes hinzufügen:  
 ```
 # Bot nach Reboot starten. Die Wartezeit wird benötigt, damit CouchDB genug Zeit hat zu starten.  
-@reboot sleep 45 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
+@reboot sleep 180 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
 # Updates nachts automatisch ausführen
 00 03 * * * root /usr/bin/apt update -q -y >> /var/log/apt/automaticupdates.log
 30 03 * * * root /usr/bin/apt upgrade -q -y >> /var/log/apt/automaticupdates.log
@@ -173,8 +173,9 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRIC
 ```
 
 # TODOs
+* User X Wochen vor auto Löschung darüber informieren (sofern sie den Bot nicht geblockt haben)
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
-* Start-Script prüfen
+* Start-Script prüfen: Evtl. längeres Sleep Statement, damit der Autostart auch nach OS Updates zuverlässig funktioniert?!
 * Handling mit Datumsangaben verbessern
 * isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
@@ -258,16 +259,21 @@ FAQ BetterKing Bot und Channel
 Wo finde ich die aktuellen Papiercoupons als Scan?
 Sofern es welche gibt, hier:
 mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
-Derzeitige Papiercoupons gültig bis: 29.07.2022
+Letzte/aktuelle Papiercoupons gültig bis: 16.09.2022
 
-Warum fehlen manchmal Papiercoupons?
-Seit dem 03.12.2021 sind Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlen manchmal welche.
-Eine Liste der fehlenden Coupons findest du in der Coupon-Übersicht im Channel.
-Generell gilt: Sind weniger als 46 Papiercoupons aufgeführt, fehlen welche -> Schaut in das verlinkte Papiercoupon PDF Dokument.
+Warum fehlen (manchmal) Papiercoupons im Bot/Channel?
+Seit dem 03.12.2021 waren Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlten manchmal welche.
+Seit dem 30.07.2022 gibt es keine Papiercoupons mehr direkt im Bot/Channel, da man diese manuell eintragen müsste und ich _noch_ keine Zeit hatte, ein System dafür zu bauen.
+Die aktuellen Papiercoupons finden sich immer auf MyDealz und in der oben verlinkten MEGA Cloud.
 
 Welche Daten speichert der Bot?
-Deine Benutzer-ID und deine Einstellungen.
+Deine Benutzer-ID, deine Einstellungen und alle 48 Stunden einen Zeitstempel der letzten Bot verwendung.
 Diese Daten werden nicht ausgewertet und du kannst sie jederzeit mit dem Befehl '/tschau' endgültig aus der Datenbank löschen.
+Der Zeitstempel dient nur dazu, inaktive Accounts nach 6 Monaten automatisch löschen zu können.
+
+Kann der Bot meine Telefonnummer sehen?
+Nein das können Bots standardmäßig nur, wenn du es erlaubst.
+Selbst wenn du dies tust: Der Bot speichert ausschließlich die oben genannten Daten.
 
 Meine BK Filiale verlangt original Papier-/App Coupons, wie kann ich die aus dem Channel dennoch verwenden?
 Es gibt mehrere Möglichkeiten:
@@ -295,8 +301,9 @@ Quellcode: github.com/WebFreak001/WurgerKing
 
 Gibt es sowas auch für McDonalds/KFC/...?
 McDonalds:
-Coupons: mccoupon.deals
-Gratis Getränke: t.me/gimmecockbot
+•mccoupon.deals | Gratis Getränke & Coupons
+•t.me/gimmecockbot | Gratis Getränke
+•mcbroken.com | Wo funktioniert die Eismaschine?
 ```
 
 ### Test Cases
@@ -357,6 +364,7 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * https://t.me/gimmecockbot (https://t.me/freecokebot)
 * https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
 * [pbcp.de/partner/burger-king](https://pbcp.de/partner/burger-king)
+* https://mcbroken.com/
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot

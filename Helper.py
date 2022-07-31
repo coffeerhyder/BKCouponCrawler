@@ -37,6 +37,7 @@ class URLs:
     BK_WUERGER_KING_SOURCE = 'https://github.com/WebFreak001/WurgerKing'
     MCD_MCCOUPON_DEALS = 'https://www.mccoupon.deals/'
     MCD_COCKBOT = 'https://t.me/gimmecockbot'
+    MCD_MCBROKEN = 'https://mcbroken.com/'
 
 
 def loadConfig(fallback: str = None):

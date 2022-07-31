@@ -58,4 +58,3 @@ allViews = CouponViews.__dict__
 
 print(str(CouponViews.__dict__))
 
-

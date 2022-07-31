@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from BotUtils import getImageBasePath
 from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponTypes, \
     CouponType, \
-    formatPrice
+    formatPrice, getFormattedPassedTime
 
 
 class CouponFilter(BaseModel):
@@ -119,7 +119,8 @@ class CouponViews:
     ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=False))
     CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=None))
     CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
-    HIDDEN_APP_COUPONS_ONLY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
+    HIDDEN_APP_COUPONS_ONLY = CouponView(
+        couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
     # Dummy item basically only used for holding default sortCode for users' favorites
     FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
 
@@ -516,7 +517,11 @@ class UserFavoritesInfo:
 
 
 MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION = 6 * 30 * 24 * 60 * 60
+# X time before account would get deleted, we can inform the user X time before about upcoming auto account deletion
+MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER = MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - 9 * 24 * 60 * 60
 MAX_HOURS_ACTIVITY_TRACKING = 48
+MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION = 3
+MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING = 2 * 24 * 60 * 60
 
 
 class User(Document):
@@ -548,6 +553,9 @@ class User(Document):
     couponViewSortModes = DictField(default={})
     # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
     timestampLastTimeAccountUsed = FloatField(default=getCurrentDate().timestamp())
+    timesInformedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
+    timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
+    timestampLastTimeBlockedBot = IntegerField(default=0)
 
     def hasProbablyBlockedBot(self) -> bool:
         if self.botBlockedCounter > 0:
@@ -565,7 +573,8 @@ class User(Document):
         """ If this returns True, upper handling is allowed to delete this account as it looks like it has been abandoned by the user. """
         if self.hasProbablyBlockedBotForLongerTime():
             return True
-        elif getCurrentDate().timestamp() - self.timestampLastTimeAccountUsed > MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
+        elif self.getSecondsPassedSinceLastTimeUsed() >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
+            # Looks like user hasn't used bot for a loong time
             return True
         else:
             return False
@@ -707,12 +716,29 @@ class User(Document):
             else:
                 return False
 
-    def updateActivityTimestamp(self) -> bool:
-        if self.hasRecentlyUsedBot():
-            return False
-        else:
+    def updateActivityTimestamp(self, force: bool = False) -> bool:
+        if force or not self.hasRecentlyUsedBot():
             self.timestampLastTimeAccountUsed = getCurrentDate().timestamp()
+            # Reset this as user is active and is not about to be auto deleted
+            self.timesInformedAboutUpcomingAutoAccountDeletion = 0
+            # Reset this because user is using bot so it's obviously not blocked (anymore)
+            self.botBlockedCounter = 0
             return True
+        else:
+            return False
+
+    def getSecondsUntilAccountDeletion(self) -> float:
+        return getCurrentDate().timestamp() + MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - self.timestampLastTimeAccountUsed
+
+    def getSecondsPassedSinceLastTimeUsed(self) -> float:
+        return getCurrentDate().timestamp() - self.timestampLastTimeAccountUsed
+
+    def allowWarningAboutUpcomingAutoAccountDeletion(self) -> bool:
+        currentTimestampSeconds = getCurrentDate().timestamp()
+        if currentTimestampSeconds + MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - self.timestampLastTimeAccountUsed <= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and self.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+            return True
+        else:
+            return False
 
     def resetSettings(self):
         dummyUser = User()
@@ -820,6 +846,7 @@ def sortCouponsByDiscount(couponList: List[Coupon], descending: bool = False) ->
         couponList = couponList.values()
     return sorted(couponList,
                   key=lambda x: 0 if x.getReducedPercentage() is None else x.getReducedPercentage(), reverse=descending)
+
 
 def sortCouponsByNew(couponList: List[Coupon], descending: bool = False) -> List[Coupon]:
     """Sort by price -> But price is not always given -> Place items without prices at the BEGINNING of each list."""

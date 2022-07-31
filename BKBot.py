@@ -14,7 +14,7 @@ from telegram.ext import Updater, CommandHandler, CallbackContext, ConversationH
 from telegram.utils.helpers import DEFAULT_NONE
 from telegram.utils.types import ODVInput, FileInput
 
-from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel
+from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion
 from BotUtils import *
 from BaseUtils import *
 
@@ -396,7 +396,7 @@ class BKBot:
         text += 'Anzahl User im Bot: ' + str(len(userDB))
         text += '\nAnzahl von Usern gesetzte Favoriten: ' + str(userStats.numberofFavorites)
         text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(userStats.numberofUsersWhoFoundEasterEgg)
-        text += '\nAnzahl User, die den Bot geblockt haben: ' + str(userStats.numberofUsersWhoBlockedBot)
+        text += '\nAnzahl User, die den Bot wahrscheinlich geblockt haben: ' + str(userStats.numberofUsersWhoProbablyBlockedBot)
         # TODO: Enable this once new user timestamp data migration has been done
         # text += '\nAnzahl User, die demnächst automatisch gelöscht werden könnten: ' + str(userStats.numberofUsersWhoAreEligableForAutoDeletion)
         text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoRecentlyUsedBot)
@@ -983,7 +983,7 @@ class BKBot:
             user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
             user.addPaybackCard(paybackCardNumber=userInput)
             user.store(userDB)
-            text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde erfolgreich eingetragen.'
+            text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde eingetragen.'
             self.sendMessage(chat_id=update.effective_user.id, text=text)
             return self.displayPaybackCard(update=update, context=context, user=user)
         else:
@@ -1004,7 +1004,7 @@ class BKBot:
         elif userInput == user.getPaybackCardNumber():
             user.deletePaybackCard()
             user.store(userDB)
-            text = SYMBOLS.CONFIRM + 'Payback Karte ' + userInput + ' wurde erfolgreich gelöscht.'
+            text = SYMBOLS.CONFIRM + 'Payback Karte ' + userInput + ' wurde gelöscht.'
             self.editOrSendMessage(update, text=text,
                                    parse_mode='HTML',
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
@@ -1126,6 +1126,7 @@ class BKBot:
         """ Notify users about expired favorite coupons that are back or new coupons depending on their settings. """
         try:
             notifyUsersAboutNewCoupons(self)
+            notifyUsersAboutUpcomingAccountDeletion(self)
         except Exception:
             # This should never happen
             traceback.print_exc()
@@ -1375,15 +1376,12 @@ class ImageCache:
 
 if __name__ == '__main__':
     bkbot = BKBot()
-    # schedule.every().day.do(bkbot.crawl)
-    """ We could even choose the same time here as schedule will run jobs that were "missed" because the job before was taking too long ;) """
     if bkbot.getPublicChannelName() is None:
-        schedule.every().day.at("00:01").do(bkbot.batchProcessWithoutChannelUpdate)
+        schedule.every().day.at('00:02').do(bkbot.batchProcessWithoutChannelUpdate)
     else:
-        schedule.every().day.at("00:01").do(bkbot.batchProcess)
+        schedule.every().day.at('00:02').do(bkbot.batchProcess)
+
     schedule.every(21).days.do(bkbot.cleanupCaches)
-    # schedule.every().day.at("00:02").do(bkbot.renewPublicChannel)
-    # schedule.every().day.at("00:03").do(bkbot.notifyUsers)
     """ Always run bot first. """
     bkbot.startBot()
     """ Check for special flag to force-run batch process immediately. """
@@ -1412,7 +1410,6 @@ if __name__ == '__main__':
         bkbot.crawler.migrateDBs()
     if bkbot.args.usernotify:
         bkbot.notifyUsers()
-    # schedule.every(10).seconds.do(bkbot.startBot)
     while True:
         schedule.run_pending()
         time.sleep(1)
