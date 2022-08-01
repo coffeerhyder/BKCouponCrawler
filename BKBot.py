@@ -1377,9 +1377,9 @@ class ImageCache:
 if __name__ == '__main__':
     bkbot = BKBot()
     if bkbot.getPublicChannelName() is None:
-        schedule.every().day.at('00:01').do(bkbot.batchProcessWithoutChannelUpdate)
+        schedule.every().day.at('00:00:30').do(bkbot.batchProcessWithoutChannelUpdate)
     else:
-        schedule.every().day.at('00:01').do(bkbot.batchProcess)
+        schedule.every().day.at('00:00:30').do(bkbot.batchProcess)
 
     schedule.every(21).days.do(bkbot.cleanupCaches)
     """ Always run bot first. """
