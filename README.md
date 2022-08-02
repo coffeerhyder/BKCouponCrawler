@@ -101,10 +101,10 @@ optional arguments:
                         Nützlich um ein Channelupdate bei einem Abbruch genau
                         an derselben Stelle fortzusetzen.
   -fb FORCEBATCHPROCESS, --forcebatchprocess FORCEBATCHPROCESS
-                        Alle drei Aktionen ausführen, die eigentlich nur
-                        täglich 1x durchlaufen: Crawler, User Favoriten
-                        Benachrichtigungen rausschicken und Channelupdate mit
-                        Löschen- und neu Einsenden.
+                        Alle Aktionen ausführen, die eigentlich nur täglich 1x
+                        durchlaufen: Crawler, User Benachrichtigungen
+                        rausschicken und Channelupdate mit Löschen- und neu
+                        Einsenden.
   -un USERNOTIFY, --usernotify USERNOTIFY
                         User benachrichtigen über abgelaufene favorisierte
                         Coupons, die wieder zurück sind und neue Coupons (=

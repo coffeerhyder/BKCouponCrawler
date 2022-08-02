@@ -100,7 +100,7 @@ class BKBot:
                            type=bool,
                            default=False)
     my_parser.add_argument('-fb', '--forcebatchprocess',
-                           help='Alle drei Aktionen ausführen, die eigentlich nur täglich 1x durchlaufen: Crawler, User Favoriten Benachrichtigungen rausschicken und Channelupdate mit Löschen- und neu Einsenden.',
+                           help='Alle Aktionen ausführen, die eigentlich nur täglich 1x durchlaufen: Crawler, User Benachrichtigungen rausschicken und Channelupdate mit Löschen- und neu Einsenden.',
                            type=bool, default=False)
     my_parser.add_argument('-un', '--usernotify',
                            help='User benachrichtigen über abgelaufene favorisierte Coupons, die wieder zurück sind und neue Coupons (= Coupons, die seit dem letzten DB Update neu hinzu kamen).',
@@ -1048,7 +1048,7 @@ class BKBot:
         coupons = self.getBotCoupons()
         dbUpdates = []
         for user in users:
-            userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(coupons)
+            userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sort=False)
             if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0:
                 for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
                     user.deleteFavoriteCouponID(unavailableCoupon.id)
