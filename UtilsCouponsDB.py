@@ -573,7 +573,7 @@ class User(Document):
         """ If this returns True, upper handling is allowed to delete this account as it looks like it has been abandoned by the user. """
         if self.hasProbablyBlockedBotForLongerTime():
             return True
-        elif self.getSecondsPassedSinceLastTimeUsed() >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
+        elif self.getSecondsPassedSinceLastTimeUsed() >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION and self.timesInformedAboutUpcomingAutoAccountDeletion >= MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
             # Looks like user hasn't used bot for a loong time
             return True
         else:
