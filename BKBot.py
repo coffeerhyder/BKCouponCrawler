@@ -1048,7 +1048,7 @@ class BKBot:
         coupons = self.getBotCoupons()
         dbUpdates = []
         for user in users:
-            userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sort=False)
+            userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=False)
             if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0:
                 for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
                     user.deleteFavoriteCouponID(unavailableCoupon.id)
