@@ -10,3 +10,4 @@ python-telegram-bot~=13.2
 pydantic==1.9.1
 furl~=2.1.2
 python-barcode==0.14.0
+httpx~=0.23.0

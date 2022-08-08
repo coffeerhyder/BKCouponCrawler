@@ -173,14 +173,13 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRIC
 ```
 
 # TODOs
-* User X Wochen vor auto Löschung darüber informieren (sofern sie den Bot nicht geblockt haben)
+* Angebote von neuer API parsen: burgerking.de/kingdeals
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Start-Script prüfen: Evtl. längeres Sleep Statement, damit der Autostart auch nach OS Updates zuverlässig funktioniert?!
 * Handling mit Datumsangaben verbessern
-* isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren?
+* isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren und zeitbasiert gestalten (sind Coupons derzeit 1x als "neu" markiert, bleibt das so, bis der Crawler wieder läuft -> Nicht gut)
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
-* Neue API einbauen: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default (Insomnia Client oder Postman verwenden) -> 02.03.2022: Wird auch von der Webseite verwendet: https://www.burgerking.de/rewards/offers
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
 * App DB per Proxy in der originalen BK App modifizieren?

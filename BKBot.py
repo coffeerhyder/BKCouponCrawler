@@ -103,7 +103,7 @@ class BKBot:
                            help='Alle Aktionen ausführen, die eigentlich nur täglich 1x durchlaufen: Crawler, User Benachrichtigungen rausschicken und Channelupdate mit Löschen- und neu Einsenden.',
                            type=bool, default=False)
     my_parser.add_argument('-un', '--usernotify',
-                           help='User benachrichtigen über abgelaufene favorisierte Coupons, die wieder zurück sind und neue Coupons (= Coupons, die seit dem letzten DB Update neu hinzu kamen).',
+                           help='User beim Start sofort benachrichtigen über abgelaufene favorisierte Coupons, die wieder zurück sind und neue Coupons (= Coupons, die seit dem letzten DB Update neu hinzu kamen).',
                            type=bool, default=False)
     my_parser.add_argument('-n', '--nukechannel', help='Alle Nachrichten im Channel automatisiert löschen (debug/dev Funktion)', type=bool, default=False)
     my_parser.add_argument('-cc', '--cleanupchannel', help='Zu löschende alte Coupon-Posts aus dem Channel löschen.', type=bool, default=False)
@@ -397,8 +397,6 @@ class BKBot:
         text += '\nAnzahl von Usern gesetzte Favoriten: ' + str(userStats.numberofFavorites)
         text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(userStats.numberofUsersWhoFoundEasterEgg)
         text += '\nAnzahl User, die den Bot wahrscheinlich geblockt haben: ' + str(userStats.numberofUsersWhoProbablyBlockedBot)
-        # TODO: Enable this once new user timestamp data migration has been done
-        # text += '\nAnzahl User, die demnächst automatisch gelöscht werden könnten: ' + str(userStats.numberofUsersWhoAreEligableForAutoDeletion)
         text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoRecentlyUsedBot)
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
@@ -407,7 +405,7 @@ class BKBot:
         text += '\nDein BetterKing Account:'
         text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
         text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
-        text += f'\nBot zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
+        text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt vom Bot zugestellter Nachrichten bei aktivierten Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
         text += '</pre>'
         if isinstance(msg, Message):
             self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
@@ -430,8 +428,7 @@ class BKBot:
             if user.updateActivityTimestamp():
                 saveUserToDB = True
             highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
-            displayHiddenCouponsWithinOtherCategories = None if (
-                    user.settings.displayHiddenAppCouponsWithinGenericCategories is True) else False  # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
+            displayHiddenCouponsWithinOtherCategories = user.settings.displayHiddenAppCouponsWithinGenericCategories
             if mode == CouponDisplayMode.FAVORITES:
                 userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user, sortCoupons=False)
                 coupons = userFavorites.couponsAvailable
@@ -465,6 +462,7 @@ class BKBot:
                 couponFilter = deepcopy(view.getFilter())
                 # First we only want to filter coupons. Sort them later according to user preference.
                 couponFilter.sortCode = None
+                couponFilter.isHidden = None if (displayHiddenCouponsWithinOtherCategories is True) else False # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
                 coupons = self.getFilteredCoupons(couponFilter)
                 couponCategory = CouponCategory(coupons)
                 menuText = couponCategory.getCategoryInfoText(withMenu=couponFilter.containsFriesAndCoke, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
@@ -480,10 +478,11 @@ class BKBot:
                 user.setCustomSortModeForCouponView(couponView=view, sortMode=nextSortMode)
             else:
                 coupons = sortCouponsAsList(coupons, user.getSortModeForCouponView(couponView=view))
-            # Build bot menu
+            # Answer query
             query = update.callback_query
             if query is not None:
                 query.answer()
+            # Build bot menu
             urlquery_callbackBack = furl(urlquery.args["cb"])
             buttons = []
             maxCouponsPerPage = 20
@@ -646,14 +645,17 @@ class BKBot:
         Posts all current offers (= photos with captions) into current chat.
         """
         activeOffers = self.crawler.getOffersActive()
+        bkOffersOnWebsiteText = 'Angebote auf der BK Webseite anzeigen: ' + URLs.NO_PROTOCOL_BK_KING_DEALS
         if len(activeOffers) == 0:
             # BK should always have offers but let's check for this case anyways.
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
             menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote!</b>'
+            menuText += '\n' + bkOffersOnWebsiteText
             self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
             return CallbackVars.MENU_MAIN
         prePhotosText = f'<b>Es sind derzeit {len(activeOffers)} Angebote verfügbar:</b>'
-        self.editOrSendMessage(update, text=prePhotosText, parse_mode='HTML')
+        prePhotosText += '\n' + bkOffersOnWebsiteText
+        self.editOrSendMessage(update, text=prePhotosText, parse_mode='HTML', disable_web_page_preview=True)
         for offer in activeOffers:
             offerText = offer['title']
             subtitle = offer.get('subline')
@@ -673,7 +675,7 @@ class BKBot:
         menuText = '<b>Nix dabei?</b>'
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN),
                                               InlineKeyboardButton(SYMBOLS.ARROW_RIGHT + " Zu den Gutscheinen", callback_data="?a=dcs&m=" + CouponDisplayMode.ALL + "&cs=")], []])
-        self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode='HTML', reply_markup=reply_markup)
+        self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode='HTML', reply_markup=reply_markup, disable_web_page_preview=True)
         return CallbackVars.MENU_OFFERS
 
     def botDisplayFeedbackCodes(self, update: Update, context: CallbackContext):

@@ -13,6 +13,7 @@ class CouponCategory:
         self.displayDescription = False  # Display description for this category in bot menu?
         self.expireDatetimeLowest = None
         self.expireDatetimeHighest = None
+        self.numberofCouponsValid = 0
         self.numberofCouponsTotal = 0
         self.numberofCouponsHidden = 0
         self.numberofCouponsEatable = 0
@@ -24,14 +25,10 @@ class CouponCategory:
             parameter = list(parameter.values())
         if isinstance(parameter, list):
             self.coupons = parameter
-            mainCouponType = self.coupons[0].type
-            isAllSameCouponType = True
             for coupon in self.coupons:
                 self.updateWithCouponInfo(coupon)
-                if coupon.type != mainCouponType:
-                    isAllSameCouponType = False
-            if isAllSameCouponType:
-                self.mainCouponType = mainCouponType
+            if len(self.couponTypes) == 1:
+                self.mainCouponType = self.couponTypes[0]
             else:
                 self.mainCouponType = None
         else:
@@ -170,7 +167,6 @@ class CouponCategory:
         else:
             return fallbackSortMode
 
-
     def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:
         if self.mainCouponType == CouponType.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
             # Only hidden (App-) coupons
@@ -219,29 +215,30 @@ class CouponCategory:
             couponList = couponOrCouponList
         for coupon in couponList:
             if coupon.isValid():
-                self.couponTypes.add(coupon.type)
-                self.setNumberofCouponsTotal(self.numberofCouponsTotal + 1)
-                if coupon.isHidden:
-                    self.setNumberofCouponsHidden(self.numberofCouponsHidden + 1)
-                if coupon.isEatable():
-                    self.setNumberofCouponsEatable(self.numberofCouponsEatable + 1)
-                if coupon.isNewCoupon():
-                    self.setNumberofCouponsNew(self.numberofCouponsNew + 1)
-                if coupon.isContainsFriesOrCoke():
-                    self.setNumberofCouponsWithFriesOrCoke(self.numberofCouponsWithFriesOrCoke + 1)
-                # Update expire-date info
-                date = coupon.getExpireDatetime()
-                if self.expireDatetimeLowest is None and self.expireDatetimeHighest is None:
+                self.numberofCouponsValid += 1
+            self.couponTypes.add(coupon.type)
+            self.setNumberofCouponsTotal(self.numberofCouponsTotal + 1)
+            if coupon.isHidden:
+                self.setNumberofCouponsHidden(self.numberofCouponsHidden + 1)
+            if coupon.isEatable():
+                self.setNumberofCouponsEatable(self.numberofCouponsEatable + 1)
+            if coupon.isNewCoupon():
+                self.setNumberofCouponsNew(self.numberofCouponsNew + 1)
+            if coupon.isContainsFriesOrCoke():
+                self.setNumberofCouponsWithFriesOrCoke(self.numberofCouponsWithFriesOrCoke + 1)
+            # Update expire-date info
+            date = coupon.getExpireDatetime()
+            if self.expireDatetimeLowest is None and self.expireDatetimeHighest is None:
+                self.expireDatetimeLowest = date
+                self.expireDatetimeHighest = date
+            else:
+                if date < self.expireDatetimeLowest:
                     self.expireDatetimeLowest = date
+                elif date > self.expireDatetimeHighest:
                     self.expireDatetimeHighest = date
-                else:
-                    if date < self.expireDatetimeLowest:
-                        self.expireDatetimeLowest = date
-                    elif date > self.expireDatetimeHighest:
-                        self.expireDatetimeHighest = date
-                if coupon.getPrice() is not None:
-                    self.setTotalPrice(self.getTotalPrice() + coupon.getPrice())
-                    self.setNumberofCouponsEatableWithPrice(self.getNumberofCouponsEatableWithPrice() + 1)
+            if coupon.getPrice() is not None:
+                self.setTotalPrice(self.getTotalPrice() + coupon.getPrice())
+                self.setNumberofCouponsEatableWithPrice(self.getNumberofCouponsEatableWithPrice() + 1)
         return None
 
 
@@ -255,5 +252,3 @@ def getCouponCategory(coupons: Union[List[Coupon], dict]) -> CouponCategory:
     for coupon in coupons:
         category.updateWithCouponInfo(coupon)
     return category
-
-

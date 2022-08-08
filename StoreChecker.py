@@ -1,16 +1,14 @@
 from json import loads
 
-from hyper import HTTP20Connection
+import httpx
 
 from Crawler import HEADERS_OLD
 
 from BaseUtils import logging
 
 """ Helper tools to find storeIDs of stores via which we can obtain a list of coupons via API. """
-conn = HTTP20Connection('api.burgerking.de')
 """ Returns List of stores """
-conn.request("GET", '/api/o2uvrPdUY57J5WwYs6NtzZ2Knk7TnAUY/v2/de/de/stores/', headers=HEADERS_OLD)
-stores = loads(conn.get_response().read())
+stores = httpx.get('https://api.burgerking.de/api/o2uvrPdUY57J5WwYs6NtzZ2Knk7TnAUY/v2/de/de/stores/', headers=HEADERS_OLD).json()
 
 storeIDsToCheck = []
 """ Collect all storeIDs that provide coupons """
@@ -41,9 +39,7 @@ for storeID in storeIDsToCheck:
         # time.sleep(5)
         pass
     logging.info("Checking coupons of store " + str(index + 1) + "/" + str(len(storeIDsToCheck)) + " | " + str(storeID))
-    conn = HTTP20Connection('mo.burgerking-app.eu')
-    conn.request("GET", '/api/v2/stores/' + str(storeID) + '/menu', headers=HEADERS_OLD)
-    apiResponse = loads(conn.get_response().read())
+    apiResponse = httpx.get('https://mo.burgerking-app.eu' + '/api/v2/stores/' + str(storeID) + '/menu', headers=HEADERS_OLD).json()
     """ E.g. response for storeIDs without mobileOrdering: {"errors":[{"code":19,"message":"Record not found.","details":{"TillsterStore":null}}]} """
     coupons = apiResponse.get("coupons")
     if coupons is None:
