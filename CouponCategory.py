@@ -28,7 +28,9 @@ class CouponCategory:
             for coupon in self.coupons:
                 self.updateWithCouponInfo(coupon)
             if len(self.couponTypes) == 1:
-                self.mainCouponType = self.couponTypes[0]
+                for first_item in self.couponTypes:
+                    self.mainCouponType = first_item
+                    break
             else:
                 self.mainCouponType = None
         else:
