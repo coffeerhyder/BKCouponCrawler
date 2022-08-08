@@ -32,6 +32,9 @@ class URLs:
     ELEMENT = 'https://app.element.io/#/room/#BetterKingDE:matrix.org'
     BK_SPAR_KINGS = 'https://www.burgerking.de/sparkings'
     BK_KING_FINDER = 'https://www.burgerking.de/store-locator'
+    NO_PROTOCOL_BK_KING_DEALS = 'burgerking.de/kingdeals'
+    BK_KING_DEALS = 'https://www' + NO_PROTOCOL_BK_KING_DEALS
+    NO_PROTOCOL_COUPONS = 'burgerking.de/rewards/offers'
     NGB_FORUM_THREAD = 'https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/'
     BK_WUERGER_KING = 'https://wurgerking.wfr.moe/'
     BK_WUERGER_KING_SOURCE = 'https://github.com/WebFreak001/WurgerKing'

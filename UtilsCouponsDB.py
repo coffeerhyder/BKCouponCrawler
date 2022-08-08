@@ -155,8 +155,6 @@ class Coupon(Document):
     timestampStart = FloatField()
     timestampExpireInternal = FloatField()  # Internal expire-date
     timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
-    dateFormattedStart = TextField()
-    dateFormattedExpireInternal = TextField()
     dateFormattedExpire = TextField()
     imageURL = TextField()
     paybackMultiplicator = IntegerField()

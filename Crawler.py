@@ -3,10 +3,10 @@ import logging
 import traceback
 from typing import List
 
+import httpx
 import qrcode
 import requests
 from couchdb import Document, Database
-from hyper import HTTP20Connection  # we're using hyper instead of requests because of its' HTTP/2.0 capability
 
 import couchdb
 from json import loads
@@ -24,7 +24,7 @@ from UtilsCouponsDB import Coupon, InfoEntry, CouponFilter, getCouponTitleMappin
 from CouponCategory import CouponCategory
 
 HEADERS_OLD = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36",
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36",
            "Origin": "https://www.burgerking.de",
            "Content-Type": "application/json",
            "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Google Chrome\";v=\"99\"",
@@ -35,8 +35,7 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
            "sec-fetch-site": "cross-site",
            "x-ui-language": "de",
            "x-ui-platform": "web",
-           "x-ui-region": "DE",
-           "": ""}
+           "x-ui-region": "DE"}
 # x-user-datetime: 2022-03-16T20:59:45+01:00
 """ Enable this to crawl from localhost instead of API. Useful if there is a lot of testing to do! """
 DEBUGCRAWLER = False
@@ -123,13 +122,23 @@ class BKCrawler:
         # Test 2022-06-05 to find invalid datasets
         # userDB = self.couchdb[DATABASES.TELEGRAM_USERS]
         # if os.path.exists('telegram_users.json'):
-        #     usersOld = loadJson("telegram_users.json")['docs']
-        #     for userO in usersOld:
+        #     usersBackup = loadJson("telegram_users.json")['docs']
+        #     for userO in usersBackup:
         #         user = User.wrap(userO)
         #         del user.data['_rev']
         #         if user.id not in userDB:
         #             logging.info("Adding new user: " + str(user.id))
         #             user.store(userDB)
+
+        # couponDB_debug = self.couchdb[DATABASES.COUPONS]
+        # if os.path.exists('coupons.json'):
+        #     couponsBackup = loadJson("coupons.json")['docs']
+        #     for userO in couponsBackup:
+        #         coupon = Coupon.wrap(userO)
+        #         del coupon.data['_rev']
+        #         if coupon.id not in couponDB_debug:
+        #             logging.info("Adding coupon from backup: " + str(coupon.id))
+        #             coupon.store(couponDB_debug)
 
         # Create required folders
         if not os.path.exists(getImageBasePath()):
@@ -174,15 +183,13 @@ class BKCrawler:
 
     def crawl(self):
         """ Updates DB with new coupons & offers. """
-        useNewAPI = False
+        useNewAPI = True
         crawledCouponsDict = {}
         if useNewAPI:
             self.crawlCoupons1New(crawledCouponsDict)
         else:
             """ Using public API: https://gist.github.com/max1220/7f2f65be4381bc0878e64a985fd71da4 """
-            conn = HTTP20Connection('mo.burgerking-app.eu')
-            conn.request("GET", '/api/v2/coupons', headers=HEADERS_OLD)
-            apiResponse = loads(conn.get_response().read())
+            apiResponse = httpx.get('https://mo.burgerking-app.eu', headers=HEADERS_OLD).json()
             if self.storeCouponAPIDataAsJson:
                 # Save API response so we can easily use this data for local testing later on.
                 saveJson('crawler/coupons1_old.json', apiResponse)
@@ -254,44 +261,59 @@ class BKCrawler:
             self.updateCache(self.getCouponDB())
 
     def crawlCoupons1New(self, crawledCouponsDict: dict):
-        """ Stores coupons from App API, generates- and adds some special strings to DB for later usage.
-         This is work in progress. Does not work yet!!
+        """ Crawls coupons from App API.
          """
         timestampCrawlStart = datetime.now().timestamp()
-        conn = HTTP20Connection('euc1-prod-bk.rbictg.com')
-        conn.request("POST", '/graphql', body="TODO"
-                     , headers=HEADERS)
-        apiResponse = loads(conn.get_response().read())
+        # Docs: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default
+        # Official live instance: https://www.burgerking.de/rewards/offers
+        date = datetime.now(getTimezone())
+        utcOffset = date.strftime('%z')
+        utcOffsetFormatted = utcOffset[:3] + ':' + utcOffset[3:]
+        dateformatted = date.strftime('%Y-%m-%dT%H:%M:%S.%f') + utcOffsetFormatted
+        post_json = {"operationName": "evaluateAllUserOffers",
+                     "variables": {"locale": "de", "platform": "web", "serviceMode": "TAKEOUT", "redeemedOn": dateformatted, "storeId": None},
+                     "query": "query evaluateAllUserOffers($locale: Locale, $platform: Platform, $redeemedOn: String!, $serviceMode: ServiceMode, $storeId: String) {\n  evaluateAllUserOffers(locale: $locale, platform: $platform, redeemedOn: $redeemedOn, serviceMode: $serviceMode, storeId: $storeId) {\n    offersFeedback {\n      ...OfferFeedbackEntryFragment\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment OfferFeedbackEntryFragment on CouponUserOffersFeedbackEntry {\n  cartEntry {\n    cartId: lineId\n    __typename\n  }\n  _id: couponId\n  tokenId\n  couponId\n  offerDetails\n  offerState\n  offerVariables {\n    key\n    type\n    value\n    __typename\n  }\n  rank\n  redemptionEligibility {\n    isRedeemable\n    isValid\n    evaluationFeedback {\n      code\n      condition\n      message\n      redeemableForSeconds\n      redeemableInSeconds\n      ruleSetType\n      sanityId\n      __typename\n    }\n    validationErrors {\n      code\n      message\n      ruleSetType\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n"}
+        req = httpx.post('https://euc1-prod-bk.rbictg.com/graphql', json=post_json, headers=HEADERS)
+        apiResponse = req.json()
         if self.storeCouponAPIDataAsJson:
             # Save API response so we can easily use this data for local testing later on.
             saveJson('crawler/coupons1.json', apiResponse)
         offersFeedback = apiResponse['data']['evaluateAllUserOffers']['offersFeedback']
-        couponJsons = []
-        for offerFeedback in offersFeedback:
-            couponJsons.append(offerFeedback['offerDetails'])
         appCoupons = []
-        for couponJson in couponJsons:
+        for offerFeedback in offersFeedback:
+            # String containing json
+            couponJson = offerFeedback['offerDetails']
             couponBK = loads(couponJson)
             try:
                 uniqueCouponID = couponBK['vendorConfigs']['rpos']['constantPlu']
-                title = couponBK['name']['de'].get(0)['children'].get(0)['text']
-                subtitle = couponBK['description']['de'].get(0)['children'].get(0)['text']
+                title = couponBK['name']['de'][0]['children'][0]['text']
+                subtitle = couponBK['description']['de'][0]['children'][0]['text']
                 titleFull = sanitizeCouponTitle(title + subtitle)
-                imageURL = couponBK['localizedImage']['de']['app']['asset']['url']
-                newCoupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
-                                   type=CouponType.APP, price=couponBK['offerPrice'])
-                newCoupon.imageURL = imageURL
+                coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
+                                type=CouponType.APP, price=couponBK['offerPrice'])
+                coupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(titleFull)
+                coupon.imageURL = couponBK['localizedImage']['de']['app']['asset']['url']
                 # Find expire-date
                 ruleSets = couponBK['ruleSet']
+                foundExpireDate = False
                 for ruleSet in ruleSets:
-                    if ruleSet['_type'] != 'between-dates':
-                        continue
-                    # see startDate and endDate given in format: 2022-01-31T01:00:00.000Z
-                    break
-                newCoupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(titleFull)
-                crawledCouponsDict[uniqueCouponID] = newCoupon
-            except:
-                logging.warning("Got unexpected json structure")
+                    ruleSetsChilds = ruleSet.get('ruleSet')
+                    if ruleSetsChilds is not None:
+                        for ruleSetsChild in ruleSetsChilds:
+                            if ruleSetsChild['_type'] == 'between-dates':
+                                dateformat = '%Y-%m-%dT%H:%M:%S.%fZ'
+                                coupon.timestampStart = datetime.strptime(ruleSetsChild['startDate'], dateformat).timestamp()
+                                coupon.timestampExpire = datetime.strptime(ruleSetsChild['endDate'], dateformat).timestamp()
+                                crawledCouponsDict[uniqueCouponID] = coupon
+                                appCoupons.append(coupon)
+                                foundExpireDate = True
+                                break
+                if not foundExpireDate:
+                    # This should never happen
+                    logging.warning("WTF failed to find expiredate")
+            except Exception as e:
+                print(e)
+                logging.warning("Got unexpected json structure in: " + couponJson)
                 pass
         logging.info('Coupons in app: ' + str(len(appCoupons)))
         logging.info("Total coupons1 crawl time: " + getFormattedPassedTime(timestampCrawlStart))
@@ -315,7 +337,6 @@ class BKCrawler:
             timestampStart = couponGetStartTimestamp(coupon)
             if timestampStart > -1:
                 newCoupon.timestampStart = timestampStart
-                newCoupon.dateFormattedStart = formatDateGerman(datetime.fromtimestamp(timestampStart))
             newCoupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(titleFull)
             newCoupon.imageURL = couponOrOfferGetImageURL(coupon)
             # price_text could be either e.g. "50%" or "2,99€" -> We want to find the price otherwise that is worthless for us!
@@ -345,10 +366,8 @@ class BKCrawler:
             # storeIDs = [682, 4108, 514]
             storeIDs = [666]
         else:
-            conn = HTTP20Connection('api.burgerking.de')
             """ Returns List of all stores """
-            conn.request("GET", '/api/o2uvrPdUY57J5WwYs6NtzZ2Knk7TnAUY/v2/de/de/stores/', headers=HEADERS_OLD)
-            stores = loads(conn.get_response().read())
+            stores = httpx.get('https://api.burgerking.de/api/o2uvrPdUY57J5WwYs6NtzZ2Knk7TnAUY/v2/de/de/stores/', headers=HEADERS_OLD).json()
             storeIDs = []
             # Collect storeIDs from which we can obtain coupons
             for store in stores:
@@ -384,9 +403,7 @@ class BKCrawler:
             if DEBUGCRAWLER:
                 apiResponse = loads(requests.get('http://localhost/bkcrawler/coupons2_latest.json').text)
             else:
-                conn = HTTP20Connection('mo.burgerking-app.eu')
-                conn.request("GET", '/api/v2/stores/' + str(storeID) + '/menu', headers=HEADERS_OLD)
-                apiResponse = loads(conn.get_response().read())
+                apiResponse = httpx.get('https://mo.burgerking-app.eu/api/v2/stores/'+ str(storeID) + '/menu', headers=HEADERS_OLD).json()
                 if self.storeCouponAPIDataAsJson:
                     # Save API response so we can easily use this data for local testing later on.
                     saveJson('crawler/coupons2_latest.json', apiResponse)
@@ -559,7 +576,6 @@ class BKCrawler:
             expiredateStr = extraCouponJson["expire_date"] + " 23:59:59"
             expiredate = datetime.strptime(expiredateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
             coupon.timestampExpire = expiredate.timestamp()
-            coupon.dateFormattedExpire = formatDateGerman(expiredate)
             # Only add coupon if it is valid
             if coupon.isValid():
                 validExtraCoupons[coupon.uniqueID] = coupon
@@ -577,7 +593,6 @@ class BKCrawler:
                 usedMappingToFindPaperCoupons = True
                 coupon.type = CouponType.PAPER
                 coupon.timestampExpire = paperCouponOverride.timestampExpire
-                coupon.dateFormattedExpire = paperCouponOverride.dateFormattedExpire
                 coupon.plu = paperCouponOverride.plu
 
         foundPaperCoupons = []
@@ -819,65 +834,6 @@ class BKCrawler:
         if numberOfMissingImages > 0:
             logging.warning("Total number of missing images: " + str(numberOfMissingImages))
 
-    def crawlProducts_DEPRECATED(self):
-        # 2021-04-20: Not required at this moment!
-        dbProducts = self.couchdb[DATABASES.PRODUCTS]
-        dbProductsHistory = None
-        if self.keepHistoryDB:
-            dbProductsHistory = self.couchdb[DATABASES.PRODUCTS_HISTORY]
-        host = 'api.burgerking.de'
-        conn = HTTP20Connection(host)
-        conn.request("GET", '/api/o2uvrPdUY57J5WwYs6NtzZ2Knk7TnAUY/v2/de/de/products/',
-                     headers=HEADERS_OLD)
-        products = loads(conn.get_response().read())
-        numberofNewProductImages = 0
-        """ Enable this if you want to laugh hard! """
-        printAlternativeTerms = False
-        """ Debug switch """
-        printShortenedProductTitles = False
-        for product in products:
-            productID = product.get('id', None)
-            if productID is None:
-                """ This should never happen -> Skip invalid items """
-                logging.warning('Product parser failure')
-                continue
-            title = product['name']
-            uniqueID = str(productID)
-            if printAlternativeTerms:
-                print(title + ' | ' + uniqueID)
-                alternativeTerms = product['alternativeTerms']
-                for alternativeTerm in alternativeTerms:
-                    print(alternativeTerm)
-                print('-----')
-            if printShortenedProductTitles:
-                print(shortenProductNames(title))
-                print('---')
-            """ Save product image """
-            imageInfo = product['images']['bgImage']
-            """ 2021-01-24: Products which haven't been released yet may already be available via API but without product image! """
-            if imageInfo is not None and imageInfo.get('url') is not None:
-                imageURL = imageInfo['url']
-                if imageURL[0] == '/':
-                    imageURL = 'https://' + host + imageURL
-                imageURL = setImageURLQuality(imageURL)
-                imagePath = getPathImagesProducts() + "/" + str(productID) + "_" + getFilenameFromURL(imageURL)
-                if downloadImageIfNonExistant(imageURL, imagePath):
-                    numberofNewProductImages += 1
-            else:
-                logging.info('Product without image: ' + title)
-            # Update products DB
-            if uniqueID in dbProducts:
-                del dbProducts[uniqueID]
-            dbProducts[uniqueID] = product
-            if self.keepHistoryDB:
-                # Update history DB
-                self.updateHistoryEntry(dbProductsHistory, uniqueID, product)
-        # Done! Now do some logging ...
-        if numberofNewProductImages > 0:
-            logging.info('Products new downloaded images: ' + str(numberofNewProductImages))
-        logging.info('Products in DB: ' + str(len(dbProducts)))
-        logging.info('Products in API: ' + str(len(products)))
-
     def findProductIDsOfCoupons_DEPRECATED(self):
         """ Finds productIDs of products contained in vouchers.
         In the future this can be used to e.g. find duplicated coupons or reliably compare coupons to other coupons!
@@ -973,7 +929,7 @@ class BKCrawler:
                                  'PRICE': coupon.get(Coupon.price.name, -1), 'PRICE_COMPARE': coupon.get(Coupon.priceCompare.name, -1),
                                  'START': coupon.getStartDateFormatted('N/A'),
                                  'EXP': (coupon.dateFormattedExpireInternal if coupon.dateFormattedExpireInternal is not None else "N/A"),
-                                 'EXP2': (coupon.dateFormattedExpire if coupon.dateFormattedExpire is not None else 'N/A'),
+                                 'EXP2': (coupon.getExpireDateFormatted(fallback='N/A')),
                                  'EXP_PRODUCTIVE': coupon.getExpireDateFormatted()
                                  })
 
@@ -1066,7 +1022,7 @@ class BKCrawler:
             """ DB is empty or contains only extraCoupons which will get added on application launch
             --> Flag only existing expired coupons as new """
             flagNewCouponsAsNew = False
-            logging.info("Not flagging new coupons as new while adding coupons now!!")
+            logging.info("Not flagging new coupons as new while adding coupons now because DB is empty or contains only extraCoupons!")
         dbUpdates = []
         updatedCouponIDs = []
         newCouponIDs = []
