@@ -186,17 +186,18 @@ class BKCrawler:
         useNewAPI = True
         crawledCouponsDict = {}
         if useNewAPI:
-            self.crawlCoupons1New(crawledCouponsDict)
+            self.crawlCoupons(crawledCouponsDict)
         else:
+            # Old handling using old API
             """ Using public API: https://gist.github.com/max1220/7f2f65be4381bc0878e64a985fd71da4 """
             apiResponse = httpx.get('https://mo.burgerking-app.eu', headers=HEADERS_OLD).json()
             if self.storeCouponAPIDataAsJson:
                 # Save API response so we can easily use this data for local testing later on.
                 saveJson('crawler/coupons1_old.json', apiResponse)
             self.crawlProcessOffers(apiResponse)
-            self.crawlCoupons1(apiResponse, crawledCouponsDict)
+            self.crawlCoupons1OLD(apiResponse, crawledCouponsDict)
             logging.info('App API Crawling done')
-            self.crawlCoupons2(crawledCouponsDict)
+            self.crawlCoupons2OLD(crawledCouponsDict)
         self.addExtraCoupons(crawledCouponsDict=crawledCouponsDict, immediatelyAddToDB=False)
         self.processCrawledCoupons(crawledCouponsDict)
         # self.crawlProducts()
@@ -260,7 +261,7 @@ class BKCrawler:
         finally:
             self.updateCache(self.getCouponDB())
 
-    def crawlCoupons1New(self, crawledCouponsDict: dict):
+    def crawlCoupons(self, crawledCouponsDict: dict):
         """ Crawls coupons from App API.
          """
         timestampCrawlStart = datetime.now().timestamp()
@@ -282,9 +283,9 @@ class BKCrawler:
         appCoupons = []
         for offerFeedback in offersFeedback:
             # String containing json
-            couponJson = offerFeedback['offerDetails']
-            couponBK = loads(couponJson)
             try:
+                couponJson = offerFeedback['offerDetails']
+                couponBK = loads(couponJson)
                 uniqueCouponID = couponBK['vendorConfigs']['rpos']['constantPlu']
                 title = couponBK['name']['de'][0]['children'][0]['text']
                 subtitle = couponBK['description']['de'][0]['children'][0]['text']
@@ -318,7 +319,7 @@ class BKCrawler:
         logging.info('Coupons in app: ' + str(len(appCoupons)))
         logging.info("Total coupons1 crawl time: " + getFormattedPassedTime(timestampCrawlStart))
 
-    def crawlCoupons1(self, apiResponse: dict, crawledCouponsDict: dict):
+    def crawlCoupons1OLD(self, apiResponse: dict, crawledCouponsDict: dict):
         """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
         timestampCrawlStart = datetime.now().timestamp()
         appCoupons = apiResponse['coupons']
@@ -357,7 +358,7 @@ class BKCrawler:
         logging.info('Coupons in old app API: ' + str(len(appCoupons)))
         logging.info("Total coupons1_old crawl time: " + getFormattedPassedTime(timestampCrawlStart))
 
-    def crawlCoupons2(self, crawledCouponsDict: dict):
+    def crawlCoupons2OLD(self, crawledCouponsDict: dict):
         """ Crawls coupons from secondary sources and adds additional information to the data crawled via app API.
          Main purpose: Crawl paper coupons """
         timestampStart = datetime.now().timestamp()
@@ -1036,7 +1037,7 @@ class BKCrawler:
                 if hasChanged(existingCoupon, crawledCoupon, ignoreKeys=['timestampAddedToDB', 'timestampLastModifiedDB']):
                     # Set isNew flag if necessary
                     if existingCoupon.isExpiredForLongerTime() and crawledCoupon.isValid():
-                        crawledCoupon.isNew = True
+                        crawledCoupon.timestampIsNew = getCurrentDate().timestamp()
                         numberofCouponsFlaggedAsNew += 1
                     # Important: We need the "_rev" value to be able to update/overwrite existing documents!
                     crawledCoupon["_rev"] = existingCoupon.rev
@@ -1049,7 +1050,7 @@ class BKCrawler:
                 numberofCouponsNew += 1
                 if flagNewCouponsAsNew:
                     numberofCouponsFlaggedAsNew += 1
-                    crawledCoupon.isNew = True
+                    crawledCoupon.timestampIsNew = getCurrentDate().timestamp()
                 dbUpdates.append(crawledCoupon)
                 newCouponIDs.append(crawledCoupon.id)
         logging.info('Pushing ' + str(len(dbUpdates)) + ' coupon DB updates')

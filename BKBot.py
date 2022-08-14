@@ -365,7 +365,7 @@ class BKBot:
         self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode="HTML", reply_markup=reply_markup, disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
-    def getBotCoupons(self):
+    def getBotCoupons(self) -> dict:
         """ Wrapper """
         return self.crawler.getBotCoupons()
 

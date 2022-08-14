@@ -173,11 +173,10 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRIC
 ```
 
 # TODOs
+* Ablaufdatum von Coupons der neuen API anpassen
 * Angebote von neuer API parsen: burgerking.de/kingdeals
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
-* Start-Script prüfen: Evtl. längeres Sleep Statement, damit der Autostart auch nach OS Updates zuverlässig funktioniert?!
-* Handling mit Datumsangaben verbessern
-* isNew: Markierung von Coupons als "neu" und "zeige als neu" separieren und zeitbasiert gestalten (sind Coupons derzeit 1x als "neu" markiert, bleibt das so, bis der Crawler wieder läuft -> Nicht gut)
+* Handling mit Datumsangaben prüfen/verbessern
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
 * resumechannelupdate verbessern

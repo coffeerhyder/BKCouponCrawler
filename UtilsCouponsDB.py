@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from BotUtils import getImageBasePath
 from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponTypes, \
     CouponType, \
-    formatPrice, getFormattedPassedTime
+    formatPrice, formatSeconds
 
 
 class CouponFilter(BaseModel):
@@ -142,6 +142,9 @@ def getCouponViewByIndex(index: int) -> Union[CouponSortMode, None]:
         return allCouponViews[0]
 
 
+COUPON_IS_NEW_FOR_SECONDS = 24 * 60 * 60
+
+
 class Coupon(Document):
     plu = TextField()
     uniqueID = TextField()
@@ -161,8 +164,8 @@ class Coupon(Document):
     productIDs = ListField(IntegerField())
     type = IntegerField(name='source')  # Legacy. This is called "type" now!
     containsFriesOrCoke = BooleanField()
-    isNew = BooleanField()
-    isNewUntilDate = TextField()
+    timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
+    isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new
     isHidden = BooleanField(default=False)  # Typically only available for App coupons
     isUnsafeExpiredate = BooleanField(
         default=False)  # Set this if timestampExpire is a made up date that is just there to ensure that the coupon is considered valid for a specified time
@@ -268,9 +271,13 @@ class Coupon(Document):
 
     def isNewCoupon(self) -> bool:
         """ Determines whether or not this coupon is considered 'new'. """
-        if self.isNew is not None:
-            # isNew status is pre-given --> Return that
-            return self.isNew
+        currentTimestamp = getCurrentDate().timestamp()
+        timePassedSinceLastNewTimestamp = currentTimestamp - self.timestampIsNew
+        if timePassedSinceLastNewTimestamp < COUPON_IS_NEW_FOR_SECONDS:
+            # Coupon has been added just recently and thus can still be considered 'new'
+            # couponNewSecondsRemaining = COUPON_IS_NEW_FOR_SECONDS - timePassedSinceLastNewTimestamp
+            # print(f'Coupon is considered as new for {formatSeconds(seconds=couponNewSecondsRemaining)} time')
+            return True
         elif self.isNewUntilDate is not None:
             # Check if maybe coupon should be considered as new for X
             try:
@@ -282,7 +289,7 @@ class Coupon(Document):
                     return False
             except:
                 # This should never happen
-                logging.warning("Coupon.getIsNew: WTF invalid date format??")
+                logging.warning("Coupon.isNewCoupon: WTF invalid date format??")
                 return False
         else:
             return False
@@ -651,7 +658,7 @@ class User(Document):
         dummyUser = User()
         self.paybackCard = dummyUser.paybackCard
 
-    def getUserFavoritesInfo(self, couponsFromDB: Union[dict, Document], sortCoupons: bool) -> UserFavoritesInfo:
+    def getUserFavoritesInfo(self, couponsFromDB: dict, sortCoupons: bool) -> UserFavoritesInfo:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
         Coupons from DB are required to get current dataset of available favorites.

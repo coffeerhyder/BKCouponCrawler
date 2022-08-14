@@ -343,7 +343,11 @@ def getFormattedPassedTime(pastTimestamp: float) -> str:
     secondsPassed = datetime.now().timestamp() - pastTimestamp
     # duration = datetime.utcfromtimestamp(secondsPassed)
     # return duration.strftime("%Hh:%Mm")
-    return str(timedelta(seconds=secondsPassed))
+    return formatSeconds(seconds=secondsPassed)
+
+
+def formatSeconds(seconds: float) -> str:
+    return str(timedelta(seconds=seconds))
 
 
 def isValidImageFile(path: str) -> bool:
