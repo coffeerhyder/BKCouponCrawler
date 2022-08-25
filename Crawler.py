@@ -14,7 +14,7 @@ from json import loads
 import PaperCouponHelper
 from BotUtils import Config, getImageBasePath
 from Helper import *
-from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesOrCoke, \
+from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesAndDrink, \
     isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, BotAllowedCouponTypes, CouponType, Paths
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
@@ -186,17 +186,18 @@ class BKCrawler:
         useNewAPI = True
         crawledCouponsDict = {}
         if useNewAPI:
-            self.crawlCoupons1New(crawledCouponsDict)
+            self.crawlCoupons(crawledCouponsDict)
         else:
+            # Old handling using old API
             """ Using public API: https://gist.github.com/max1220/7f2f65be4381bc0878e64a985fd71da4 """
             apiResponse = httpx.get('https://mo.burgerking-app.eu', headers=HEADERS_OLD).json()
             if self.storeCouponAPIDataAsJson:
                 # Save API response so we can easily use this data for local testing later on.
                 saveJson('crawler/coupons1_old.json', apiResponse)
             self.crawlProcessOffers(apiResponse)
-            self.crawlCoupons1(apiResponse, crawledCouponsDict)
+            self.crawlCoupons1OLD(apiResponse, crawledCouponsDict)
             logging.info('App API Crawling done')
-            self.crawlCoupons2(crawledCouponsDict)
+            self.crawlCoupons2OLD(crawledCouponsDict)
         self.addExtraCoupons(crawledCouponsDict=crawledCouponsDict, immediatelyAddToDB=False)
         self.processCrawledCoupons(crawledCouponsDict)
         # self.crawlProducts()
@@ -260,7 +261,7 @@ class BKCrawler:
         finally:
             self.updateCache(self.getCouponDB())
 
-    def crawlCoupons1New(self, crawledCouponsDict: dict):
+    def crawlCoupons(self, crawledCouponsDict: dict):
         """ Crawls coupons from App API.
          """
         timestampCrawlStart = datetime.now().timestamp()
@@ -281,17 +282,51 @@ class BKCrawler:
         offersFeedback = apiResponse['data']['evaluateAllUserOffers']['offersFeedback']
         appCoupons = []
         for offerFeedback in offersFeedback:
-            # String containing json
+            # json in json
             couponJson = offerFeedback['offerDetails']
-            couponBK = loads(couponJson)
+            bkCoupons = []
             try:
+                couponBK = loads(couponJson)
+                bkCoupons.append(couponBK)
+                # Collect hidden coupons
+                upsellOptions = couponBK.get('upsellOptions')
+                if upsellOptions is None or len(upsellOptions) == 0:
+                    continue
+                for upsellOption in upsellOptions:
+                    upsellType = upsellOption.get('_type')
+                    upsellShortCode = upsellOption.get('shortCode')
+                    if upsellType != 'offer' or upsellShortCode is None:
+                        # Skip invalid items: This should never happen
+                        logging.info("Found invalid upsell object: " + str(upsellOption))
+                        continue
+                    bkCoupons.append(upsellOption)
+
+            except Exception as e:
+                print(e)
+                logging.warning("Got unexpected json structure in: " + couponJson)
+                pass
+            index = 0
+            for couponBK in bkCoupons:
                 uniqueCouponID = couponBK['vendorConfigs']['rpos']['constantPlu']
-                title = couponBK['name']['de'][0]['children'][0]['text']
-                subtitle = couponBK['description']['de'][0]['children'][0]['text']
-                titleFull = sanitizeCouponTitle(title + subtitle)
+                internalName = couponBK['internalName']
+                # Find coupon-title
+                internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_)?(.+)').search(internalName)
+                if internalNameRegex is not None:
+                    titleFull = internalNameRegex.group(1)
+                else:
+                    title = couponBK['name']['de'][0]['children'][0]['text']
+                    subtitle = couponBK['description']['de'][0]['children'][0]['text']
+                    titleFull = sanitizeCouponTitle(title + subtitle)
+                price = couponBK['offerPrice']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
-                                type=CouponType.APP, price=couponBK['offerPrice'])
-                coupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(titleFull)
+                                type=CouponType.APP, price=price)
+                if price <= 0:
+                    # 2022-08-25: Debug line: Articles with 50% discount contain a price of 0?
+                    logging.warning("Found coupon with price <= 0 : " + coupon.plu)
+                if index > 0:
+                    # First item = Real coupon, all others = upsell[hidden] coupons
+                    coupon.isHidden = True
+                coupon.containsFriesOrCoke = couponTitleContainsFriesAndDrink(titleFull)
                 coupon.imageURL = couponBK['localizedImage']['de']['app']['asset']['url']
                 # Find expire-date
                 ruleSets = couponBK['ruleSet']
@@ -311,14 +346,12 @@ class BKCrawler:
                 if not foundExpireDate:
                     # This should never happen
                     logging.warning("WTF failed to find expiredate")
-            except Exception as e:
-                print(e)
-                logging.warning("Got unexpected json structure in: " + couponJson)
-                pass
+                index += 1
+
         logging.info('Coupons in app: ' + str(len(appCoupons)))
         logging.info("Total coupons1 crawl time: " + getFormattedPassedTime(timestampCrawlStart))
 
-    def crawlCoupons1(self, apiResponse: dict, crawledCouponsDict: dict):
+    def crawlCoupons1OLD(self, apiResponse: dict, crawledCouponsDict: dict):
         """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
         timestampCrawlStart = datetime.now().timestamp()
         appCoupons = apiResponse['coupons']
@@ -337,7 +370,7 @@ class BKCrawler:
             timestampStart = couponGetStartTimestamp(coupon)
             if timestampStart > -1:
                 newCoupon.timestampStart = timestampStart
-            newCoupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(titleFull)
+            newCoupon.containsFriesOrCoke = couponTitleContainsFriesAndDrink(titleFull)
             newCoupon.imageURL = couponOrOfferGetImageURL(coupon)
             # price_text could be either e.g. "50%" or "2,99€" -> We want to find the price otherwise that is worthless for us!
             priceText = coupon['price_text']
@@ -357,7 +390,7 @@ class BKCrawler:
         logging.info('Coupons in old app API: ' + str(len(appCoupons)))
         logging.info("Total coupons1_old crawl time: " + getFormattedPassedTime(timestampCrawlStart))
 
-    def crawlCoupons2(self, crawledCouponsDict: dict):
+    def crawlCoupons2OLD(self, crawledCouponsDict: dict):
         """ Crawls coupons from secondary sources and adds additional information to the data crawled via app API.
          Main purpose: Crawl paper coupons """
         timestampStart = datetime.now().timestamp()
@@ -519,7 +552,7 @@ class BKCrawler:
                     newCoupon = Coupon(id=uniqueCouponID, type=CouponType.UNKNOWN, uniqueID=uniqueCouponID, plu=plu, title=title, titleShortened=shortenProductNames(title),
                                        timestampStart=expirationDate.timestamp(), timestampExpire=expirationDate.timestamp(),
                                        dateFormattedStart=formatDateGerman(startDate), dateFormattedExpire=formatDateGerman(expirationDate),
-                                       price=price, containsFriesOrCoke=couponTitleContainsFriesOrCoke(title))
+                                       price=price, containsFriesOrCoke=couponTitleContainsFriesAndDrink(title))
                     if priceCompare > 0:
                         newCoupon.priceCompare = priceCompare
                     newCoupon.imageURL = image_url
@@ -572,7 +605,7 @@ class BKCrawler:
             coupon.id = coupon.uniqueID  # Set custom uniqueID otherwise couchDB will create one later -> This is not what we want to happen!!
             coupon.title = sanitizeCouponTitle(coupon.title)
             coupon.titleShortened = shortenProductNames(coupon.title)
-            coupon.containsFriesOrCoke = couponTitleContainsFriesOrCoke(coupon.title)
+            coupon.containsFriesOrCoke = couponTitleContainsFriesAndDrink(coupon.title)
             expiredateStr = extraCouponJson["expire_date"] + " 23:59:59"
             expiredate = datetime.strptime(expiredateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
             coupon.timestampExpire = expiredate.timestamp()
@@ -1036,7 +1069,7 @@ class BKCrawler:
                 if hasChanged(existingCoupon, crawledCoupon, ignoreKeys=['timestampAddedToDB', 'timestampLastModifiedDB']):
                     # Set isNew flag if necessary
                     if existingCoupon.isExpiredForLongerTime() and crawledCoupon.isValid():
-                        crawledCoupon.isNew = True
+                        crawledCoupon.timestampIsNew = getCurrentDate().timestamp()
                         numberofCouponsFlaggedAsNew += 1
                     # Important: We need the "_rev" value to be able to update/overwrite existing documents!
                     crawledCoupon["_rev"] = existingCoupon.rev
@@ -1049,7 +1082,7 @@ class BKCrawler:
                 numberofCouponsNew += 1
                 if flagNewCouponsAsNew:
                     numberofCouponsFlaggedAsNew += 1
-                    crawledCoupon.isNew = True
+                    crawledCoupon.timestampIsNew = getCurrentDate().timestamp()
                 dbUpdates.append(crawledCoupon)
                 newCouponIDs.append(crawledCoupon.id)
         logging.info('Pushing ' + str(len(dbUpdates)) + ' coupon DB updates')

@@ -125,6 +125,7 @@ class BKBot:
         self.crawler.setExportCSVs(False)
         self.crawler.setKeepHistoryDB(False)
         self.crawler.setKeepSimpleHistoryDB(True)
+        self.crawler.setStoreCouponAPIDataAsJson(True)  # 2022-08-25: For debug purposes
         self.publicChannelName = self.cfg.get(Config.PUBLIC_CHANNEL_NAME)
         self.botName = self.cfg[Config.BOT_NAME]
         self.couchdb = self.crawler.couchdb
@@ -365,7 +366,7 @@ class BKBot:
         self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode="HTML", reply_markup=reply_markup, disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
-    def getBotCoupons(self):
+    def getBotCoupons(self) -> dict:
         """ Wrapper """
         return self.crawler.getBotCoupons()
 
@@ -456,13 +457,18 @@ class BKBot:
                 elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
                     # Display all hidden App coupons (ONLY)
                     view = CouponViews.HIDDEN_APP_COUPONS_ONLY
-                    displayHiddenCouponsWithinOtherCategories = True
+                    displayHiddenCouponsWithinOtherCategories = None
                 else:
                     raise BetterBotException("WTF developer mistake")
                 couponFilter = deepcopy(view.getFilter())
                 # First we only want to filter coupons. Sort them later according to user preference.
                 couponFilter.sortCode = None
-                couponFilter.isHidden = None if (displayHiddenCouponsWithinOtherCategories is True) else False # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons
+                if displayHiddenCouponsWithinOtherCategories is True:
+                    # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons only
+                    couponFilter.isHidden = None
+                else:
+                    # Don't touch couponFilter.isHidden and use pre-given value
+                    pass
                 coupons = self.getFilteredCoupons(couponFilter)
                 couponCategory = CouponCategory(coupons)
                 menuText = couponCategory.getCategoryInfoText(withMenu=couponFilter.containsFriesAndCoke, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)

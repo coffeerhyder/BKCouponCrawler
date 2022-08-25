@@ -341,12 +341,13 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += '\n<b>Vollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.</b>'
     # Add 'useful links text'
     infoText += '\n<b>------</b>'
-    infoText += '\n<b>Nützliche Links</b>:'
+    infoText += '\n<b>Nützliche Links/Infos</b>:'
     infoText += '\n<b>BK</b>:'
     infoText += '\n•<a href=\"' + URLs.BK_SPAR_KINGS + '\">Spar Kings</a>'
     infoText += '\n•<a href=\"' + URLs.BK_KING_FINDER + '\">KING Finder</a>'
     infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to BetterKing Forum Thread</a>'
     infoText += '\n•<a href=\"' + URLs.BK_WUERGER_KING + '\">Würger King</a> (' + '<a href=\"' + URLs.BK_WUERGER_KING_SOURCE + '\">source</a>' + ')'
+    infoText += '\n•Alte Coupons verwenden und sparen: Siehe angepinntes Channel FAQ'
     infoText += '\n<b>McDonalds</b>'
     infoText += '\n•<a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a> | Gratis Getränke & Coupons'
     infoText += '\n•<a href=\"' + URLs.MCD_COCKBOT + '\">t.me/gimmecockbot</a> | Gratis Getränke'
@@ -359,7 +360,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += "\n... oder verwende <a href=\"https://t.me/" + bkbot.botName + "\">den Bot</a>."
     infoText += "\n<b>Der Bot kann außerdem deine Favoriten speichern, Coupons filtern und einiges mehr ;)</b>"
     infoText += "\nMöchtest du diesen Channel mit jemandem teilen, der kein Telegram verwendet?"
-    infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a> oder <a href=\"" + URLs.ELEMENT + "\">Element per Matrix Bridge</a>."
+    infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a>, <a href=\"" + URLs.ELEMENT + "\">Element per Matrix Bridge</a> oder <a href=\"" + URLs.BK_WUERGER_KING + "\">Würger King</a>."
     infoText += "\n<b>Guten Hunger!</b>"
     infoText += "\n" + getBotImpressum()
     """ 

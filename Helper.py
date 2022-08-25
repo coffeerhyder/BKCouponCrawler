@@ -283,13 +283,31 @@ def getFilenameFromURL(url: str) -> str:
     return filenameURL
 
 
-def couponTitleContainsFriesOrCoke(titleLower: str) -> bool:
+def couponTitleContainsFriesAndDrink(title: str) -> bool:
     # Convert title to lowercase for more thoughtless string comparison
-    titleLower = titleLower.lower()
+    titleLower = title.lower()
     if re.compile(r'.*king\s*jr\s*\.?\s*meal.*').search(titleLower):
         return True
-    elif '+' in titleLower and (('pommes' in titleLower or 'fries' in titleLower) and (
-            'cola' in titleLower or re.compile(r'red\s*bull').search(titleLower))):  # 2021-04-13: Chili Cheese Fries are now treated the same way as normal fries are!
+    elif '+' in titleLower and couponTitleContainsFries(titleLower) and couponTitleContainsDrink(titleLower):
+        return True
+    else:
+        return False
+
+
+def couponTitleContainsFries(title: str) -> bool:
+    titleLower = title.lower()
+    # 2021-04-13: Chili Cheese Fries are now treated the same way as normal fries are!
+    if 'pommes' in titleLower:
+        return True
+    elif 'fries' in titleLower:
+        return True
+    else:
+        return False
+
+
+def couponTitleContainsDrink(title: str) -> bool:
+    titleLower = title.lower()
+    if 'cola' in titleLower or re.compile(r'red\s*bull').search(titleLower):
         return True
     else:
         return False
@@ -343,7 +361,11 @@ def getFormattedPassedTime(pastTimestamp: float) -> str:
     secondsPassed = datetime.now().timestamp() - pastTimestamp
     # duration = datetime.utcfromtimestamp(secondsPassed)
     # return duration.strftime("%Hh:%Mm")
-    return str(timedelta(seconds=secondsPassed))
+    return formatSeconds(seconds=secondsPassed)
+
+
+def formatSeconds(seconds: float) -> str:
+    return str(timedelta(seconds=seconds))
 
 
 def isValidImageFile(path: str) -> bool:
