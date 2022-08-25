@@ -19,7 +19,7 @@ class CouponCategory:
         self.numberofCouponsEatable = 0
         self.numberofCouponsEatableWithPrice = 0
         self.numberofCouponsNew = 0
-        self.numberofCouponsWithFriesOrCoke = 0
+        self.numberofCouponsWithFriesAndDrink = 0
         self.totalPrice = 0
         if isinstance(parameter, dict):
             parameter = list(parameter.values())
@@ -111,7 +111,7 @@ class CouponCategory:
         self.numberofCouponsNew = newNumber
 
     def setNumberofCouponsWithFriesOrCoke(self, newNumber: int):
-        self.numberofCouponsWithFriesOrCoke = newNumber
+        self.numberofCouponsWithFriesAndDrink = newNumber
 
     def setTotalPrice(self, newPrice: float):
         self.totalPrice = newPrice
@@ -141,7 +141,7 @@ class CouponCategory:
         if self.totalPrice > 0:
             sortModes.append(CouponSortModes.PRICE)
             sortModes.append(CouponSortModes.PRICE_DESCENDING)
-        if self.numberofCouponsTotal != self.numberofCouponsWithFriesOrCoke:
+        if self.numberofCouponsTotal != self.numberofCouponsWithFriesAndDrink:
             sortModes.append(CouponSortModes.MENU_PRICE)
         if len(self.couponTypes) > 1:
             sortModes.append(CouponSortModes.TYPE_MENU_PRICE)
@@ -178,7 +178,7 @@ class CouponCategory:
             couponCount = self.numberofCouponsTotal
             text = '<b>[{couponCount} Stück] {couponCategoryName}</b>'
         else:
-            couponCount = self.numberofCouponsTotal - self.numberofCouponsWithFriesOrCoke
+            couponCount = self.numberofCouponsTotal - self.numberofCouponsWithFriesAndDrink
             text = '<b>[{couponCount} Stück] {couponCategoryName} ohne Menü</b>'
         if includeHiddenCouponsInCount is False:
             couponCount -= self.numberofCouponsHidden
@@ -226,8 +226,8 @@ class CouponCategory:
                 self.setNumberofCouponsEatable(self.numberofCouponsEatable + 1)
             if coupon.isNewCoupon():
                 self.setNumberofCouponsNew(self.numberofCouponsNew + 1)
-            if coupon.isContainsFriesOrCoke():
-                self.setNumberofCouponsWithFriesOrCoke(self.numberofCouponsWithFriesOrCoke + 1)
+            if coupon.isContainsFriesAndDrink():
+                self.setNumberofCouponsWithFriesOrCoke(self.numberofCouponsWithFriesAndDrink + 1)
             # Update expire-date info
             date = coupon.getExpireDatetime()
             if self.expireDatetimeLowest is None and self.expireDatetimeHighest is None:

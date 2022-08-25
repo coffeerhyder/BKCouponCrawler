@@ -302,7 +302,7 @@ def couponTitleContainsFries(title: str) -> bool:
     elif 'fries' in titleLower:
         return True
     else:
-        return False
+        return False#
 
 
 def couponTitleContainsDrink(title: str) -> bool:
