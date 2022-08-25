@@ -315,7 +315,7 @@ class BKBot:
                 # Do not display this category if disabled by user
                 continue
             allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural, callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY + "&cs=" + str(couponSrc))])
-            if couponCategory.numberofCouponsWithFriesOrCoke < couponCategory.numberofCouponsTotal and couponCategory.isEatable():
+            if couponCategory.numberofCouponsWithFriesAndDrink < couponCategory.numberofCouponsTotal and couponCategory.isEatable():
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' ohne Menü',
                                                         callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY_WITHOUT_MENU + "&cs=" + str(couponSrc))])
             if couponSrc == CouponType.APP and couponCategory.numberofCouponsHidden > 0:
@@ -1212,7 +1212,7 @@ class BKBot:
                     """ Add a separator so it is easier for the user to distinguish between coupons with- and without menu. 
                     This only works as "simple" as that because we pre-sorted these coupons!
                     """
-                    if not coupon.isContainsFriesOrCoke():
+                    if not coupon.isContainsFriesAndDrink():
                         listContainsAtLeastOneItemWithoutMenu = True
                     elif not hasAddedSeparatorAfterCouponsWithoutMenu and listContainsAtLeastOneItemWithoutMenu:
                         couponOverviewText += '\n<b>' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + couponCategory.namePluralWithoutSymbol + ' mit Menü' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + '</b>'

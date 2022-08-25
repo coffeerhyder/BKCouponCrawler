@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from BotUtils import getImageBasePath
 from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesAndDrink, BotAllowedCouponTypes, \
     CouponType, \
-    formatPrice, formatSeconds
+    formatPrice
 
 
 class CouponFilter(BaseModel):
@@ -243,7 +243,7 @@ class Coupon(Document):
         else:
             return False
 
-    def isContainsFriesOrCoke(self) -> bool:
+    def isContainsFriesAndDrink(self) -> bool:
         # TODO: Make use of this
         if couponTitleContainsFriesAndDrink(self.title):
             return True
@@ -998,20 +998,20 @@ def sortCouponsAsList(coupons: Union[list, dict], sortCode: Union[int, CouponSor
     else:
         sortMode = getSortModeBySortCode(sortCode)
     if sortMode == CouponSortModes.TYPE_MENU_PRICE:
-        couponsWithoutFriesOrCoke = []
-        couponsWithFriesOrCoke = []
+        couponsWithoutFriesAndDrink = []
+        couponsWithFriesAndDrink = []
         allContainedCouponTypes = []
         for coupon in coupons:
             if coupon.type not in allContainedCouponTypes:
                 allContainedCouponTypes.append(coupon.type)
-            if coupon.isContainsFriesOrCoke():
-                couponsWithFriesOrCoke.append(coupon)
+            if coupon.isContainsFriesAndDrink():
+                couponsWithFriesAndDrink.append(coupon)
             else:
-                couponsWithoutFriesOrCoke.append(coupon)
-        couponsWithoutFriesOrCoke = sortCouponsByPrice(couponsWithoutFriesOrCoke)
-        couponsWithFriesOrCoke = sortCouponsByPrice(couponsWithFriesOrCoke)
+                couponsWithoutFriesAndDrink.append(coupon)
+        couponsWithoutFriesAndDrink = sortCouponsByPrice(couponsWithoutFriesAndDrink)
+        couponsWithFriesAndDrink = sortCouponsByPrice(couponsWithFriesAndDrink)
         # Merge them together again.
-        coupons = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
+        coupons = couponsWithoutFriesAndDrink + couponsWithFriesAndDrink
         # App coupons(source == 0) > Paper coupons
         allContainedCouponTypes.sort()
         # Separate sorted coupons by type
@@ -1024,17 +1024,17 @@ def sortCouponsAsList(coupons: Union[list, dict], sortCode: Union[int, CouponSor
         for allCouponsOfOneSourceType in couponsSeparatedByType.values():
             coupons += allCouponsOfOneSourceType
     elif sortMode == CouponSortModes.MENU_PRICE:
-        couponsWithoutFriesOrCoke = []
-        couponsWithFriesOrCoke = []
+        couponsWithoutFriesAndDrink = []
+        couponsWithFriesAndDrink = []
         for coupon in coupons:
-            if coupon.isContainsFriesOrCoke():
-                couponsWithFriesOrCoke.append(coupon)
+            if coupon.isContainsFriesAndDrink():
+                couponsWithFriesAndDrink.append(coupon)
             else:
-                couponsWithoutFriesOrCoke.append(coupon)
-        couponsWithoutFriesOrCoke = sortCouponsByPrice(couponsWithoutFriesOrCoke)
-        couponsWithFriesOrCoke = sortCouponsByPrice(couponsWithFriesOrCoke)
+                couponsWithoutFriesAndDrink.append(coupon)
+        couponsWithoutFriesAndDrink = sortCouponsByPrice(couponsWithoutFriesAndDrink)
+        couponsWithFriesAndDrink = sortCouponsByPrice(couponsWithFriesAndDrink)
         # Merge them together again.
-        coupons = couponsWithoutFriesOrCoke + couponsWithFriesOrCoke
+        coupons = couponsWithoutFriesAndDrink + couponsWithFriesAndDrink
     elif sortMode == CouponSortModes.PRICE:
         coupons = sortCouponsByPrice(coupons)
     elif sortMode == CouponSortModes.PRICE_DESCENDING:

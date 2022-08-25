@@ -956,7 +956,7 @@ class BKCrawler:
             writer.writeheader()
             for couponID in couponDB:
                 coupon = Coupon.load(couponDB, couponID)
-                writer.writerow({'PRODUCT': coupon.getTitle(), 'MENU': coupon.isContainsFriesOrCoke(),
+                writer.writerow({'PRODUCT': coupon.getTitle(), 'MENU': coupon.isContainsFriesAndDrink(),
                                  'PLU': (coupon.plu if coupon.plu is not None else "N/A"), 'PLU2': coupon.id,
                                  'TYPE': coupon.type,
                                  'PRICE': coupon.get(Coupon.price.name, -1), 'PRICE_COMPARE': coupon.get(Coupon.priceCompare.name, -1),
@@ -977,7 +977,7 @@ class BKCrawler:
                 coupon = Coupon.load(couponDB, couponID)
                 if coupon.type != CouponType.PAPER:
                     continue
-                writer.writerow({'Produkt': coupon.getTitle(), 'Menü': coupon.isContainsFriesOrCoke(),
+                writer.writerow({'Produkt': coupon.getTitle(), 'Menü': coupon.isContainsFriesAndDrink(),
                                  'PLU': coupon.plu, 'PLU2': coupon.id,
                                  'Preis': coupon.getPrice(), 'OPreis': coupon.get(Coupon.priceCompare.name, -1),
                                  'Ablaufdatum': coupon.getExpireDateFormatted()
@@ -1169,7 +1169,7 @@ class BKCrawler:
             elif filters.allowedCouponTypes is not None and coupon.type not in filters.allowedCouponTypes:
                 # Skip non-allowed coupon-types
                 continue
-            elif filters.containsFriesAndCoke is not None and coupon.isContainsFriesOrCoke() != filters.containsFriesAndCoke:
+            elif filters.containsFriesAndCoke is not None and coupon.isContainsFriesAndDrink() != filters.containsFriesAndCoke:
                 # Skip items if they do not have the expected "containsFriesOrCoke" state
                 continue
             elif filters.isNew is not None and coupon.isNewCoupon() != filters.isNew:
@@ -1184,6 +1184,7 @@ class BKCrawler:
             desiredCoupons = removeDuplicatedCoupons(desiredCoupons)
         # Now check if the result shall be sorted
         if filters.sortCode is None:
+            # Do not sort coupons
             return desiredCoupons
         else:
             # Sort coupons: Separate by type and sort each by coupons with/without menu and price.
