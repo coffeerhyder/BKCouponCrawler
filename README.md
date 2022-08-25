@@ -174,7 +174,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortMode=CouponSortModes.PRIC
 
 # TODOs
 * Ablaufdatum von Coupons der neuen API anpassen
-* Angebote von neuer API parsen: burgerking.de/kingdeals
+* Seit neuer API haben alle 50% Artikel einen Preis von 0€?
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Handling mit Datumsangaben prüfen/verbessern
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann

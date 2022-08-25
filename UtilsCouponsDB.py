@@ -12,7 +12,7 @@ from couchdb.mapping import TextField, FloatField, ListField, IntegerField, Bool
 from pydantic import BaseModel
 
 from BotUtils import getImageBasePath
-from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesOrCoke, BotAllowedCouponTypes, \
+from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesAndDrink, BotAllowedCouponTypes, \
     CouponType, \
     formatPrice, formatSeconds
 
@@ -245,7 +245,7 @@ class Coupon(Document):
 
     def isContainsFriesOrCoke(self) -> bool:
         # TODO: Make use of this
-        if couponTitleContainsFriesOrCoke(self.title):
+        if couponTitleContainsFriesAndDrink(self.title):
             return True
         else:
             return False
