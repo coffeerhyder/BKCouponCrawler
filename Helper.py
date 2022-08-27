@@ -29,11 +29,11 @@ class HISTORYDB:
 
 
 class URLs:
+    PROTOCOL_BK = 'https://www.'
     ELEMENT = 'https://app.element.io/#/room/#BetterKingDE:matrix.org'
-    BK_SPAR_KINGS = 'https://www.burgerking.de/sparkings'
-    BK_KING_FINDER = 'https://www.burgerking.de/store-locator'
-    NO_PROTOCOL_BK_KING_DEALS = 'burgerking.de/kingdeals'
-    BK_KING_DEALS = 'https://www' + NO_PROTOCOL_BK_KING_DEALS
+    BK_SPAR_KINGS = 'burgerking.de/sparkings'
+    BK_KING_FINDER = 'burgerking.de/store-locator'
+    BK_KING_DEALS = 'burgerking.de/kingdeals'
     NO_PROTOCOL_COUPONS = 'burgerking.de/rewards/offers'
     NGB_FORUM_THREAD = 'https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/'
     BK_WUERGER_KING = 'https://wurgerking.wfr.moe/'

@@ -343,7 +343,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n<b>------</b>'
     infoText += '\n<b>Nützliche Links/Infos</b>:'
     infoText += '\n<b>BK</b>:'
-    infoText += '\n•<a href=\"' + URLs.BK_SPAR_KINGS + '\">Spar Kings</a>'
+    infoText += '\n•<a href=\"' + URLs.PROTOCOL_BK + URLs.BK_SPAR_KINGS + '\">Spar Kings</a>'
     infoText += '\n•<a href=\"' + URLs.BK_KING_FINDER + '\">KING Finder</a>'
     infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to BetterKing Forum Thread</a>'
     infoText += '\n•<a href=\"' + URLs.BK_WUERGER_KING + '\">Würger King</a> (' + '<a href=\"' + URLs.BK_WUERGER_KING_SOURCE + '\">source</a>' + ')'
