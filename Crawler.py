@@ -290,18 +290,18 @@ class BKCrawler:
                 bkCoupons.append(couponBK)
                 # Collect hidden coupons
                 upsellOptions = couponBK.get('upsellOptions')
-                if upsellOptions is None or len(upsellOptions) == 0:
-                    continue
-                for upsellOption in upsellOptions:
-                    upsellType = upsellOption.get('_type')
-                    upsellShortCode = upsellOption.get('shortCode')
-                    if upsellType != 'offer' or upsellShortCode is None:
-                        # Skip invalid items: This should never happen
-                        logging.info("Found invalid upsell object: " + str(upsellOption))
-                        continue
-                    bkCoupons.append(upsellOption)
+                if upsellOptions is not None and len(upsellOptions) > 0:
+                    for upsellOption in upsellOptions:
+                        upsellType = upsellOption.get('_type')
+                        upsellShortCode = upsellOption.get('shortCode')
+                        if upsellType != 'offer' or upsellShortCode is None:
+                            # Skip invalid items: This should never happen
+                            logging.info("Found invalid upsell object: " + str(upsellOption))
+                            continue
+                        bkCoupons.append(upsellOption)
 
             except Exception as e:
+                # This should never happen
                 print(e)
                 logging.warning("Got unexpected json structure in: " + couponJson)
                 pass

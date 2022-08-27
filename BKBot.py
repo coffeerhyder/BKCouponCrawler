@@ -333,7 +333,7 @@ class BKBot:
             [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS)])
         if user.settings.displayBKWebsiteURLs:
             allButtons.append(
-                [InlineKeyboardButton('Spar Kings', url=URLs.BK_SPAR_KINGS), InlineKeyboardButton('KING Finder', url=URLs.BK_KING_FINDER)])
+                [InlineKeyboardButton('Spar Kings', url=URLs.BK_SPAR_KINGS), InlineKeyboardButton('KING Finder', url=URLs.PROTOCOL_BK + URLs.BK_KING_FINDER)])
         if user.settings.displayFeedbackCodeGenerator:
             allButtons.append([InlineKeyboardButton('Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
@@ -651,7 +651,7 @@ class BKBot:
         Posts all current offers (= photos with captions) into current chat.
         """
         activeOffers = self.crawler.getOffersActive()
-        bkOffersOnWebsiteText = 'Angebote auf der BK Webseite anzeigen: ' + URLs.NO_PROTOCOL_BK_KING_DEALS
+        bkOffersOnWebsiteText = 'Angebote auf der BK Webseite anzeigen: ' + URLs.BK_KING_DEALS
         if len(activeOffers) == 0:
             # BK should always have offers but let's check for this case anyways.
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
@@ -728,7 +728,7 @@ class BKBot:
         else:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
-        menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
+        menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.PROTOCOL_BK + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
         userSortModes = user.couponViewSortModes
