@@ -310,13 +310,16 @@ class BKCrawler:
                 uniqueCouponID = couponBK['vendorConfigs']['rpos']['constantPlu']
                 internalName = couponBK['internalName']
                 # Find coupon-title
-                internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_)?(.+)').search(internalName)
-                if internalNameRegex is not None:
+                useInternalNameAsTitle = False
+                internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|MYBK_|\d{3,}_)?(.+)').search(internalName)
+                if internalNameRegex is not None and useInternalNameAsTitle:
                     titleFull = internalNameRegex.group(1)
+                    titleFull = titleFull.replace('_', ' ')
                 else:
                     title = couponBK['name']['de'][0]['children'][0]['text']
                     subtitle = couponBK['description']['de'][0]['children'][0]['text']
-                    titleFull = sanitizeCouponTitle(title + subtitle)
+                    titleFull = title + subtitle
+                titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP, price=price)

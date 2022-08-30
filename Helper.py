@@ -178,7 +178,9 @@ def shortenProductNames(couponTitle: str) -> str:
 
 def sanitizeCouponTitle(title: str) -> str:
     """ Generic method which sanitizes strings and removes unneeded symbols such as trademark symbols. """
-    return title.replace('®', '').strip()
+    title = title.replace('®', '')
+    title = title.strip()
+    return title
 
 
 def getPathImagesOffers() -> str:
