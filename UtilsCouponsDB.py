@@ -538,6 +538,7 @@ class User(Document):
             displayCouponSortButton=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
+            displayCouponArchiveLinkButton=BooleanField(default=True),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
@@ -891,7 +892,7 @@ USER_SETTINGS_ON_OFF = {
         "default": False
     },
     "displayCouponCategoryPayback": {
-        "description": "Payback Coupons/Karte im Hauptmenü zeigen",
+        "description": "Payback Coupons/Karte Button zeigen",
         "default": True
     },
     "displayCouponSortButton": {
@@ -899,11 +900,15 @@ USER_SETTINGS_ON_OFF = {
         "default": True
     },
     "displayFeedbackCodeGenerator": {
-        "description": "Feedback Code Generator im Hauptmenü zeigen",
+        "description": "Feedback Code Generator Button zeigen",
+        "default": True
+    },
+    "displayCouponArchiveLinkButton": {
+        "description": "Coupon Archiv Button zeigen",
         "default": True
     },
     "displayBKWebsiteURLs": {
-        "description": "BK Verlinkungen im Hauptmenü zeigen",
+        "description": "BK Verlinkungen Buttons zeigen",
         "default": True
     },
     "highlightFavoriteCouponsInButtonTexts": {
