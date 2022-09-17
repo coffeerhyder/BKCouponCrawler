@@ -41,6 +41,8 @@ class URLs:
     MCD_MCCOUPON_DEALS = 'https://www.mccoupon.deals/'
     MCD_COCKBOT = 'https://t.me/gimmecockbot'
     MCD_MCBROKEN = 'https://mcbroken.com/'
+    MEGA_COUPON_ARCHIVE = 'mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg'
+    MEGA_COUPON_ARCHIVE_SHORT = 'bit.ly/bkcoupons'
 
 
 def loadConfig(fallback: str = None):

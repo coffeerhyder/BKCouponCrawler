@@ -238,7 +238,7 @@ Source: github.com/coffeerhyder/BKCouponCrawler
 ### Channel angepinnter Post mit Papiercoupons Datei & Verlinkung
 ```
 Aktuelle Papiercoupons (gültig bis 24.09.2021):
-Externer Downloadlink: mega.nz/folder/HLJFGAyL#Da7bq1Sues_mrC-uvVLTGQ
+Externer Downloadlink: mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
 Quelle(n):
 mydealz.de/gutscheine/burger-king-coupons-bundesweit-gultig-bis-23042021-1762251
 mydealz.de/gutscheine/burger-king-coupons-bundesweit-gultig-bis-05032021-1731958
@@ -281,11 +281,23 @@ Es gibt mehrere Möglichkeiten:
 - Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
 
 Wie kann ich noch mehr sparen?
-In Filialen mit Terminals lassen sich teilweise die alten Papiercoupons mind. aus 2018-2020 verwenden.  
+In Filialen mit Terminals lassen sich teilweise alte "abgelaufene" Papiercoupons verwenden.  
 App Coupons theoretisch ebenso, wenn man sie gesammelt hat.
 Hier findest du ein stetig aktualisiertes Archiv alter (Papier-)coupons: mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
-Vor Ort einfach die QR Codes am Terminal bestellen.
-Wichtig: Es kann passieren, dass ganz am Ende vor dem Bezahlen ein Fehler auftritt. In diesem Fall hat die entsprechende BK Filiale ein oder mehrere der in deiner Bestellung verwendeten alten Codes bereits gesperrt.
+
+Wie verwende ich alte Coupons?
+- Geht nur am Terminal
+- QR Code scannen oder falls möglich, PLU Code eintippen
+
+Ab welchem Jahr sind alte Coupons verwendbar?
+Ungefähr ab dem Jahr 2018, da BK ab hier QR Codes eingeführt hat (erster Couponbogen im Archiv mit QR Codes ist "2018_11_11_1.pdf".)
+Natürlich kannst du trotzdem jeden alten PLU Code (also die Nummer) zu einem QR Code machen und ältere ausprobieren. Nimm dafür einen beliebigen QR Code Generator (z.B. qrcode-generator.de) oder App und wähle "Text" als Datentyp.
+
+Ganz am Ende vorm Bezahlen tritt ein Fehler auf und meine Bestellung verschwindet. Warum und was kann ich tun?
+Viele alte Coupons sind gesperrt bzw. lassen sich nicht mehr bestellen, aber zunächst trotzdem dem Warenkorb hinzufügen.
+- Schaue auf MyDealz, ob es Feedback von Usern zu bestimmten Codes gibt
+- Versuche, Coupons einzeln zu bestellen um nach und nach herauszufinden, welche Coupons funktionieren und welche nicht. Es gibt keine Liste dazu und das kann von Filiale zu Filiale variieren.
+- Pass auf, dass du keine Burger bestellst, die es nicht mehr gibt das kann zwar durchgehen, aber dann nervt dich die Filialleitung. Beispiel: X-tra Long BBQ
 
 Wo finde ich den Quellcode?
 Hier: github.com/coffeerhyder/BKCouponCrawler

@@ -65,10 +65,12 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 # r = httpx.post('https://euc1-prod-bk.rbictg.com/graphql', json=json, headers=HEADERS)
 # print(r.text)
 
-datetimetest = datetime.strptime('2022-07-18T21:59:00.000Z', '%Y-%m-%dT%H:%M:%S.%fZ')
-print('datetimemillis = ' + str(datetimetest.timestamp()))
-date = datetime.now(getTimezone())
-utcOffset = date.strftime('%z')
-utcOffsetFormatted = utcOffset[:3] + ':' + utcOffset[3:]
-dateformatted = date.strftime('%Y-%m-%dT%H:%M:%S.%f') + utcOffsetFormatted
-print('datetimeformattest: ' + dateformatted)
+# 2022-09-17
+dateformat = '%Y-%m-%dT%H:%M:%S.%fZ'
+testDatetime = datetime.strptime('2022-09-26T21:59:00.000Z', dateformat)
+testDatetime.astimezone(getTimezone())
+print("Formatted: " + testDatetime.strftime('%Y-%m-%dT%H:%M:%S.%f'))
+
+print('Timestamp: ' + str(testDatetime.timestamp()))
+print('Timestamp2: ' + str(testDatetime.timestamp()))
+print("utcoffset" + str(testDatetime.utcoffset()))

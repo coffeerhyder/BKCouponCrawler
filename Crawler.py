@@ -322,12 +322,19 @@ class BKCrawler:
                 titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
-                                type=CouponType.APP, price=price)
-                if price <= 0:
-                    # 2022-08-25: Debug line: Articles with 50% discount contain a price of 0?
-                    logging.warning("Found coupon with price <= 0 : " + coupon.plu)
+                                type=CouponType.APP)
+                if price == 0:
+                    # Special detection for some 50%/2for1 coupons that are listed with price == 0€
+                    if titleFull.startswith('2'):
+                        # E.g. 2 Crispy Chicken
+                        coupon.staticReducedPercent = 50
+                    else:
+                        # While it is super unlikely let's allow BK to provide coupons for free products :)
+                        coupon.price = 0
+                else:
+                    coupon.price = price
                 if index > 0:
-                    # First item = Real coupon, all others = upsell[hidden] coupons
+                    # First item = Real coupon, all others = upsell/"hidden" coupon(s)
                     coupon.isHidden = True
                 coupon.containsFriesOrCoke = couponTitleContainsFriesAndDrink(titleFull)
                 coupon.imageURL = couponBK['localizedImage']['de']['app']['asset']['url']
@@ -340,8 +347,9 @@ class BKCrawler:
                         for ruleSetsChild in ruleSetsChilds:
                             if ruleSetsChild['_type'] == 'between-dates':
                                 dateformat = '%Y-%m-%dT%H:%M:%S.%fZ'
-                                coupon.timestampStart = datetime.strptime(ruleSetsChild['startDate'], dateformat).timestamp()
-                                coupon.timestampExpire = datetime.strptime(ruleSetsChild['endDate'], dateformat).timestamp()
+                                serversideTimeOffset = 2 * 60 * 60
+                                coupon.timestampStart = datetime.strptime(ruleSetsChild['startDate'], dateformat).timestamp() + serversideTimeOffset
+                                coupon.timestampExpire = datetime.strptime(ruleSetsChild['endDate'], dateformat).timestamp() + serversideTimeOffset
                                 crawledCouponsDict[uniqueCouponID] = coupon
                                 appCoupons.append(coupon)
                                 foundExpireDate = True

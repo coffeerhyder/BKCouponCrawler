@@ -336,6 +336,9 @@ class BKBot:
                 [InlineKeyboardButton('Spar Kings', url=URLs.BK_SPAR_KINGS), InlineKeyboardButton('KING Finder', url=URLs.PROTOCOL_BK + URLs.BK_KING_FINDER)])
         if user.settings.displayFeedbackCodeGenerator:
             allButtons.append([InlineKeyboardButton('Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
+        if user.settings.displayCouponArchiveLinkButton:
+            # Use a shortlink here because the mega.nz normal link will be broken by Telegram (because of the '#'?!)
+            allButtons.append([InlineKeyboardButton('Coupon Archiv', url=URLs.PROTOCOL_BK + URLs.MEGA_COUPON_ARCHIVE_SHORT)])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = 'Hallo ' + update.effective_user.first_name + ', <b>Bock auf Fastfood?</b>'
