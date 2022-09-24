@@ -309,7 +309,7 @@ class BKCrawler:
             for couponBK in bkCoupons:
                 uniqueCouponID = couponBK['vendorConfigs']['rpos']['constantPlu']
                 internalName = couponBK['internalName']
-                # Find coupon-title
+                # Find coupon-title. Prefer to get it from 'internalName' as the other title may contain crap we don't want.
                 useInternalNameAsTitle = False
                 internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|MYBK_|\d{3,}_)?(.+)').search(internalName)
                 if internalNameRegex is not None and useInternalNameAsTitle:
@@ -323,6 +323,9 @@ class BKCrawler:
                 price = couponBK['offerPrice']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP)
+                if index > 0:
+                    # First item = Real coupon, all others = upsell/"hidden" coupon(s)
+                    coupon.isHidden = True
                 if price == 0:
                     # Special detection for some 50%/2for1 coupons that are listed with price == 0€
                     if titleFull.startswith('2'):
@@ -333,12 +336,24 @@ class BKCrawler:
                         coupon.price = 0
                 else:
                     coupon.price = price
-                if index > 0:
-                    # First item = Real coupon, all others = upsell/"hidden" coupon(s)
-                    coupon.isHidden = True
                 coupon.containsFriesOrCoke = couponTitleContainsFriesAndDrink(titleFull)
                 coupon.imageURL = couponBK['localizedImage']['de']['app']['asset']['url']
-                # Find expire-date
+                """ Find and set expire-date:
+                 BKs API can provide different start- and expire-dates depending on the coupon-type e.g. "King Deal" coupons may have an offset of 1 hour
+                 while all others have an offset of two hours. In order to get around this offset problem we prefer to extract the expire-date
+                 from the footnote of the coupons and simply add the time (end of the day).
+                 """
+                foundAndSetBetterExpireDate = False
+                try:
+                    footnote = couponBK['moreInfo']['de'][0]['children'][0]['text']
+                    expiredateRegex = re.compile(r'(?i)Abgabe bis (\d{1,2}\.\d{1,2}\.\d{4})').search(footnote)
+                    if expiredateRegex is not None:
+                        expiredateStr = expiredateRegex.group(1) + ' 23:59:59'
+                        coupon.timestampExpire = datetime.strptime(expiredateStr, '%d.%m.%Y %H:%M:%S').timestamp()
+                        foundAndSetBetterExpireDate = True
+                except:
+                    # Dontcare
+                    logging.warning('Failed to find BetterExpiredate for coupon ' + coupon.id)
                 ruleSets = couponBK['ruleSet']
                 foundExpireDate = False
                 for ruleSet in ruleSets:
@@ -349,7 +364,8 @@ class BKCrawler:
                                 dateformat = '%Y-%m-%dT%H:%M:%S.%fZ'
                                 serversideTimeOffset = 2 * 60 * 60
                                 coupon.timestampStart = datetime.strptime(ruleSetsChild['startDate'], dateformat).timestamp() + serversideTimeOffset
-                                coupon.timestampExpire = datetime.strptime(ruleSetsChild['endDate'], dateformat).timestamp() + serversideTimeOffset
+                                if not foundAndSetBetterExpireDate:
+                                    coupon.timestampExpire = datetime.strptime(ruleSetsChild['endDate'], dateformat).timestamp() + serversideTimeOffset
                                 crawledCouponsDict[uniqueCouponID] = coupon
                                 appCoupons.append(coupon)
                                 foundExpireDate = True

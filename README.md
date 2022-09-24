@@ -173,8 +173,6 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortCode=CouponSortModes.PRIC
 ```
 
 # TODOs
-* Ablaufdatum von Coupons der neuen API anpassen
-* Seit neuer API haben alle 50% Artikel einen Preis von 0€?
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Handling mit Datumsangaben prüfen/verbessern
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
@@ -365,6 +363,7 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 ### Kleine Linksammlung
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
 * http://www.fastfood-forum.net/wbb3/upload/index.php/Board/9-Burger-King/
+* https://www.burgerking.de/rewards/offers (Coupons direkt über die BK Webseite)
 
 ### Ähnliche Projekte (teilweise veraltet)
 * https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
