@@ -22,9 +22,10 @@ class CouponCategory:
         self.numberofCouponsWithFriesAndDrink = 0
         self.totalPrice = 0
         if isinstance(parameter, dict):
-            parameter = list(parameter.values())
-        if isinstance(parameter, list):
+            self.coupons = list(parameter.values())
+        elif isinstance(parameter, list):
             self.coupons = parameter
+        if self.coupons is not None:
             for coupon in self.coupons:
                 self.updateWithCouponInfo(coupon)
             if len(self.couponTypes) == 1:
@@ -137,6 +138,8 @@ class CouponCategory:
 
     def getSortModes(self) -> List:
         """ Returns all SortModes which make sense for this set of coupons. """
+        if self.coupons is None:
+            return []
         sortModes = []
         if self.totalPrice > 0:
             sortModes.append(CouponSortModes.PRICE)

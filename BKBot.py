@@ -292,14 +292,6 @@ class BKBot:
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
-        # Test code to update DB structure TODO: maybe make use of this
-        # userDB = self.crawler.getUsersDB()
-        # dummyUser = User()
-        # dct = user.__dict__
-        # # dct2 = {**dct['_data'], **dummyUser.__dict__['_data']}
-        # dct2 = {**dummyUser.__dict__['_data'], **dct['_data']}
-        # user2 = User.wrap(dct2)
-        # user2.store(userDB)
         allButtons = []
         if self.getPublicChannelName() is not None:
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste + Pics + News', url='https://t.me/' + self.getPublicChannelName())])
@@ -329,8 +321,9 @@ class BKBot:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
             else:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
-        allButtons.append(
-            [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS)])
+        if self.crawler.cachedNumberofAvailableOffers > 0:
+            allButtons.append(
+                [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS)])
         if user.settings.displayBKWebsiteURLs:
             allButtons.append(
                 [InlineKeyboardButton('Spar Kings', url=URLs.BK_SPAR_KINGS), InlineKeyboardButton('KING Finder', url=URLs.PROTOCOL_BK + URLs.BK_KING_FINDER)])
@@ -516,7 +509,7 @@ class BKBot:
 
                 buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
                 index += 1
-            # numberofCouponsOnCurrentPage = len(buttons)
+            numberofCouponsOnCurrentPage = len(buttons)
             if paginationMax > 1:
                 # Add pagination navigation buttons if needed
                 menuText += "\nSeite " + str(currentPage) + "/" + str(paginationMax)
@@ -546,7 +539,7 @@ class BKBot:
                 buttons.append(navigationButtons)
             # Display sort button if it makes sense
             possibleSortModes = couponCategory.getSortModes()
-            if user.settings.displayCouponSortButton and len(possibleSortModes) > 1:
+            if user.settings.displayCouponSortButton and len(possibleSortModes) > 1 and numberofCouponsOnCurrentPage > 1:
                 currentSortMode = user.getSortModeForCouponView(couponView=view)
                 nextSortMode = user.getNextSortModeForCouponView(couponView=view)
                 urlquery_callbackBack.args['a'] = 'dcss'

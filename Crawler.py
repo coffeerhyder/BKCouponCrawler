@@ -75,6 +75,7 @@ class BKCrawler:
         # Init DB
         self.couchdb = couchdb.Server(self.cfg[Config.DB_URL])
         self.cachedAvailableCouponCategories = {}
+        self.cachedNumberofAvailableOffers = 0
         self.keepHistoryDB = False
         self.keepSimpleHistoryDB = False
         self.crawlOnlyBotCompatibleCoupons = True
@@ -259,7 +260,7 @@ class BKCrawler:
             # self.checkProductiveOffersDBImagesIntegrity()
             logging.info("Total crawl duration: " + getFormattedPassedTime(timestampStart))
         finally:
-            self.updateCache(self.getCouponDB())
+            self.updateCache(couponDB=self.getCouponDB(), offerDB=self.getOfferDB())
 
     def crawlCoupons(self, crawledCouponsDict: dict):
         """ Crawls coupons from App API.
@@ -696,9 +697,7 @@ class BKCrawler:
                             pluCharMap[newChar] = coupons
             # Store possible paper coupon short-PLU numbers without chars e.g. {"B": [1, 2, 3], "C": [1, 2, 3] }
             foundPaperCouponMap = {}
-            if len(pluCharMap) == 0:
-                logging.info("Failed to find any currently valid paper coupon candidates")
-            else:
+            if len(pluCharMap) > 0:
                 # Logging
                 couponCharsLogtext = ''
                 for paperPLUChar, coupons in pluCharMap.items():
@@ -1010,7 +1009,7 @@ class BKCrawler:
                                  'Ablaufdatum': coupon.getExpireDateFormatted()
                                  })
 
-    def updateCache(self, couponDB: Database):
+    def updateCache(self, couponDB: Database, offerDB: Database = None):
         """ Updates cache containing all existent coupon sources e.g. used be the Telegram bot to display them inside
         main menu without having to do any DB requests. """
         newCachedAvailableCouponCategories = {}
@@ -1022,6 +1021,13 @@ class BKCrawler:
                 category.updateWithCouponInfo(coupon)
         # Overwrite old cache
         self.cachedAvailableCouponCategories = newCachedAvailableCouponCategories
+        if offerDB is not None:
+            validOffers = []
+            for offerID in offerDB:
+                offer = offerDB[offerID]
+                if offerIsValid(offer):
+                    validOffers.append(offer)
+            self.cachedNumberofAvailableOffers = len(validOffers)
 
     def getCachedCouponCategory(self, couponSrc: Union[CouponType, int]):
         return self.cachedAvailableCouponCategories.get(couponSrc)
