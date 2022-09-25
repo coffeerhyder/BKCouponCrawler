@@ -1,8 +1,8 @@
 # Better King
 Burger King Coupon Telegram Bot
 
-<html><img src="https://www.picflash.org/viewer.php?img=Logo36AUIGS.jpg" width="220" height="216" /> </br>
-<img src="https://www.picflash.org/viewer.php?img=2021_01_24_Showcase_21OL5XA.png" width="360" height="640" /> </br> </html>
+<html><img src="https://github.com/coffeerhyder/BKCouponCrawler/blob/GithubMirror/media/Logo2.jpeg?raw=true" width="220" height="216" /> </br>
+<img src="https://github.com/coffeerhyder/BKCouponCrawler/blob/GithubMirror/media/2021_01_24_Showcase_2.png?raw=true" width="360" height="640" /> </br> </html>
 
 # Features
 * Alle Burger King Coupons ohne App & Accountzwang
