@@ -321,7 +321,8 @@ class BKBot:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
             else:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
-        if self.crawler.cachedNumberofAvailableOffers > 0:
+        alwaysShowOfferButton = True  # 2022-09-28: Always show offer button because BK website may have some offers
+        if self.crawler.cachedNumberofAvailableOffers > 0 or alwaysShowOfferButton:
             allButtons.append(
                 [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS)])
         if user.settings.displayBKWebsiteURLs:
@@ -647,13 +648,13 @@ class BKBot:
         Posts all current offers (= photos with captions) into current chat.
         """
         activeOffers = self.crawler.getOffersActive()
-        bkOffersOnWebsiteText = 'Angebote auf der BK Webseite anzeigen: ' + URLs.BK_KING_DEALS
+        bkOffersOnWebsiteText = 'Vielleicht findest du auf der BK Webseite welche: ' + URLs.BK_KING_DEALS
         if len(activeOffers) == 0:
             # BK should always have offers but let's check for this case anyways.
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
             menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote!</b>'
             menuText += '\n' + bkOffersOnWebsiteText
-            self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
+            self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
             return CallbackVars.MENU_MAIN
         prePhotosText = f'<b>Es sind derzeit {len(activeOffers)} Angebote verfügbar:</b>'
         prePhotosText += '\n' + bkOffersOnWebsiteText

@@ -1,5 +1,6 @@
 import csv
 import logging
+import re
 import traceback
 from typing import List
 
@@ -311,7 +312,7 @@ class BKCrawler:
                 uniqueCouponID = couponBK['vendorConfigs']['rpos']['constantPlu']
                 internalName = couponBK['internalName']
                 # Find coupon-title. Prefer to get it from 'internalName' as the other title may contain crap we don't want.
-                useInternalNameAsTitle = False
+                useInternalNameAsTitle = True
                 internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|MYBK_|\d{3,}_)?(.+)').search(internalName)
                 if internalNameRegex is not None and useInternalNameAsTitle:
                     titleFull = internalNameRegex.group(1)
@@ -319,7 +320,12 @@ class BKCrawler:
                 else:
                     title = couponBK['name']['de'][0]['children'][0]['text']
                     subtitle = couponBK['description']['de'][0]['children'][0]['text']
-                    titleFull = title + subtitle
+                    ignoreTitleRegex = re.compile(r'(?i)Im King Menü \(\+[^)]+\)').search(title)
+                    if ignoreTitleRegex:
+                        # Ignore title and only use subtitle
+                        titleFull = subtitle
+                    else:
+                        titleFull = title + subtitle
                 titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
