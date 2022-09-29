@@ -81,6 +81,11 @@ Die `config_extra_coupons.json` ist nützlich, um manuell Coupons hinzuzufügen,
 Beispiel:  
 Siehe `config_extra_coupons.json`
 
+### Bot mit Logging in File starten
+```
+python3 BKBot.py 2>&1 | tee /tmp/bkbot.log
+```
+
 ### Mögliche Start-Parameter für `BKBot.py`:  
 Die meisten Parameter sind nur einzeln verwendbar.  
 
