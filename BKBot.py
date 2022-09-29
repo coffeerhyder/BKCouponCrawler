@@ -568,11 +568,10 @@ class BKBot:
                 coupons = self.getBotCoupons()
             userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=sortCoupons)
             if len(userFavoritesInfo.couponsAvailable) == 0:
-                # Edge case
                 errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar:</b>'
                 errorMessage += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
                 if user.isAllowSendFavoritesNotification():
-                    errorMessage += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Coupons wieder verfügbar sind.'
+                    errorMessage += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Favoriten wieder verfügbar sind.'
                 raise BetterBotException(errorMessage, InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
 
             menuText = SYMBOLS.STAR
