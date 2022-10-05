@@ -313,7 +313,7 @@ class BKCrawler:
                 internalName = couponBK['internalName']
                 # Find coupon-title. Prefer to get it from 'internalName' as the other title may contain crap we don't want.
                 useInternalNameAsTitle = True
-                internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|MYBK_|\d{3,}_)?(.+)').search(internalName)
+                internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|CRM_MYBK_|MYBK_|\d{3,}_)?(.+)').search(internalName)
                 if internalNameRegex is not None and useInternalNameAsTitle:
                     titleFull = internalNameRegex.group(1)
                     titleFull = titleFull.replace('_', ' ')

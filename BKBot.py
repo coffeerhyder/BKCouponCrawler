@@ -23,7 +23,7 @@ from Crawler import BKCrawler, UserStats
 
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
     USER_SETTINGS_ON_OFF, CouponSortModes, CouponViews, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING
-from CouponCategory import CouponCategory, getCouponCategory
+from CouponCategory import CouponCategory
 from Helper import BotAllowedCouponTypes, CouponType
 from UtilsOffers import offerGetImagePath
 
@@ -461,11 +461,11 @@ class BKBot:
                 # First we only want to filter coupons. Sort them later according to user preference.
                 couponFilter.sortCode = None
                 if displayHiddenCouponsWithinOtherCategories is True:
-                    # None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons only
+                    # True translates to None -> Allow hidden- and none-hidden coupons
                     couponFilter.isHidden = None
                 else:
-                    # Don't touch couponFilter.isHidden and use pre-given value
-                    pass
+                    # Loop through None and False:  None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons only
+                    couponFilter.isHidden = displayHiddenCouponsWithinOtherCategories
                 coupons = self.getFilteredCoupons(couponFilter)
                 couponCategory = CouponCategory(coupons)
                 menuText = couponCategory.getCategoryInfoText(withMenu=couponFilter.containsFriesAndCoke, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
@@ -579,7 +579,7 @@ class BKBot:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
             else:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + '/' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
-            couponCategoryDummy = getCouponCategory(userFavoritesInfo.couponsAvailable)
+            couponCategoryDummy = CouponCategory(parameter=userFavoritesInfo.couponsAvailable)
             menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             priceInfo = couponCategoryDummy.getPriceInfoText()
             if priceInfo is not None:

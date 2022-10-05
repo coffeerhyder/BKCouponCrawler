@@ -185,6 +185,8 @@ class CouponCategory:
             text = '<b>[{couponCount} Stück] {couponCategoryName} ohne Menü</b>'
         if includeHiddenCouponsInCount is False:
             couponCount -= self.numberofCouponsHidden
+        # if self.coupons is not None:
+        #     couponCount = len(self.coupons)
         if couponCount == 1:
             couponCategoryName = self.nameSingular
         else:
@@ -244,16 +246,6 @@ class CouponCategory:
             if coupon.getPrice() is not None:
                 self.setTotalPrice(self.getTotalPrice() + coupon.getPrice())
                 self.setNumberofCouponsEatableWithPrice(self.getNumberofCouponsEatableWithPrice() + 1)
-        return None
+        # End of function
+        return
 
-
-def getCouponCategory(coupons: Union[List[Coupon], dict]) -> CouponCategory:
-    """ Returns CouponCategory for given list of coupons.Assumes that this list only contains coupons of one
-    category. """
-    if isinstance(coupons, dict):
-        coupons = list(coupons.values())
-    mainCouponType = coupons[0].type
-    category = CouponCategory(parameter=mainCouponType)
-    for coupon in coupons:
-        category.updateWithCouponInfo(coupon)
-    return category
