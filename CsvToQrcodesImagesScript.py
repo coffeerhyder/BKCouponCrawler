@@ -7,7 +7,9 @@ import qrcode
 
 """ Quick and dirty script to create QR Codes for all items of CSV exported darta from: https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
 Usage:
-1. Download said 
+1. Download said excel table here: https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
+2. Export it as .csv file and make sure there is no unnecessary line break in line 1.
+3. Run this script and find its output in folder 'bkplucs_qrimages'.
 """
 class CsvToQrcodesImagesScript:
     def __init__(self):
