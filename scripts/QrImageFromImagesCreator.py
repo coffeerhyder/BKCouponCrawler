@@ -46,7 +46,6 @@ class QrImageFromImagesCreator:
             # print('Writing file' + qrFilepath)
             qr = qrcode.QRCode(
                 version=1,
-                # 2021-05-02: This makes the image itself bigger but due to the border and the resize of Telegram, these QR codes might be suited better for usage in Telegram
                 border=10
             )
             qr.add_data(plu)
