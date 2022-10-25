@@ -5,7 +5,7 @@ import re
 import qrcode
 
 
-""" Quick and dirty script to create QR Codes for all items of CSV exported darta from: https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
+""" Quick and dirty script to create QR Codes for all items of CSV exported data from: https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
 Usage:
 1. Download said excel table here: https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
 2. Export it as .csv file and make sure there is no unnecessary line break in line 1.
@@ -20,26 +20,27 @@ class CsvToQrcodesImagesScript:
         if not os.path.exists(imagefolder):
             os.makedirs(imagefolder)
         with open('bkplucs.csv', encoding='utf-8') as csvfile:
-            spamreader = csv.DictReader(csvfile, dialect='excel',
+            csvreader = csv.DictReader(csvfile, dialect='excel',
                                         fieldnames=["PLU", "Rabatt-Preis", "Normal -preis", "Rabatt", "Artikel/Menü", "Zuletzt funktionierend /Gültig bis", "Quelle",
                                                     "Saison /Promotion", "Kommentar"], delimiter=';')
 
             position = 0
-            for row in spamreader:
+            for row in csvreader:
                 position += 1
                 print(f"Working on row {position}")
-                if position == 1:
-                    # Skip table header
-                    continue
                 plu = row['PLU'].strip()
                 price = row['Rabatt-Preis']
                 articlename = row['Artikel/Menü']
                 season = row['Saison /Promotion']
-
+                if plu is None or price is None or articlename is None or season is None:
+                    # WTF should never happen
+                    print(f'Skipping invalid row data {position}')
+                    continue
                 pluregex = re.compile(r'^(\d+)').search(plu.strip())
                 # This is how we easily determine wrong/invalid datarows
                 if pluregex is None:
-                    print(f'Skipping pos {position} because: Invalid plu data')
+                    # Typically that is the table header
+                    print(f'Skipping pos {position} because: Invalid plu data: {row}')
                     continue
                 # Beautify/fix data
                 plu = pluregex.group(1)
@@ -66,7 +67,7 @@ class CsvToQrcodesImagesScript:
                 # Quickly stolen from: https://stackoverflow.com/questions/295135/turn-a-string-into-a-valid-filename/38766141#38766141
                 filename = re.sub('[^\\w_.)( -]', '', filename)
                 # print(str(row))
-                print('Writing file' + filename)
+                # print('Writing file ' + filename)
                 qr = qrcode.QRCode(
                     version=1,
                     border=10
