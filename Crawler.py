@@ -286,33 +286,26 @@ class BKCrawler:
         for offerFeedback in offersFeedback:
             # json in json
             couponJson = offerFeedback['offerDetails']
-            bkCoupons = []
-            try:
-                couponBK = loads(couponJson)
-                bkCoupons.append(couponBK)
-                # Collect hidden coupons
-                upsellOptions = couponBK.get('upsellOptions')
-                if upsellOptions is not None and len(upsellOptions) > 0:
-                    for upsellOption in upsellOptions:
-                        upsellType = upsellOption.get('_type')
-                        upsellShortCode = upsellOption.get('shortCode')
-                        if upsellType != 'offer' or upsellShortCode is None:
-                            # Skip invalid items: This should never happen
-                            logging.info("Found invalid upsell object: " + str(upsellOption))
-                            continue
-                        bkCoupons.append(upsellOption)
-
-            except Exception as e:
-                # This should never happen
-                print(e)
-                logging.warning("Got unexpected json structure in: " + couponJson)
-                pass
+            couponBK = loads(couponJson)
+            bkCoupons = [couponBK]
+            # Collect hidden coupons
+            upsellOptions = couponBK.get('upsellOptions')
+            if upsellOptions is not None and len(upsellOptions) > 0:
+                for upsellOption in upsellOptions:
+                    upsellType = upsellOption.get('_type')
+                    upsellShortCode = upsellOption.get('shortCode')
+                    if upsellType != 'offer' or upsellShortCode is None:
+                        # Skip invalid items: This should never happen
+                        logging.info("Found invalid upsell object: " + str(upsellOption))
+                        continue
+                    bkCoupons.append(upsellOption)
             index = 0
             for couponBK in bkCoupons:
                 uniqueCouponID = couponBK['vendorConfigs']['rpos']['constantPlu']
                 internalName = couponBK['internalName']
                 # Find coupon-title. Prefer to get it from 'internalName' as the other title may contain crap we don't want.
-                useInternalNameAsTitle = True
+                # 2022-11-02: Prefer normal titles again because internal ones are sometimes incomplete
+                useInternalNameAsTitle = False
                 internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|CRM_MYBK_|MYBK_|\d{3,}_)?(.+)').search(internalName)
                 if internalNameRegex is not None and useInternalNameAsTitle:
                     titleFull = internalNameRegex.group(1)
