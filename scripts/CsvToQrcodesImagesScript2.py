@@ -68,8 +68,8 @@ class CsvToQrcodesImagesScript2:
                 """ 2021-01-25: Use the same color they're using in their app. """
                 img = qr.make_image(fill_color="#4A1E0D", back_color="white")
                 img.save(os.path.join(imagefolder, filename))
-            print('SUCCESS | Done')
-            return None
+        print('SUCCESS | Done')
+        return None
 
 
 if __name__ == '__main__':
