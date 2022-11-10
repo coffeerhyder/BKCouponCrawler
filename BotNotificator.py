@@ -350,8 +350,8 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n•Alte Coupons verwenden und sparen: Siehe angepinntes Channel FAQ --> ' + '<a href=\"' + URLs.MEGA_COUPON_ARCHIVE + '\">Direkt zum Coupon Archiv</a>'
     infoText += '\n<b>McDonalds</b>'
     infoText += '\n•<a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a> | Gratis Getränke & Coupons'
-    infoText += '\n•<a href=\"' + URLs.MCD_COCKBOT + '\">t.me/gimmecockbot</a> | Gratis Getränke'
-    infoText += '\n•<a href=\"' + URLs.MCD_MCBROKEN + '\">mcbroken.com</a> | Wo funktioniert die Eismaschine?'
+    infoText += '\n•<a href=\"https://' + URLs.MCD_MCDONALDS4FREEBOT + '\">' + URLs.MCD_MCDONALDS4FREEBOT + '</a> | Gratis Getränke'
+    infoText += '\n•<a href=\"https://' + URLs.MCD_MCBROKEN + '\">' + URLs.MCD_MCBROKEN + '</a> | Wo funktioniert die Eismaschine?'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"
