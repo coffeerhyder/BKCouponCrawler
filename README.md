@@ -315,7 +315,7 @@ Quellcode: github.com/WebFreak001/WurgerKing
 Gibt es sowas auch für McDonalds/KFC/...?
 McDonalds:
 •mccoupon.deals | Gratis Getränke & Coupons
-•t.me/mcdonalds4free_bot | Gratis Getränke
+•t.me/mcdonalds4free_bot | Gratis Getränke (danke an mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092)
 •mcbroken.com | Wo funktioniert die Eismaschine?
 ```
 
