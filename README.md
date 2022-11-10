@@ -315,7 +315,7 @@ Quellcode: github.com/WebFreak001/WurgerKing
 Gibt es sowas auch für McDonalds/KFC/...?
 McDonalds:
 •mccoupon.deals | Gratis Getränke & Coupons
-•t.me/gimmecockbot | Gratis Getränke
+•t.me/mcdonalds4free_bot | Gratis Getränke (danke an mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092)
 •mcbroken.com | Wo funktioniert die Eismaschine?
 ```
 
@@ -370,15 +370,27 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * http://www.fastfood-forum.net/wbb3/upload/index.php/Board/9-Burger-King/
 * https://www.burgerking.de/rewards/offers (Coupons direkt über die BK Webseite)
 
-### Ähnliche Projekte (teilweise veraltet)
+### Ähnliche Projekte | funktionierend
+Name | Beschreibung | Live-Instanz
+--- | --- | ---
+Würger King | https://github.com/WebFreak001/WurgerKing | https://wurgerking.wfr.moe/
+- | https://github.com/reteps/burger-king-api-wrapper | -
+- | https://github.com/robsonkades/clone-burger-king-app-with-expo | -
+mccoupon.deals | McDonalds Coupons ohne App, [Autor](https://www.mydealz.de/profile/Jicu) | https://www.mccoupon.deals/
+mcdonalds4free_bot | McDonalds Getränke kostenlos, [MyDealz Thread](https://www.mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092) | https://t.me/mcdonalds4free_bot
+
 * https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
 * https://github.com/reteps/burger-king-api-wrapper
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
-* https://bk.eris.cc/ --> https://gist.github.com/printfuck
-* https://t.me/gimmecockbot (https://t.me/freecokebot)
 * https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
 * [pbcp.de/partner/burger-king](https://pbcp.de/partner/burger-king)
 * https://mcbroken.com/
+
+### Ähnliche Projekte | down/defekt
+Name | Beschreibung | Live-Instanz | Down seit
+--- | --- | --- | ---
+freecokebot aka gimmecockbot | McDonalds gratis Getränke | https://t.me/gimmecockbot (Alternativ https://t.me/freecokebot) | 10.11.2022
+bk.eris.cc | BK Coupons ohne App, [Autor](https://gist.github.com/printfuck) | https://bk.eris.cc/ | 10.11.2022
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot
