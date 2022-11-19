@@ -8,7 +8,7 @@ VERSION = '1.9.3'
 
 
 def getBotImpressum() -> str:
-    text = "BKBot v." + VERSION
+    text = "BetterKing Bot v." + VERSION
     # 2022-04-26: Add some love for Ukraine (RE stupid war RU vs UA 2022)
     text += " | " + SYMBOLS.FLAG_UA + SYMBOLS.HEART
     text += "\n<i>Made with " + SYMBOLS.HEART + " and " + SYMBOLS.BEER + " during " + SYMBOLS.CORONA

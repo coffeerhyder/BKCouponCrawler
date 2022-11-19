@@ -719,10 +719,12 @@ class BKBot:
                 else:
                     # Setting is currently disabled
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
+        addDeletePaybackCardButton = False
         if user.getPaybackCardNumber() is None:
             keyboard.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
         else:
-            keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
+            # Looks complicated but this is simply so that we can show all "delete buttons" in one row
+            addDeletePaybackCardButton = True
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.PROTOCOL_BK + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
@@ -732,8 +734,10 @@ class BKBot:
             menuText += "\n---"
             menuText += f"\nEs gibt gespeicherte Coupon Sortierungen für {len(userSortModes)} Coupon Ansichten, die beim Klick auf den zurücksetzen Button ebenfalls gelöscht werden."
         if not user.hasDefaultSettings():
-            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen |" + SYMBOLS.STAR + " & PB Karte bleiben",
+            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen | PB Karte & " + SYMBOLS.STAR + " bleiben",
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
+        if addDeletePaybackCardButton:
+            keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
             userFavoritesInfo = user.getUserFavoritesInfo(self.getBotCoupons(), sortCoupons=True)
@@ -742,7 +746,7 @@ class BKBot:
                                                       callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
                 menuText += "\n*²" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
                 menuText += "\n" + userFavoritesInfo.getUnavailableFavoritesText()
-        keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Meinen Account löschen",
+        keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "BetterKing Account löschen",
                                               callback_data=CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT)])
         # Back button
         keyboard.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])

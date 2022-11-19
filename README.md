@@ -260,7 +260,6 @@ FAQ BetterKing Bot und Channel
 Wo finde ich die aktuellen Papiercoupons als Scan?
 Sofern es welche gibt, hier:
 mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
-Letzte/aktuelle Papiercoupons gültig bis: 16.09.2022
 
 Warum fehlen (manchmal) Papiercoupons im Bot/Channel?
 Seit dem 03.12.2021 waren Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlten manchmal welche.
@@ -284,23 +283,21 @@ Es gibt mehrere Möglichkeiten:
 - Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
 
 Wie kann ich noch mehr sparen?
-In Filialen mit Terminals lassen sich teilweise alte "abgelaufene" Papiercoupons verwenden.  
+~~In Filialen mit Terminals lassen sich teilweise alte "abgelaufene" Papiercoupons verwenden.  
 App Coupons theoretisch ebenso, wenn man sie gesammelt hat.
 Hier findest du ein stetig aktualisiertes Archiv alter (Papier-)coupons: mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
-
 Wie verwende ich alte Coupons?
 - Geht nur am Terminal
 - QR Code scannen oder falls möglich, PLU Code eintippen
-
 Ab welchem Jahr sind alte Coupons verwendbar?
 Ungefähr ab dem Jahr 2018, da BK ab hier QR Codes eingeführt hat (erster Couponbogen im Archiv mit QR Codes ist "2018_11_11_1.pdf".)
 Natürlich kannst du trotzdem jeden alten PLU Code (also die Nummer) zu einem QR Code machen und ältere ausprobieren. Nimm dafür einen beliebigen QR Code Generator (z.B. qrcode-generator.de) oder App und wähle "Text" als Datentyp.
-
 Ganz am Ende vorm Bezahlen tritt ein Fehler auf und meine Bestellung verschwindet. Warum und was kann ich tun?
 Viele alte Coupons sind gesperrt bzw. lassen sich nicht mehr bestellen, aber zunächst trotzdem dem Warenkorb hinzufügen.
 - Schaue auf MyDealz, ob es Feedback von Usern zu bestimmten Codes gibt
 - Versuche, Coupons einzeln zu bestellen um nach und nach herauszufinden, welche Coupons funktionieren und welche nicht. Es gibt keine Liste dazu und das kann von Filiale zu Filiale variieren.
-- Pass auf, dass du keine Burger bestellst, die es nicht mehr gibt das kann zwar durchgehen, aber dann nervt dich die Filialleitung. Beispiel: X-tra Long BBQ
+- Pass auf, dass du keine Burger bestellst, die es nicht mehr gibt das kann zwar durchgehen, aber dann nervt dich die Filialleitung. Beispiel: X-tra Long BBQ~~
+⚠Funktioniert seit Anfang November 2022 nicht mehr!
 
 Wo finde ich den Quellcode?
 Hier: github.com/coffeerhyder/BKCouponCrawler
