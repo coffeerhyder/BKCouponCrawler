@@ -13,7 +13,7 @@ import couchdb
 from json import loads
 
 import PaperCouponHelper
-from BotUtils import Config, getImageBasePath
+from BotUtils import getImageBasePath, loadConfig
 from Helper import *
 from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesAndDrink, \
     isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, BotAllowedCouponTypes, CouponType, Paths
@@ -71,10 +71,10 @@ class BKCrawler:
 
     def __init__(self):
         self.cfg = loadConfig()
-        if self.cfg is None or self.cfg.get(Config.DB_URL) is None:
+        if self.cfg is None:
             raise Exception('Broken or missing config')
         # Init DB
-        self.couchdb = couchdb.Server(self.cfg[Config.DB_URL])
+        self.couchdb = couchdb.Server(self.cfg.db_url)
         self.cachedAvailableCouponCategories = {}
         self.cachedNumberofAvailableOffers = 0
         self.keepHistoryDB = False

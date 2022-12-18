@@ -1,8 +1,12 @@
+import json
+from typing import Optional, List
+
+import pydantic
 from telegram import InlineKeyboardMarkup
 
 from Helper import SYMBOLS
 
-VERSION = '1.9.3'
+VERSION = '1.9.4'
 
 """ Place static stuff into this class. """
 
@@ -14,13 +18,6 @@ def getBotImpressum() -> str:
     text += "\n<i>Made with " + SYMBOLS.HEART + " and " + SYMBOLS.BEER + " during " + SYMBOLS.CORONA
     text += "\nKontakt: bkfeedback@pm.me</i>"
     return text
-
-
-class Config:
-    BOT_TOKEN = 'bot_token'
-    DB_URL = 'db_url'
-    PUBLIC_CHANNEL_NAME = 'public_channel_name'
-    BOT_NAME = 'bot_name'
 
 
 class CallbackVars:
@@ -45,6 +42,11 @@ class CallbackVars:
     EASTER_EGG = 'easter_egg'
 
 
+class Commands:
+    """ Contains commands that are programmatically used at multiple places to keep the strings at one place. """
+    MAINTENANCE = 'maintenance'
+
+
 class PATTERN:
     PLU = r'^plu,(\d{2,})$'
     PLU_TOGGLE_FAV = r'^plu,(\d{2,}),togglefav,([^,]+)$'
@@ -64,3 +66,18 @@ class BetterBotException(Exception):
 
 def getImageBasePath() -> str:
     return "crawler/images/couponsproductive"
+
+
+class Config(pydantic.BaseModel):
+
+    bot_token: str
+    bot_name: str
+    db_url: str
+    admin_ids: Optional[List]
+    public_channel_name: Optional[str]
+
+
+def loadConfig() -> Config:
+    with open('config.json', encoding='utf-8') as infile:
+        jsondict = json.load(infile)
+        return Config(**jsondict)

@@ -45,14 +45,6 @@ class URLs:
     MEGA_COUPON_ARCHIVE_SHORT = 'bit.ly/bkcoupons'
 
 
-def loadConfig(fallback: str = None):
-    try:
-        return loadJson(Paths.configPath)
-    except:
-        print('Failed to load ' + Paths.configPath)
-        return fallback
-
-
 def loadJson(path: str):
     with open(os.path.join(os.getcwd(), path), encoding='utf-8') as infile:
         loadedJson = json.load(infile, use_decimal=True)

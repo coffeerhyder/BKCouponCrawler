@@ -50,6 +50,7 @@ bot_token | String | Nein | Bot Token | `1234567890:HJDH-gh56urj6r5u6grhrkJO7Qw`
 db_url | String | Nein | URL zur CouchDB DB samt Zugangsdaten | `http://username:pw@localhost:5984/` 
 public_channel_name | String | Ja | Name des öffentlichen Telegram Channels, in den der Bot die aktuell gültigen Gutscheine posten soll.  | `TestChannel`
 bot_name | String | Nein | Name des Bots | `BetterKingBot`
+admin_ids | StringArray | Nein | Telegram UserIDs der gewünschten Bot Admins | ["57659679843", "534494657832"]
 **Falls nur der Crawler benötigt wird, reicht die CouchDB URL (mit Zugangsdaten)!**
 
 ## Optional: Papiercoupons hinzufügen  
