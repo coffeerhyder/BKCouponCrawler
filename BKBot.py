@@ -244,7 +244,7 @@ class BKBot:
 
     def adminOrException(self, user: User):
         if not self.isAdmin(user):
-            raise BetterBotException(SYMBOLS.DENY + ' <b>Dir fehlen die Rechte für diese Aktion!</b>')
+            raise BetterBotException(SYMBOLS.DENY + ' <b>Dir fehlen die Rechte zum Ausführen dieser Aktion!</b>')
 
     def isAdmin(self, user: User) -> bool:
         if user is not None and self.cfg.admin_ids is not None and user.id in self.cfg.admin_ids:
