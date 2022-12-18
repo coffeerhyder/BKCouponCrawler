@@ -347,7 +347,6 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n•<a href=\"' + URLs.BK_KING_FINDER + '\">KING Finder</a>'
     infoText += '\n•<a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to BetterKing Forum Thread</a>'
     infoText += '\n•<a href=\"' + URLs.BK_WUERGER_KING + '\">Würger King</a> (' + '<a href=\"' + URLs.BK_WUERGER_KING_SOURCE + '\">source</a>' + ')'
-    infoText += '\n•Alte Coupons verwenden und sparen: Siehe angepinntes Channel FAQ --> ' + '<a href=\"' + URLs.MEGA_COUPON_ARCHIVE + '\">Direkt zum Coupon Archiv</a>'
     infoText += '\n<b>McDonalds</b>'
     infoText += '\n•<a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a> | Gratis Getränke & Coupons'
     infoText += '\n•<a href=\"https://' + URLs.MCD_MCDONALDS4FREEBOT + '\">' + URLs.MCD_MCDONALDS4FREEBOT + '</a> | Gratis Getränke'

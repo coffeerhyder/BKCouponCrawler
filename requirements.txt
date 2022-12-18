@@ -7,7 +7,7 @@ pytz==2022.1
 schedule==1.1.0
 qrcode==7.3.1
 python-telegram-bot~=13.2
-pydantic==1.9.1
+pydantic==1.10.2
 furl~=2.1.2
 python-barcode==0.14.0
 httpx~=0.23.0

@@ -17,6 +17,7 @@ from telegram.utils.types import ODVInput, FileInput
 from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion
 from BotUtils import *
 from BaseUtils import *
+from BotUtils import loadConfig
 
 from Helper import *
 from Crawler import BKCrawler, UserStats
@@ -125,19 +126,24 @@ class BKBot:
         self.crawler.setExportCSVs(False)
         self.crawler.setKeepHistoryDB(False)
         self.crawler.setKeepSimpleHistoryDB(True)
-        self.crawler.setStoreCouponAPIDataAsJson(True)  # 2022-08-25: For debug purposes
-        self.publicChannelName = self.cfg.get(Config.PUBLIC_CHANNEL_NAME)
-        self.botName = self.cfg[Config.BOT_NAME]
+        self.crawler.setStoreCouponAPIDataAsJson(False)
+        self.publicChannelName = self.cfg.public_channel_name
+        self.botName = self.cfg.bot_name
         self.couchdb = self.crawler.couchdb
-        self.updater = Updater(self.cfg[Config.BOT_TOKEN], request_kwargs={"read_timeout": 30})
-        dispatcher = self.updater.dispatcher
+        self.updater = Updater(self.cfg.bot_token, request_kwargs={"read_timeout": 30})
+        self.initHandlers()
+        self.updater.dispatcher.add_error_handler(self.botErrorCallback)
 
+    def initHandlers(self):
+        """ Adds all handlers to dispatcher (not error_handlers!!) """
+        dispatcher = self.updater.dispatcher
         # Main conversation handler - handles nearly all bot menus.
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', self.botDisplayMenuMain), CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND),
                           CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND), CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND),
                           CommandHandler('angebote', self.botDisplayOffers), CommandHandler('payback', self.botDisplayPaybackCard),
                           CommandHandler('einstellungen', self.botDisplayMenuSettings),
+                          CommandHandler(Commands.MAINTENANCE, self.botAdminToggleMaintenanceMode),
                           CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$')],
             states={
                 CallbackVars.MENU_MAIN: [
@@ -231,24 +237,20 @@ class BKBot:
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="CouponToggleFavoriteWithImageHandler",
         )
-        if self.maintenanceMode:
-            # Re-route all callbacks to maintenance mode function
-            for convHandler in [conv_handler, conv_handler2, conv_handler3]:
-                # Collect all handlers
-                all_handlers: List[Handler] = []
-                all_handlers.extend(convHandler.entry_points)
-                all_handlers.extend(convHandler.fallbacks)
-                for handlers in convHandler.states.values():
-                    all_handlers.extend(handlers)
-                for handler in all_handlers:
-                    handler.callback = self.botDisplayMaintenanceMode
         dispatcher.add_handler(conv_handler)
         dispatcher.add_handler(conv_handler2)
         dispatcher.add_handler(conv_handler3)
         dispatcher.add_handler(CommandHandler('stats', self.botDisplayStats))
-        # dispatcher.add_handler(CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND))
-        dispatcher.add_error_handler(self.botErrorCallback)
-        # dispatcher.add_handler(MessageHandler(Filters.command, self.botUnknownCommand))
+
+    def adminOrException(self, user: User):
+        if not self.isAdmin(user):
+            raise BetterBotException(SYMBOLS.DENY + ' <b>Dir fehlen die Rechte zum Ausführen dieser Aktion!</b>')
+
+    def isAdmin(self, user: User) -> bool:
+        if user is not None and self.cfg.admin_ids is not None and user.id in self.cfg.admin_ids:
+            return True
+        else:
+            return False
 
     def botErrorCallback(self, update: Update, context: CallbackContext):
         try:
@@ -286,8 +288,12 @@ class BKBot:
 
     def botDisplayMaintenanceMode(self, update: Update, context: CallbackContext):
         text = SYMBOLS.DENY + '<b>Wartungsmodus!' + SYMBOLS.DENY + '</b>'
+        text += '\nKeine Sorge solange der Bot reagiert, lebt er auch noch ;)'
         if self.getPublicChannelName() is not None:
             text += '\nMehr Infos siehe ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + '.'
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        if self.isAdmin(user):
+            text += '\nWartungsmodus deaktivieren: /' + Commands.MAINTENANCE
         self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
     def botDisplayMenuMain(self, update: Update, context: CallbackContext):
@@ -344,6 +350,10 @@ class BKBot:
             if self.getPublicChannelName() is not None:
                 menuText += '\nVollständige Papiercouponbögen sind im angepinnten FAQ im ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + ' verlinkt.'
             menuText += '</b>'
+        if self.isAdmin(user):
+            menuText += '\n<b>Du bist Admin!</b>'
+            menuText += '\nAdmin Commands:'
+            menuText += '\n/' + Commands.MAINTENANCE + ' - Wartungsmodus toggeln'
         self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
@@ -719,10 +729,12 @@ class BKBot:
                 else:
                     # Setting is currently disabled
                     keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
+        addDeletePaybackCardButton = False
         if user.getPaybackCardNumber() is None:
             keyboard.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
         else:
-            keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
+            # Looks complicated but this is simply so that we can show all "delete buttons" in one row
+            addDeletePaybackCardButton = True
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.PROTOCOL_BK + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
@@ -732,8 +744,10 @@ class BKBot:
             menuText += "\n---"
             menuText += f"\nEs gibt gespeicherte Coupon Sortierungen für {len(userSortModes)} Coupon Ansichten, die beim Klick auf den zurücksetzen Button ebenfalls gelöscht werden."
         if not user.hasDefaultSettings():
-            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen |" + SYMBOLS.STAR + " & PB Karte bleiben",
+            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Einstell. zurücksetzen | PB Karte & " + SYMBOLS.STAR + " bleiben",
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
+        if addDeletePaybackCardButton:
+            keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
             userFavoritesInfo = user.getUserFavoritesInfo(self.getBotCoupons(), sortCoupons=True)
@@ -742,7 +756,7 @@ class BKBot:
                                                       callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
                 menuText += "\n*²" + SYMBOLS.DENY + "Löschbare abgelaufene Favoriten:"
                 menuText += "\n" + userFavoritesInfo.getUnavailableFavoritesText()
-        keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Meinen Account löschen",
+        keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + SYMBOLS.DENY + "BetterKing Account löschen" + SYMBOLS.DENY + SYMBOLS.DENY,
                                               callback_data=CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT)])
         # Back button
         keyboard.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
@@ -1036,6 +1050,42 @@ class BKBot:
             self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True,
                            reply_markup=replyMarkup)
         return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
+
+    def botAdminToggleMaintenanceMode(self, update: Update, context: CallbackContext):
+        user = getUserFromDB(userDB=self.crawler.getUserDB(), userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        self.adminOrException(user)
+        dispatcher = self.updater.dispatcher
+        if self.maintenanceMode:
+            # Remove all handlers
+            for handlerList in dispatcher.handlers.values():
+                for handler in handlerList:
+                    handler.callback = self.botDisplayMaintenanceMode
+                    dispatcher.remove_handler(handler)
+            # RE-init handlers so bot behaves normal again
+            self.initHandlers()
+            self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.CONFIRM + 'Wartungsmodus deaktiviert.')
+            self.maintenanceMode = False
+        else:
+            # Change callback of all handlers to point to maintenance function
+            for handlerList in dispatcher.handlers.values():
+                for handler in handlerList:
+                    all_handlers: List[Handler] = []
+                    try:
+                        # Not all types of handlers have all properties
+                        all_handlers.extend(handler.entry_points)
+                        all_handlers.extend(handler.fallbacks)
+                        for handlers in handler.states.values():
+                            all_handlers.extend(handlers)
+                    except AttributeError:
+                        pass
+                    for thishandler in all_handlers:
+                        """ Make sure not to disable the maintenance command itself otherwise the bot will be stuck in maintenance mode forever ;) """
+                        if isinstance(thishandler, CommandHandler) and Commands.MAINTENANCE in thishandler.command:
+                            continue
+                        thishandler.callback = self.botDisplayMaintenanceMode
+            self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.CONFIRM + 'Wartungsmodus aktiviert.')
+            self.maintenanceMode = True
+        return None
 
     def batchProcessAutoDeleteUsersUnavailableFavorites(self):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
