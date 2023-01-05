@@ -454,7 +454,7 @@ def nukeChannel(bkbot):
             updateInfoDoc = True
     # Delete coupon information message
     if infoDoc.informationMessageID is not None:
-        logging.info("Deleting channel overview message: " + infoDoc.informationMessageID)
+        logging.info(f'Deleting channel overview message with ID {infoDoc.informationMessageID}')
         bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=infoDoc.informationMessageID)
         infoDoc.informationMessageID = None
         updateInfoDoc = True
