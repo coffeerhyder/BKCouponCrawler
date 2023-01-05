@@ -1164,9 +1164,6 @@ class BKCrawler:
             # DB was not updated
             return False
 
-    def deleteInactiveUsers(self):
-        deleteInactiveUsers(userDB=self.getUserDB())
-
     def getCouponDB(self):
         return self.couchdb[DATABASES.COUPONS]
 
@@ -1245,17 +1242,6 @@ class BKCrawler:
     def getBotCoupons(self) -> dict:
         """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
         return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.PRICE.getSortCode()))
-
-
-def deleteInactiveUsers(userDB: Database):
-    usersToDelete = []
-    for userID in userDB:
-        user = User.load(userDB, userID)
-        if user.isEligableForAutoDeletion():
-            usersToDelete.append(user)
-    if len(usersToDelete) > 0:
-        logging.info("Deleting inactive users: " + str(len(usersToDelete)))
-        userDB.purge(docs=usersToDelete)
 
 
 def getCouponByID(coupons: List[Coupon], couponID: str) -> Union[Coupon, None]:
