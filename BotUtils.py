@@ -6,16 +6,15 @@ from telegram import InlineKeyboardMarkup
 
 from Helper import SYMBOLS
 
-VERSION = '1.9.4'
+VERSION = '1.9.5'
 
 """ Place static stuff into this class. """
 
 
 def getBotImpressum() -> str:
-    text = "BetterKing Bot v." + VERSION
     # 2022-04-26: Add some love for Ukraine (RE stupid war RU vs UA 2022)
-    text += " | " + SYMBOLS.FLAG_UA + SYMBOLS.HEART
-    text += "\n<i>Made with " + SYMBOLS.HEART + " and " + SYMBOLS.BEER + " during " + SYMBOLS.CORONA
+    text = f"BetterKing Bot v.{VERSION} | {SYMBOLS.FLAG_UA}{SYMBOLS.HEART}"
+    text += f"\n<i>Made with {SYMBOLS.HEART} and {SYMBOLS.BEER} during {SYMBOLS.CORONA}"
     text += "\nKontakt: bkfeedback@pm.me</i>"
     return text
 
@@ -44,6 +43,7 @@ class CallbackVars:
 
 class Commands:
     """ Contains commands that are programmatically used at multiple places to keep the strings at one place. """
+    DELETE_ACCOUNT = 'tschau'
     MAINTENANCE = 'maintenance'
 
 

@@ -579,8 +579,8 @@ class User(Document):
         """ If this returns True, upper handling is allowed to delete this account as it looks like it has been abandoned by the user. """
         if self.hasProbablyBlockedBotForLongerTime():
             return True
-        elif self.getSecondsPassedSinceLastTimeUsed() >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION and self.timesInformedAboutUpcomingAutoAccountDeletion >= MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
-            # Looks like user hasn't used bot for a loong time
+        elif self.getSecondsUntilAccountDeletion() == 0 and self.timesInformedAboutUpcomingAutoAccountDeletion >= MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+            # Looks like user hasn't used this bot for a loong time. Only allow this to return true if user has been warned enough times in beforehand.
             return True
         else:
             return False
@@ -627,10 +627,13 @@ class User(Document):
 
     def isAllowSendFavoritesNotification(self):
         if self.settings.autoDeleteExpiredFavorites:
+            # User wants expired coupons to be auto-deleted so it is impossible to inform him about expired favourites that are back.
             return False
         elif self.settings.notifyWhenFavoritesAreBack:
+            # User wants to be informed about expired favourite coupons that are back.
             return True
         else:
+            # User does not want to be informed about expired favourite coupons that are back.
             return False
 
     def getPaybackCardNumber(self) -> Union[str, None]:
@@ -734,7 +737,13 @@ class User(Document):
             return False
 
     def getSecondsUntilAccountDeletion(self) -> float:
-        return getCurrentDate().timestamp() + MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - self.timestampLastTimeAccountUsed
+        secondsPassedSinceLastUsage = self.getSecondsPassedSinceLastTimeUsed()
+        if secondsPassedSinceLastUsage > MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
+            # Account can be deleted now
+            return 0
+        else:
+            # Account can be deleted in X seconds
+            return MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - secondsPassedSinceLastUsage
 
     def getSecondsPassedSinceLastTimeUsed(self) -> float:
         return getCurrentDate().timestamp() - self.timestampLastTimeAccountUsed

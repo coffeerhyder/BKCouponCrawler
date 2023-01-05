@@ -84,7 +84,7 @@ def getUserFromDB(userDB: Database, userID: Union[str, int], addIfNew: bool, upd
     elif addIfNew:
         """ New user? --> Add userID to DB if wished. """
         # Add user to DB for the first time
-        logging.info('Storing new userID: ' + str(userID))
+        logging.info(f'Storing new userID: {userID}')
         user = User(id=str(userID))
         user.store(userDB)
 
@@ -208,7 +208,7 @@ class BKBot:
         )
         """ Handles deletion of user accounts. """
         conv_handler2 = ConversationHandler(
-            entry_points=[CommandHandler('tschau', self.botUserDeleteAccountSTART_COMMAND),
+            entry_points=[CommandHandler(Commands.DELETE_ACCOUNT, self.botUserDeleteAccountSTART_COMMAND),
                           CallbackQueryHandler(self.botUserDeleteAccountSTART_MENU, pattern="^" + CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT + "$")],
             states={
                 CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT: [
@@ -812,7 +812,7 @@ class BKBot:
             menuText = SYMBOLS.CONFIRM + 'Dein BetterKing Account wurde vernichtet!'
             menuText += '\nDu kannst diesen Chat nun löschen.'
             menuText += '\n<b>Viel Erfolg beim Abnehmen!</b>'
-            menuText += '\nIn loving memory of <i>blauelagunepb</i> ' + SYMBOLS.HEART
+            menuText += '\nIn loving memory of <i>blauelagunepb_mydealz</i> ' + SYMBOLS.HEART
             self.editOrSendMessage(update, text=menuText, parse_mode='HTML')
             return ConversationHandler.END
         else:
@@ -863,7 +863,12 @@ class BKBot:
             isFavorite = False
         else:
             # Add coupon to favorites
-            user.addFavoriteCoupon(Coupon.load(self.crawler.getCouponDB(), uniqueCouponID))
+            coupon = Coupon.load(self.crawler.getCouponDB(), uniqueCouponID)
+            if coupon is None:
+                # Edge case: Coupon may have been deleted from DB while user had this keyboard open.
+                self.editOrSendMessage(update, text=SYMBOLS.WARNING + 'Coupon Favoritenstatus kann nicht geändert werden, da dieser Coupon nicht mehr existiert!', parse_mode='HTML')
+                return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
+            user.addFavoriteCoupon(coupon)
             isFavorite = True
         # Update DB
         user.store(userDB)
@@ -1153,11 +1158,32 @@ class BKBot:
                 infoText += '\n+ ' + str(numberOfNonHyperinkedItems) + ' weitere'
         return infoText
 
+    def deleteInactiveAccounts(self) -> None:
+        """ Deletes all inactive accounts from DB and informs user about that account deletion. """
+        usersToDelete = []
+        userDB = self.crawler.getUserDB()
+        for userID in userDB:
+            user = User.load(userDB, userID)
+            if user.isEligableForAutoDeletion():
+                usersToDelete.append(user)
+                try:
+                    text = SYMBOLS.WARNING + '<b>Dein BetterKing Account wurde wegen Inaktivität gelöscht.</b>'
+                    text += f'\nDu hast ihn zuletzt verwendet vor: {formatSeconds(seconds=user.getSecondsPassedSinceLastTimeUsed())}'
+                    self.sendMessage(chat_id=userID, text=text, parse_mode='HTML')
+                except:
+                    traceback.print_exc()
+                    logging.info(f'Error while notifying user {userID} about auto account deletion.')
+                    pass
+        if len(usersToDelete) > 0:
+            logging.info(f'Deleting {len(usersToDelete)} inactive users from DB')
+            userDB.purge(docs=usersToDelete)
+        pass
+
     def batchProcess(self):
         """ Runs all processes which should only run once per day. """
         self.crawl()
         self.renewPublicChannel()
-        self.crawler.deleteInactiveUsers()
+        self.deleteInactiveAccounts()
         self.batchProcessAutoDeleteUsersUnavailableFavorites()
         self.notifyUsers()
         self.cleanupPublicChannel()
