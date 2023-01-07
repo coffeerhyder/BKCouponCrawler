@@ -413,7 +413,7 @@ class BKBot:
         text += '\nDein BetterKing Account:'
         text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
         text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
-        text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt vom Bot zugestellter Nachrichten bei aktivierten Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
+        text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt von vom Bot zugestelltem Coupon-Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
         text += '</pre>'
         if isinstance(msg, Message):
             self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
