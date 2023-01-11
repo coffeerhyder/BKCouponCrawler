@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from BotUtils import getImageBasePath
 from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesAndDrink, BotAllowedCouponTypes, \
     CouponType, \
-    formatPrice
+    formatPrice, couponTitleContainsVeggieFood
 
 
 class CouponFilter(BaseModel):
@@ -27,6 +27,7 @@ class CouponFilter(BaseModel):
     allowedCouponTypes: Optional[Union[List[int], None]] = None  # None = allow all sources!
     isNew: Optional[Union[bool, None]] = None
     isHidden: Optional[Union[bool, None]] = None
+    isVeggie: Optional[Union[bool, None]] = None
     sortCode: Optional[Union[None, int]]
 
 
@@ -117,6 +118,7 @@ class CouponView:
 class CouponViews:
     ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
     ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=False))
+    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, isVeggie=True))
     CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=None))
     CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
     HIDDEN_APP_COUPONS_ONLY = CouponView(
@@ -172,6 +174,7 @@ class Coupon(Document):
     description = TextField()
     # TODO: Make use of this once it is possible for users to add coupons to DB via API
     addedVia = IntegerField()
+    tags = ListField(TextField())
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -249,6 +252,32 @@ class Coupon(Document):
             return True
         else:
             return False
+
+    def isVeggie(self) -> bool:
+        # First check if we got any useful information in our list of tags
+        looksLikeVeggie = False
+        if self.tags is not None:
+            # More tags:
+            # KingSnacks -> Can be meat
+            # NoPreference -> Can be anything, most items got this tag only
+            for tag in self.tags:
+                tag = tag.lower()
+                if tag == 'beef' or tag == 'chicken':
+                    # A single article with meat means that this is not a veggie coupon
+                    return False
+                elif tag == 'plantbased':
+                    # A single plant based article means that this is a veggie coupon
+                    return True
+                elif tag == 'sweetkings':
+                    looksLikeVeggie = True
+        # No result? Fallback to other, more unsafe methods.
+        if self.type == CouponType.PAYBACK:
+            # Yes, Payback coupons are technically veggie except for those that are only valid for articles containing meat
+            return True
+        elif couponTitleContainsVeggieFood(self.title):
+            return True
+        else:
+            return looksLikeVeggie
 
     def getPrice(self) -> Union[float, None]:
         return self.price
@@ -535,6 +564,7 @@ class User(Document):
             displayQR=BooleanField(default=True),
             displayBKWebsiteURLs=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
+            displayCouponCategoryVeggie=BooleanField(default=True),
             displayCouponSortButton=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
@@ -901,7 +931,11 @@ USER_SETTINGS_ON_OFF = {
         "default": False
     },
     "displayCouponCategoryPayback": {
-        "description": "Payback Coupons/Karte Button zeigen",
+        "description": "Payback Coupons & Karte Buttons zeigen",
+        "default": True
+    },
+    "displayCouponCategoryVeggie": {
+        "description": f"Veggie Coupons Button ({SYMBOLS.BROCCOLI}) zeigen",
         "default": True
     },
     "displayCouponSortButton": {

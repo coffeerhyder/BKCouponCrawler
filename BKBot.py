@@ -35,12 +35,14 @@ class CouponDisplayMode:
     CATEGORY = 'c'
     CATEGORY_WITHOUT_MENU = 'c2'
     HIDDEN_APP_COUPONS_ONLY = 'h'
+    VEGGIE = 'v'
     FAVORITES = 'f'
 
 
 class CouponCallbackVars:
     ALL_COUPONS = "?a=dcs&m=" + CouponDisplayMode.ALL + "&cs="
     ALL_COUPONS_WITHOUT_MENU = "?a=dcs&m=" + CouponDisplayMode.ALL_WITHOUT_MENU + "&cs="
+    VEGGIE = "?a=dcs&m=" + CouponDisplayMode.VEGGIE + "&cs="
     FAVORITES = "?a=dcs&m=" + CouponDisplayMode.FAVORITES + "&cs="
 
 
@@ -319,6 +321,8 @@ class BKBot:
             if couponSrc == CouponType.APP and couponCategory.numberofCouponsHidden > 0:
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' versteckte',
                                                         callback_data="?a=dcs&m=" + CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY + "&cs=" + str(couponSrc))])
+        if user.settings.displayCouponCategoryVeggie:
+            allButtons.append([InlineKeyboardButton(f'{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}', callback_data=CouponCallbackVars.VEGGIE)])
         keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data="?a=dcs&m=" + CouponDisplayMode.FAVORITES),
                                     InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten + Pics' + SYMBOLS.STAR, callback_data=CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES)]
         allButtons.append(keyboardCouponsFavorites)
@@ -413,7 +417,7 @@ class BKBot:
         text += '\nDein BetterKing Account:'
         text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
         text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
-        text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt vom Bot zugestellter Nachrichten bei aktivierten Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
+        text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt von vom Bot zugestelltem Coupon-Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
         text += '</pre>'
         if isinstance(msg, Message):
             self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
@@ -451,6 +455,9 @@ class BKBot:
                 elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                     # Display all coupons without menu
                     view = CouponViews.ALL_WITHOUT_MENU
+                elif mode == CouponDisplayMode.VEGGIE:
+                    # Display all coupons without menu
+                    view = CouponViews.VEGGIE
                 elif mode == CouponDisplayMode.CATEGORY:
                     # Display all coupons of a particular category
                     view = CouponViews.CATEGORY
@@ -737,7 +744,7 @@ class BKBot:
             addDeletePaybackCardButton = True
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.PROTOCOL_BK + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
-        menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
+        menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs auch 'Upselling Artikel' genannt."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
         userSortModes = user.couponViewSortModes
         if userSortModes is not None and len(userSortModes) > 0:

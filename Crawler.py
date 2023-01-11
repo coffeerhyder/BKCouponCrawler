@@ -323,6 +323,11 @@ class BKCrawler:
                 price = couponBK['offerPrice']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP)
+                tagsStringArray = []
+                offerTags = couponBK['offerTags']
+                for offerTag in offerTags:
+                    tagsStringArray.append(offerTag['value'])
+                coupon.tags = tagsStringArray
                 if index > 0:
                     # First item = Real coupon, all others = upsell/"hidden" coupon(s)
                     coupon.isHidden = True
@@ -1205,6 +1210,8 @@ class BKCrawler:
                 # Skip item if it does not have the expected "is_new" state
                 continue
             elif filters.isHidden is not None and coupon.isHidden != filters.isHidden:
+                continue
+            elif filters.isVeggie is not None and coupon.isVeggie() != filters.isVeggie:
                 continue
             else:
                 desiredCoupons[uniqueCouponID] = coupon

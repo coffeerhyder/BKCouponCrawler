@@ -7,6 +7,7 @@ from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
 class CouponCategory:
 
     def __init__(self, parameter: Union[CouponType, int, dict, List]):
+        # TODO: Improve this so we can inject custom category names as auto detection may return unexpected results
         self.coupons = None
         self.mainCouponType = None
         self.couponTypes = set()
@@ -20,6 +21,7 @@ class CouponCategory:
         self.numberofCouponsEatableWithPrice = 0
         self.numberofCouponsNew = 0
         self.numberofCouponsWithFriesAndDrink = 0
+        self.numberofVeggieCoupons = 0
         self.totalPrice = 0
         if isinstance(parameter, dict):
             self.coupons = list(parameter.values())
@@ -65,7 +67,7 @@ class CouponCategory:
             self.nameSingular = "Online only (store specific)"
             self.namePlural = "Online only (store specific)"
             self.namePluralWithoutSymbol = "Online only (store specific)"
-            self.description = "Coupons, die nur in bestimmten Filialen gültig sind"
+            self.description = "Coupons, die nur in bestimmten# Filialen gültig sind"
         elif self.mainCouponType == CouponType.SPECIAL:
             self.nameSingular = "Special Coupon"
             self.namePlural = SYMBOLS.GIFT + "Special Coupons"
@@ -80,6 +82,9 @@ class CouponCategory:
             self.nameSingular = "Unbekannt"
             self.namePlural = "Unbekannt"
             self.namePluralWithoutSymbol = "Unbekannt"
+        # if self.isVeggie():
+        #     self.nameSingular = '[Veggie] ' + self.nameSingular
+        #     self.namePlural = '[Veggie] ' + self.namePlural
 
     def isValidSourceForBot(self) -> bool:
         if self.mainCouponType in BotAllowedCouponTypes:
@@ -96,23 +101,8 @@ class CouponCategory:
     def getNumberofCouponsEatableWithoutPrice(self) -> int:
         return self.numberofCouponsEatable - self.numberofCouponsEatableWithPrice
 
-    def setNumberofCouponsTotal(self, newNumber: int):
-        self.numberofCouponsTotal = newNumber
-
-    def setNumberofCouponsHidden(self, newNumber: int):
-        self.numberofCouponsHidden = newNumber
-
-    def setNumberofCouponsEatable(self, newNumber: int):
-        self.numberofCouponsEatable = newNumber
-
     def setNumberofCouponsEatableWithPrice(self, newNumber: int):
         self.numberofCouponsEatableWithPrice = newNumber
-
-    def setNumberofCouponsNew(self, newNumber: int):
-        self.numberofCouponsNew = newNumber
-
-    def setNumberofCouponsWithFriesOrCoke(self, newNumber: int):
-        self.numberofCouponsWithFriesAndDrink = newNumber
 
     def setTotalPrice(self, newPrice: float):
         self.totalPrice = newPrice
@@ -120,6 +110,16 @@ class CouponCategory:
     def isEatable(self) -> bool:
         """ Typically all coupon categories except Payback coupons will return True here as they do contain at least one item that is considered 'eatable'. """
         if self.numberofCouponsEatable > 0:
+            return True
+        else:
+            return False
+
+    def isVeggie(self):
+        """ Returns True if all coupons in this categorie are veggie. """
+        if len(self.couponTypes) == 1 and self.mainCouponType == CouponType.PAYBACK:
+            # Only Payback coupons in this category -> Technically veggie but logically not ;)
+            return False
+        elif self.numberofCouponsTotal > 0 and self.numberofCouponsTotal == self.numberofVeggieCoupons:
             return True
         else:
             return False
@@ -224,15 +224,17 @@ class CouponCategory:
             if coupon.isValid():
                 self.numberofCouponsValid += 1
             self.couponTypes.add(coupon.type)
-            self.setNumberofCouponsTotal(self.numberofCouponsTotal + 1)
+            self.numberofCouponsTotal += 1
             if coupon.isHidden:
-                self.setNumberofCouponsHidden(self.numberofCouponsHidden + 1)
+                self.numberofCouponsHidden += 1
             if coupon.isEatable():
-                self.setNumberofCouponsEatable(self.numberofCouponsEatable + 1)
+                self.numberofCouponsEatable += 1
             if coupon.isNewCoupon():
-                self.setNumberofCouponsNew(self.numberofCouponsNew + 1)
+                self.numberofCouponsNew += 1
             if coupon.isContainsFriesAndDrink():
-                self.setNumberofCouponsWithFriesOrCoke(self.numberofCouponsWithFriesAndDrink + 1)
+                self.numberofCouponsWithFriesAndDrink += 1
+            if coupon.isVeggie():
+                self.numberofVeggieCoupons += 1
             # Update expire-date info
             date = coupon.getExpireDatetime()
             if self.expireDatetimeLowest is None and self.expireDatetimeHighest is None:

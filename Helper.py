@@ -235,6 +235,7 @@ def replaceRegex(old: Pattern, repl: str, text: str) -> str:
 
 class SYMBOLS:
     BACK = '⬅Zurück'
+    BROCCOLI = '🥦'
     CONFIRM = '✅'
     DENY = '🚫'
     DENY2 = '❌'
@@ -290,6 +291,30 @@ def couponTitleContainsFriesAndDrink(title: str) -> bool:
         return False
 
 
+def couponTitleContainsVeggieFood(title: str) -> bool:
+    # Convert title to lowercase for more thoughtless string comparison
+    titleLower = title.lower()
+    if 'plant' in titleLower:
+        # All plant based articles
+        return True
+    elif 'fusion' in titleLower:
+        # Ice cream
+        return True
+    elif couponTitleIsFries(titleLower):
+        return True
+    elif '+' not in titleLower and 'chili cheese nuggets' in titleLower:
+        return True
+    elif '+' not in titleLower and 'onion rings' in titleLower:
+        return True
+    elif '+' not in titleLower and 'shake' in titleLower:
+        return True
+    elif '+' not in titleLower and 'brownie' in titleLower:
+        return True
+    else:
+        # Non veggie menus and all the stuff that this handling doesn't detect properly yet
+        return False
+
+
 def couponTitleContainsFries(title: str) -> bool:
     titleLower = title.lower()
     # 2021-04-13: Chili Cheese Fries are now treated the same way as normal fries are!
@@ -297,8 +322,18 @@ def couponTitleContainsFries(title: str) -> bool:
         return True
     elif 'fries' in titleLower:
         return True
+    elif 'wedges' in titleLower:
+        return True
     else:
-        return False#
+        return False
+
+
+def couponTitleIsFries(title: str) -> bool:
+    titleLower = title.lower()
+    if '+' not in titleLower and couponTitleContainsFries(titleLower):
+        return True
+    else:
+        return False
 
 
 def couponTitleContainsDrink(title: str) -> bool:
