@@ -35,12 +35,14 @@ class CouponDisplayMode:
     CATEGORY = 'c'
     CATEGORY_WITHOUT_MENU = 'c2'
     HIDDEN_APP_COUPONS_ONLY = 'h'
+    VEGGIE = 'v'
     FAVORITES = 'f'
 
 
 class CouponCallbackVars:
     ALL_COUPONS = "?a=dcs&m=" + CouponDisplayMode.ALL + "&cs="
     ALL_COUPONS_WITHOUT_MENU = "?a=dcs&m=" + CouponDisplayMode.ALL_WITHOUT_MENU + "&cs="
+    VEGGIE = "?a=dcs&m=" + CouponDisplayMode.VEGGIE + "&cs="
     FAVORITES = "?a=dcs&m=" + CouponDisplayMode.FAVORITES + "&cs="
 
 
@@ -319,6 +321,8 @@ class BKBot:
             if couponSrc == CouponType.APP and couponCategory.numberofCouponsHidden > 0:
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' versteckte',
                                                         callback_data="?a=dcs&m=" + CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY + "&cs=" + str(couponSrc))])
+        if user.settings.displayCouponCategoryVeggie:
+            allButtons.append([InlineKeyboardButton(f'{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}', callback_data=CouponCallbackVars.VEGGIE)])
         keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data="?a=dcs&m=" + CouponDisplayMode.FAVORITES),
                                     InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten + Pics' + SYMBOLS.STAR, callback_data=CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES)]
         allButtons.append(keyboardCouponsFavorites)
@@ -451,6 +455,9 @@ class BKBot:
                 elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
                     # Display all coupons without menu
                     view = CouponViews.ALL_WITHOUT_MENU
+                elif mode == CouponDisplayMode.VEGGIE:
+                    # Display all coupons without menu
+                    view = CouponViews.VEGGIE
                 elif mode == CouponDisplayMode.CATEGORY:
                     # Display all coupons of a particular category
                     view = CouponViews.CATEGORY
@@ -737,7 +744,7 @@ class BKBot:
             addDeletePaybackCardButton = True
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.PROTOCOL_BK + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
-        menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs."
+        menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs auch 'Upselling Artikel' genannt."
         menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
         userSortModes = user.couponViewSortModes
         if userSortModes is not None and len(userSortModes) > 0:
