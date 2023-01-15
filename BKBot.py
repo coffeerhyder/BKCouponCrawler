@@ -596,7 +596,7 @@ class BKBot:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
             else:
                 menuText += str(len(userFavoritesInfo.couponsAvailable)) + '/' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
-            couponCategoryDummy = CouponCategory(parameter=userFavoritesInfo.couponsAvailable)
+            couponCategoryDummy = CouponCategory(coupons=userFavoritesInfo.couponsAvailable)
             menuText += '\n' + couponCategoryDummy.getExpireDateInfoText()
             priceInfo = couponCategoryDummy.getPriceInfoText()
             if priceInfo is not None:

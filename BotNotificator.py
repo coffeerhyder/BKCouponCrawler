@@ -129,7 +129,6 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     dbUserUpdates = []
     for userIDStr, postText in usersNotify.items():
         position += 1
-        # isLastItem = index == len(usersNotify) - 1
         logging.info("Sending user notification " + str(position) + "/" + str(len(usersNotify)) + " to user: " + userIDStr)
         user = User.load(userDB, userIDStr)
         try:

@@ -313,8 +313,7 @@ Quellcode: github.com/WebFreak001/WurgerKing
 Gibt es sowas auch für McDonalds/KFC/...?
 McDonalds:
 01. mccoupon.deals | Gratis Getränke & Coupons
-02. t.me/mcdonalds4free_bot | Gratis Getränke (danke an mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092)
-03. mcbroken.com | Wo funktioniert die Eismaschine?
+02. mcbroken.com | Wo funktioniert die Eismaschine?
 Sonstige:
 Sonstige
 01. billigepizza.netlify.app | Pizzapreise bei Domino's optimieren
@@ -378,7 +377,6 @@ Würger King | https://github.com/WebFreak001/WurgerKing | https://wurgerking.wf
 - | https://github.com/reteps/burger-king-api-wrapper | -
 - | https://github.com/robsonkades/clone-burger-king-app-with-expo | -
 mccoupon.deals | McDonalds Coupons ohne App, [Autor](https://www.mydealz.de/profile/Jicu) | https://www.mccoupon.deals/
-mcdonalds4free_bot | McDonalds Getränke kostenlos, [MyDealz Thread](https://www.mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092) | https://t.me/mcdonalds4free_bot
 billigepizza.netlify.app | Pizzapreise von Domino's optimieren | https://billigepizza.netlify.app/
 
 * https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
@@ -393,6 +391,7 @@ Name | Beschreibung | Live-Instanz | Down seit
 --- | --- | --- | ---
 freecokebot aka gimmecockbot | McDonalds gratis Getränke | https://t.me/gimmecockbot (Alternativ https://t.me/freecokebot) | 10.11.2022
 bk.eris.cc | BK Coupons ohne App, [Autor](https://gist.github.com/printfuck) | https://bk.eris.cc/ | 10.11.2022
+mcdonalds4free_bot | McDonalds Getränke kostenlos, [MyDealz Thread](https://www.mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092) | https://t.me/mcdonalds4free_bot | 15.01.2023
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot

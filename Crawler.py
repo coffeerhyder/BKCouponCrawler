@@ -328,6 +328,7 @@ class BKCrawler:
                 for offerTag in offerTags:
                     tagsStringArray.append(offerTag['value'])
                 coupon.tags = tagsStringArray
+                print(str(tagsStringArray))
                 if index > 0:
                     # First item = Real coupon, all others = upsell/"hidden" coupon(s)
                     coupon.isHidden = True
@@ -360,7 +361,7 @@ class BKCrawler:
                     # Dontcare
                     logging.warning('Failed to find BetterExpiredate for coupon ' + coupon.id)
                 ruleSets = couponBK['ruleSet']
-                foundExpireDate = False
+                foundFallbackExpireDate = False
                 for ruleSet in ruleSets:
                     ruleSetsChilds = ruleSet.get('ruleSet')
                     if ruleSetsChilds is not None:
@@ -373,11 +374,11 @@ class BKCrawler:
                                     coupon.timestampExpire = datetime.strptime(ruleSetsChild['endDate'], dateformat).timestamp() + serversideTimeOffset
                                 crawledCouponsDict[uniqueCouponID] = coupon
                                 appCoupons.append(coupon)
-                                foundExpireDate = True
+                                foundFallbackExpireDate = True
                                 break
-                if not foundExpireDate:
+                if not foundAndSetBetterExpireDate and not foundFallbackExpireDate:
                     # This should never happen
-                    logging.warning("WTF failed to find expiredate")
+                    logging.warning(f"{uniqueCouponID}: WTF failed to find expiredate")
                 index += 1
 
         logging.info('Coupons in app: ' + str(len(appCoupons)))
@@ -636,8 +637,6 @@ class BKCrawler:
             coupon = Coupon.wrap(extraCouponJson)
             coupon.id = coupon.uniqueID  # Set custom uniqueID otherwise couchDB will create one later -> This is not what we want to happen!!
             coupon.title = sanitizeCouponTitle(coupon.title)
-            coupon.titleShortened = shortenProductNames(coupon.title)
-            coupon.containsFriesOrCoke = couponTitleContainsFriesAndDrink(coupon.title)
             expiredateStr = extraCouponJson["expire_date"] + " 23:59:59"
             expiredate = datetime.strptime(expiredateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
             coupon.timestampExpire = expiredate.timestamp()
@@ -1021,7 +1020,7 @@ class BKCrawler:
             coupon = Coupon.load(couponDB, couponID)
             if coupon.isValid():
                 category = newCachedAvailableCouponCategories.setdefault(coupon.type, CouponCategory(
-                    parameter=coupon.type))
+                    coupons=coupon.type))
                 category.updateWithCouponInfo(coupon)
         # Overwrite old cache
         self.cachedAvailableCouponCategories = newCachedAvailableCouponCategories
