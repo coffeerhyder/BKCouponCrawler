@@ -6,7 +6,7 @@ from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
 
 class CouponCategory:
 
-    def __init__(self, parameter: Union[CouponType, int, dict, List]):
+    def __init__(self, coupons: Union[CouponType, int, dict, List]):
         # TODO: Improve this so we can inject custom category names as auto detection may return unexpected results
         self.coupons = None
         self.mainCouponType = None
@@ -23,10 +23,10 @@ class CouponCategory:
         self.numberofCouponsWithFriesAndDrink = 0
         self.numberofVeggieCoupons = 0
         self.totalPrice = 0
-        if isinstance(parameter, dict):
-            self.coupons = list(parameter.values())
-        elif isinstance(parameter, list):
-            self.coupons = parameter
+        if isinstance(coupons, dict):
+            self.coupons = list(coupons.values())
+        elif isinstance(coupons, list):
+            self.coupons = coupons
         if self.coupons is not None:
             for coupon in self.coupons:
                 self.updateWithCouponInfo(coupon)
@@ -37,7 +37,7 @@ class CouponCategory:
             else:
                 self.mainCouponType = None
         else:
-            self.mainCouponType = parameter
+            self.mainCouponType = coupons
         if self.mainCouponType is None:
             self.nameSingular = "Coupon"
             self.namePlural = "Alle Coupons"

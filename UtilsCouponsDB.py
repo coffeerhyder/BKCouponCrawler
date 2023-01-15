@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from BotUtils import getImageBasePath
 from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesAndDrink, BotAllowedCouponTypes, \
     CouponType, \
-    formatPrice, couponTitleContainsVeggieFood
+    formatPrice, couponTitleContainsVeggieFood, shortenProductNames
 
 
 class CouponFilter(BaseModel):
@@ -154,7 +154,7 @@ class Coupon(Document):
     priceCompare = FloatField()
     staticReducedPercent = FloatField()
     title = TextField()
-    titleShortened = TextField()
+    # titleShortened = TextField() # Deprecated 2023-01-15 use getTitleShortened instead
     timestampAddedToDB = FloatField(default=getCurrentDate().timestamp())
     timestampLastModifiedDB = FloatField(default=0)
     timestampStart = FloatField()
@@ -165,7 +165,7 @@ class Coupon(Document):
     paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
     type = IntegerField(name='source')  # Legacy. This is called "type" now!
-    containsFriesOrCoke = BooleanField()
+    # containsFriesOrCoke = BooleanField() # Deprecated 2023-01-15 use isContainsFriesAndDrink instead
     timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
     isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new
     isHidden = BooleanField(default=False)  # Typically only available for App coupons
@@ -203,9 +203,7 @@ class Coupon(Document):
             return self.title
 
     def getTitleShortened(self):
-        # TODO: Make use of this everywhere
-        return self.titleShortened
-        # return shortenProductNames(self.title)
+        return shortenProductNames(self.title)
 
     def isExpired(self):
         """ Wrapper """
@@ -247,11 +245,7 @@ class Coupon(Document):
             return False
 
     def isContainsFriesAndDrink(self) -> bool:
-        # TODO: Make use of this
-        if couponTitleContainsFriesAndDrink(self.title):
-            return True
-        else:
-            return False
+        return couponTitleContainsFriesAndDrink(self.title)
 
     def isVeggie(self) -> bool:
         # First check if we got any useful information in our list of tags
@@ -263,10 +257,15 @@ class Coupon(Document):
             for tag in self.tags:
                 tag = tag.lower()
                 if tag == 'beef' or tag == 'chicken':
-                    # A single article with meat means that this is not a veggie coupon
+                    """ 
+                     A single article with meat means that this is not a veggie coupon.
+                     """
                     return False
                 elif tag == 'plantbased':
-                    # A single plant based article means that this is a veggie coupon
+                    """ 
+                     A single plant based article means that this is a veggie coupon.
+                     Usually coupons containing plant based products aren't mixed with meat products.
+                     """
                     return True
                 elif tag == 'sweetkings':
                     looksLikeVeggie = True

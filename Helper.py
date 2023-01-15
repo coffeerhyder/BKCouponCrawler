@@ -41,6 +41,7 @@ class URLs:
     MCD_MCCOUPON_DEALS = 'https://www.mccoupon.deals/'
     MCD_MCDONALDS4FREEBOT = 't.me/mcdonalds4free_bot'
     MCD_MCBROKEN = 'mcbroken.com'
+    DOMINOS_BILLIGEPIZZA = 'billigepizza.netlify.app'
     MEGA_COUPON_ARCHIVE = 'mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg'
     MEGA_COUPON_ARCHIVE_SHORT = 'bit.ly/bkcoupons'
 
@@ -134,9 +135,9 @@ def shortenProductNames(couponTitle: str) -> str:
         b = burgerFix.group(1)
         couponTitle = replaceCaseInsensitive(burgerFix.group(0), b + 'rgr', couponTitle)
 
-    removeOR = re.compile(r'( oder)').search(couponTitle)
+    removeOR = re.compile(r'( oder ?)').search(couponTitle)
     if removeOR:
-        couponTitle = couponTitle.replace(removeOR.group(0), ',')
+        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
 
     # Assume that all users know that "Cheddar" is cheese so let's remove this double entry
     couponTitle = replaceRegex(re.compile(r'(?i)Cheddar\s*Cheese'), 'Cheddar', couponTitle)

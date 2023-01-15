@@ -44,7 +44,6 @@ class CleanCouponImagesBasedOnCouponsCSV:
             else:
                 imagesFolderPLUs.append(pluFromFilename)
         print(f'SUCCESS | Done | Number of deleted files in folder {imagefolder}: {numberofDeletedFiles}')
-        # TODO: Add code to also clear bkplucs_qrimages folder
         return None
 
 
