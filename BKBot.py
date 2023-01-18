@@ -1045,6 +1045,9 @@ class BKBot:
 
     def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        query = update.callback_query
+        if query is not None:
+            query.answer()
         return self.displayPaybackCard(update, context, user)
 
     def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
