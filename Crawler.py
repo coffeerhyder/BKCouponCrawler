@@ -310,15 +310,23 @@ class BKCrawler:
                 if internalNameRegex is not None and useInternalNameAsTitle:
                     titleFull = internalNameRegex.group(1)
                     titleFull = titleFull.replace('_', ' ')
+                    titleFull = sanitizeCouponTitle(titleFull)
                 else:
                     title = couponBK['name']['de'][0]['children'][0]['text']
+                    title = sanitizeCouponTitle(title)
                     subtitle = couponBK['description']['de'][0]['children'][0]['text']
+                    if subtitle is not None:
+                        subtitle = sanitizeCouponTitle(subtitle)
                     ignoreTitleRegex = re.compile(r'(?i)Im King Menü \(\+[^)]+\)').search(title)
                     if ignoreTitleRegex:
                         # Ignore title and only use subtitle
                         titleFull = subtitle
+                    elif title != subtitle:
+                        # Title and subtitle are the same -> Use title only
+                        titleFull = title + ' ' + subtitle
                     else:
-                        titleFull = title + subtitle
+                        titleFull = title
+
                 titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),

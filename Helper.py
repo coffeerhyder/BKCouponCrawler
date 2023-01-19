@@ -134,10 +134,6 @@ def shortenProductNames(couponTitle: str) -> str:
         b = burgerFix.group(1)
         couponTitle = replaceCaseInsensitive(burgerFix.group(0), b + 'rgr', couponTitle)
 
-    removeOR = re.compile(r'( oder ?)').search(couponTitle)
-    if removeOR:
-        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
-
     # Assume that all users know that "Cheddar" is cheese so let's remove this double entry
     couponTitle = replaceRegex(re.compile(r'(?i)Cheddar\s*Cheese'), 'Cheddar', couponTitle)
     couponTitle = replaceCaseInsensitive('Chicken', 'Ckn', couponTitle)
@@ -170,11 +166,17 @@ def shortenProductNames(couponTitle: str) -> str:
     return couponTitle
 
 
-def sanitizeCouponTitle(title: str) -> str:
+def sanitizeCouponTitle(couponTitle: str) -> str:
     """ Generic method which sanitizes strings and removes unneeded symbols such as trademark symbols. """
-    title = title.replace('®', '')
-    title = title.strip()
-    return title
+    couponTitle = couponTitle.replace('®', '')
+    removeOR = re.compile(r'( oder ?)').search(couponTitle)
+    if removeOR:
+        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
+    if 'zum Preis' in couponTitle:
+        print("WTF")
+    couponTitle = replaceRegex(re.compile(r' ?zum\s*Preis\s*von\s*1!?'), '', couponTitle)  # 2021-01-19
+    couponTitle = couponTitle.strip()
+    return couponTitle
 
 
 def getPathImagesOffers() -> str:
