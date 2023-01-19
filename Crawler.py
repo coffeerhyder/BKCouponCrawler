@@ -374,7 +374,7 @@ class BKCrawler:
                                 break
                 if not foundAndSetBetterExpireDate and not foundFallbackExpireDate:
                     # This should never happen
-                    logging.warning(f'WTF failed to find expiredate for coupon: {uniqueCouponID}')
+                    logging.warning(f'WTF failed to find any expiredate for coupon: {uniqueCouponID}')
                 crawledCouponsDict[uniqueCouponID] = coupon
                 appCoupons.append(coupon)
                 index += 1
@@ -787,13 +787,14 @@ class BKCrawler:
                 if coupon.isValidForBot():
                     couponsToAddToDB[coupon.id] = coupon
                 else:
-                    logging.info(f'Skipping non-bot compatible coupon: {coupon.id}')
+                    # Filter out incompatible coupons right away so we will need less DB operations later
+                    logging.info(f'Skipping non-bot compatible or expired coupon: {coupon.id}')
         else:
             # Add all crawled coupons to DB
             couponsToAddToDB = crawledCouponsDict
         logging.info("Number of crawled coupons: " + str(len(couponsToAddToDB)))
         if len(couponsToAddToDB) < len(crawledCouponsDict):
-            logging.warning(f'Possible bug or API/sources contained expired coupons: Not all crawled coupons will be added to DB! Crawled: {len(crawledCouponsDict)} | Added: {len(couponsToAddToDB)}')
+            logging.warning(f'Possible bug or most likely API/sources contained expired coupons: Not all crawled coupons will be added to DB! Crawled: {len(crawledCouponsDict)} | Added: {len(couponsToAddToDB)}')
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         couponDB = self.getCouponDB()
