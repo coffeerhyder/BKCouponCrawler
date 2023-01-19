@@ -341,7 +341,6 @@ class BKCrawler:
                         coupon.price = 0
                 else:
                     coupon.price = price
-                coupon.containsFriesOrCoke = couponTitleContainsFriesAndDrink(titleFull)
                 coupon.imageURL = couponBK['localizedImage']['de']['app']['asset']['url']
                 """ Find and set expire-date:
                  BKs API can provide different start- and expire-dates depending on the coupon-type e.g. "King Deal" coupons may have an offset of 1 hour
@@ -371,13 +370,13 @@ class BKCrawler:
                                 coupon.timestampStart = datetime.strptime(ruleSetsChild['startDate'], dateformat).timestamp() + serversideTimeOffset
                                 if not foundAndSetBetterExpireDate:
                                     coupon.timestampExpire = datetime.strptime(ruleSetsChild['endDate'], dateformat).timestamp() + serversideTimeOffset
-                                crawledCouponsDict[uniqueCouponID] = coupon
-                                appCoupons.append(coupon)
                                 foundFallbackExpireDate = True
                                 break
                 if not foundAndSetBetterExpireDate and not foundFallbackExpireDate:
                     # This should never happen
-                    logging.warning(f"{uniqueCouponID}: WTF failed to find expiredate")
+                    logging.warning(f'WTF failed to find expiredate for coupon: {uniqueCouponID}')
+                crawledCouponsDict[uniqueCouponID] = coupon
+                appCoupons.append(coupon)
                 index += 1
 
         logging.info('Coupons in app: ' + str(len(appCoupons)))
@@ -402,7 +401,6 @@ class BKCrawler:
             timestampStart = couponGetStartTimestamp(coupon)
             if timestampStart > -1:
                 newCoupon.timestampStart = timestampStart
-            newCoupon.containsFriesOrCoke = couponTitleContainsFriesAndDrink(titleFull)
             newCoupon.imageURL = couponOrOfferGetImageURL(coupon)
             # price_text could be either e.g. "50%" or "2,99€" -> We want to find the price otherwise that is worthless for us!
             priceText = coupon['price_text']
@@ -584,7 +582,7 @@ class BKCrawler:
                     newCoupon = Coupon(id=uniqueCouponID, type=CouponType.UNKNOWN, uniqueID=uniqueCouponID, plu=plu, title=title, titleShortened=shortenProductNames(title),
                                        timestampStart=expirationDate.timestamp(), timestampExpire=expirationDate.timestamp(),
                                        dateFormattedStart=formatDateGerman(startDate), dateFormattedExpire=formatDateGerman(expirationDate),
-                                       price=price, containsFriesOrCoke=couponTitleContainsFriesAndDrink(title))
+                                       price=price)
                     if priceCompare > 0:
                         newCoupon.priceCompare = priceCompare
                     newCoupon.imageURL = image_url
@@ -788,10 +786,14 @@ class BKCrawler:
             for coupon in crawledCouponsDict.values():
                 if coupon.isValidForBot():
                     couponsToAddToDB[coupon.id] = coupon
+                else:
+                    logging.info(f'Skipping non-bot compatible coupon: {coupon.id}')
         else:
             # Add all crawled coupons to DB
             couponsToAddToDB = crawledCouponsDict
         logging.info("Number of crawled coupons: " + str(len(couponsToAddToDB)))
+        if len(couponsToAddToDB) < len(crawledCouponsDict):
+            logging.warning(f'Possible bug or API/sources contained expired coupons: Not all crawled coupons will be added to DB! Crawled: {len(crawledCouponsDict)} | Added: {len(couponsToAddToDB)}')
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         couponDB = self.getCouponDB()
