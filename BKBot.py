@@ -475,14 +475,19 @@ class BKBot:
                 else:
                     raise BetterBotException("WTF developer mistake")
                 couponFilter = deepcopy(view.getFilter())
-                # First we only want to filter coupons. Sort them later according to user preference.
+                # First we only want to filter coupons. Sort them later according to user preference -> Needs less performance.
                 couponFilter.sortCode = None
-                if displayHiddenCouponsWithinOtherCategories is True:
-                    # True translates to None -> Allow hidden- and none-hidden coupons
-                    couponFilter.isHidden = None
-                else:
-                    # Loop through None and False:  None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons only
-                    couponFilter.isHidden = displayHiddenCouponsWithinOtherCategories
+                if couponFilter.isHidden is None:
+                    """ 
+                    Only apply user selection if this coupon filter does not have a pre-selected isHidden value.
+                    E.g. if user wants to view category "Hidden App coupons", ONLY hidden coupons should be displayed regardless of the user-setting.
+                    """
+                    if displayHiddenCouponsWithinOtherCategories is True:
+                        # True translates to None -> Allow hidden- and none-hidden coupons
+                        couponFilter.isHidden = None
+                    else:
+                        # Loop through None and False:  None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons only
+                        couponFilter.isHidden = displayHiddenCouponsWithinOtherCategories
                 coupons = self.getFilteredCoupons(couponFilter)
                 couponCategory = CouponCategory(coupons)
                 menuText = couponCategory.getCategoryInfoText(withMenu=couponFilter.containsFriesAndCoke, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
@@ -1045,6 +1050,9 @@ class BKBot:
 
     def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        query = update.callback_query
+        if query is not None:
+            query.answer()
         return self.displayPaybackCard(update, context, user)
 
     def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
