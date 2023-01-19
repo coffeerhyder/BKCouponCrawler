@@ -172,8 +172,6 @@ def sanitizeCouponTitle(couponTitle: str) -> str:
     removeOR = re.compile(r'( oder ?)').search(couponTitle)
     if removeOR:
         couponTitle = couponTitle.replace(removeOR.group(0), ', ')
-    if 'zum Preis' in couponTitle:
-        print("WTF")
     couponTitle = replaceRegex(re.compile(r' ?zum\s*Preis\s*von\s*1!?'), '', couponTitle)  # 2021-01-19
     couponTitle = couponTitle.strip()
     return couponTitle
