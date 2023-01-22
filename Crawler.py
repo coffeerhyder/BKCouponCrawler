@@ -315,17 +315,22 @@ class BKCrawler:
                     title = couponBK['name']['de'][0]['children'][0]['text']
                     title = sanitizeCouponTitle(title)
                     subtitle = couponBK['description']['de'][0]['children'][0]['text']
-                    if subtitle is not None:
-                        subtitle = sanitizeCouponTitle(subtitle)
-                    ignoreTitleRegex = re.compile(r'(?i)Im King Menü \(\+[^)]+\)').search(title)
-                    if ignoreTitleRegex:
-                        # Ignore title and only use subtitle
-                        titleFull = subtitle
-                    elif title != subtitle:
-                        # Title and subtitle are the same -> Use title only
-                        titleFull = title + ' ' + subtitle
-                    else:
+                    if subtitle is None:
                         titleFull = title
+                    else:
+                        subtitle = sanitizeCouponTitle(subtitle)
+                        ignoreTitleRegex = re.compile(r'(?i)Im King Menü \(\+[^)]+\)').search(title)
+                        if ignoreTitleRegex:
+                            # Ignore title and only use subtitle
+                            titleFull = subtitle
+                        elif title == subtitle:
+                            # Title and subtitle are the same -> Use title only
+                            titleFull = title
+                        else:
+                            titleFull = title + ' ' + subtitle
+                            # Log seemingly strange values
+                            if not subtitle.startswith('+'):
+                                logging.info('Possible subtitle which should not be included in coupon title: ' + subtitle)
 
                 titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']

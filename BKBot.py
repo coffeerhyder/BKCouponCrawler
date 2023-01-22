@@ -522,14 +522,17 @@ class BKBot:
             index = (currentPage * maxCouponsPerPage - maxCouponsPerPage)
             # Whenever the user has at least one favorite coupon on page > 1 we'll replace the dummy button in the middle and add Easter Egg functionality :)
             currentPageContainsAtLeastOneFavoriteCoupon = False
+            includeVeggieSymbol = user.settings.highlightVeggieCouponsInCouponButtonTexts
+            if view.includeVeggieSymbol is not None:
+                # Override user setting
+                includeVeggieSymbol = view.includeVeggieSymbol
             while len(buttons) < maxCouponsPerPage and index < len(coupons):
                 coupon = coupons[index]
                 if user.isFavoriteCoupon(coupon) and highlightFavorites:
-                    buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
+                    buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts, includeVeggieSymbol=includeVeggieSymbol)
                     currentPageContainsAtLeastOneFavoriteCoupon = True
                 else:
-                    buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts)
-
+                    buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts, includeVeggieSymbol=includeVeggieSymbol)
                 buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
                 index += 1
             numberofCouponsOnCurrentPage = len(buttons)
@@ -903,7 +906,7 @@ class BKBot:
     def generateCouponShortTextWithHyperlinkToChannelPost(self, coupon: Coupon, messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         text = "<b>" + coupon.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
-            messageID) + "\">" + coupon.getTitleShortened() + "</a>"
+            messageID) + "\">" + coupon.getTitleShortened(includeVeggieSymbol=True) + "</a>"
         priceFormatted = coupon.getPriceFormatted()
         if priceFormatted is not None:
             text += " | " + priceFormatted
@@ -1147,7 +1150,7 @@ class BKBot:
                 channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
                 messageID = channelCoupon.getMessageIDForChatHyperlink()
                 if messageID is not None:
-                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=False, publicChannelName=self.getPublicChannelName(),
+                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=False, includeVeggieSymbol=True, publicChannelName=self.getPublicChannelName(),
                                                                                                    messageID=messageID)
                 else:
                     # This should never happen but we'll allow it to

@@ -293,11 +293,11 @@ def couponTitleContainsFriesAndDrink(title: str) -> bool:
 
 def couponTitleContainsVeggieFood(title: str) -> bool:
     # Convert title to lowercase for more thoughtless string comparison
-    titleLower = title.lower()
-    if 'plant' in titleLower:
+    if couponTitleContainsPlantBasedFood(title):
         # All plant based articles
         return True
-    elif 'fusion' in titleLower:
+    titleLower = title.lower()
+    if 'fusion' in titleLower:
         # Ice cream
         return True
     elif couponTitleIsFries(titleLower):
@@ -312,6 +312,14 @@ def couponTitleContainsVeggieFood(title: str) -> bool:
         return True
     else:
         # Non veggie menus and all the stuff that this handling doesn't detect properly yet
+        return False
+
+
+def couponTitleContainsPlantBasedFood(title: str) -> bool:
+    titleLower = title.lower()
+    if 'plant' in titleLower:
+        return True
+    else:
         return False
 
 

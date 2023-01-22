@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from BotUtils import getImageBasePath
 from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesAndDrink, BotAllowedCouponTypes, \
     CouponType, \
-    formatPrice, couponTitleContainsVeggieFood, shortenProductNames
+    formatPrice, couponTitleContainsVeggieFood, shortenProductNames, couponTitleContainsPlantBasedFood
 
 
 class CouponFilter(BaseModel):
@@ -100,8 +100,9 @@ class CouponView:
     def getFilter(self):
         return self.couponfilter
 
-    def __init__(self, couponfilter: CouponFilter):
+    def __init__(self, couponfilter: CouponFilter, includeVeggieSymbol: Union[bool, None] = None):
         self.couponfilter = couponfilter
+        self.includeVeggieSymbol = includeVeggieSymbol
 
     def getViewCode(self) -> Union[int, None]:
         """ Returns position of current sort mode in array of all sort modes. """
@@ -118,7 +119,7 @@ class CouponView:
 class CouponViews:
     ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
     ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=False))
-    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, isVeggie=True))
+    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, isVeggie=True), includeVeggieSymbol=False)
     CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=None))
     CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
     HIDDEN_APP_COUPONS_ONLY = CouponView(
@@ -202,8 +203,15 @@ class Coupon(Document):
         else:
             return self.title
 
-    def getTitleShortened(self):
-        return shortenProductNames(self.title)
+    def getTitleShortened(self, includeVeggieSymbol: bool):
+        shortenedTitle = shortenProductNames(self.title)
+        includeNutritionTypeSymbol = False
+        includeMeatSymbol = False
+        if (includeNutritionTypeSymbol or includeMeatSymbol) and self.containsMeat():
+            shortenedTitle = '🥩' + shortenedTitle
+        elif (includeNutritionTypeSymbol or includeVeggieSymbol) and self.isVeggie():
+            shortenedTitle = '🥦' + shortenedTitle
+        return shortenedTitle
 
     def isExpired(self):
         """ Wrapper """
@@ -249,26 +257,17 @@ class Coupon(Document):
 
     def isVeggie(self) -> bool:
         # First check if we got any useful information in our list of tags
+        if self.containsMeat():
+            return False
         looksLikeVeggie = False
         if self.tags is not None:
-            # More tags:
-            # KingSnacks -> Can be meat
-            # NoPreference -> Can be anything, most items got this tag only
             for tag in self.tags:
                 tag = tag.lower()
-                if tag == 'beef' or tag == 'chicken':
-                    """ 
-                     A single article with meat means that this is not a veggie coupon.
-                     """
-                    return False
-                elif tag == 'plantbased':
-                    """ 
-                     A single plant based article means that this is a veggie coupon.
-                     Usually coupons containing plant based products aren't mixed with meat products.
-                     """
+                if tag == 'plantbased':
                     return True
-                elif tag == 'sweetkings':
+                if tag == 'sweetkings':
                     looksLikeVeggie = True
+                    break
         # No result? Fallback to other, more unsafe methods.
         if self.type == CouponType.PAYBACK:
             # Yes, Payback coupons are technically veggie except for those that are only valid for articles containing meat
@@ -277,6 +276,33 @@ class Coupon(Document):
             return True
         else:
             return looksLikeVeggie
+
+    def containsMeat(self) -> bool:
+        """ Returns true if this coupon contains at least one article with meat. """
+        """ First check for plant based stuff in title because BK sometimes has wrong tags (e.g. tag contains "chicken" when article is veggie lol)... """
+        if couponTitleContainsPlantBasedFood(self.title):
+            return False
+        elif self.tags is not None:
+            # Now check for meat in tags
+            # More tags:
+            # KingSnacks -> Can be meat
+            # NoPreference -> Can be anything, most items got this tag only
+            for tag in self.tags:
+                tag = tag.lower()
+                if tag == 'beef' or tag == 'chicken':
+                    return True
+
+        titleLower = self.title.lower()
+        if 'chicken' in titleLower:
+            return True
+        else:
+            return False
+
+    def isSweet(self) -> bool:
+        if self.tags is not None and len(self.tags) == 1 and self.tags[0].lower() == 'sweetkings':
+            return True
+        else:
+            return False
 
     def getPrice(self) -> Union[float, None]:
         return self.price
@@ -419,12 +445,12 @@ class Coupon(Document):
             # Return fallback --> This should never happen!
             return open('media/fallback_image_missing_qr_image.jpeg', mode='rb')
 
-    def generateCouponShortText(self, highlightIfNew: bool) -> str:
+    def generateCouponShortText(self, highlightIfNew: bool, includeVeggieSymbol: bool) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
         couponText = ''
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
-        couponText += self.getPLUOrUniqueID() + " | " + self.getTitleShortened()
+        couponText += self.getPLUOrUniqueID() + " | " + self.getTitleShortened(includeVeggieSymbol=includeVeggieSymbol)
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -433,18 +459,18 @@ class Coupon(Document):
         couponText = ''
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
-        couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.getTitleShortened()
+        couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.getTitleShortened(includeVeggieSymbol=True)
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
-    def generateCouponShortTextFormattedWithHyperlinkToChannelPost(self, highlightIfNew: bool, publicChannelName: str,
+    def generateCouponShortTextFormattedWithHyperlinkToChannelPost(self, highlightIfNew: bool, includeVeggieSymbol: bool, publicChannelName: str,
                                                                    messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         couponText = "<b>" + self.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
             messageID) + "\">"
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
-        couponText += self.getTitleShortened() + "</a>"
+        couponText += self.getTitleShortened(includeVeggieSymbol=includeVeggieSymbol) + "</a>"
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -542,7 +568,7 @@ class UserFavoritesInfo:
             for coupon in self.couponsUnavailable:
                 if len(unavailableFavoritesText) > 0:
                     unavailableFavoritesText += '\n'
-                unavailableFavoritesText += coupon.id + ' | ' + coupon.getTitleShortened()
+                unavailableFavoritesText += coupon.id + ' | ' + coupon.getTitleShortened(includeVeggieSymbol=False)
                 priceInfoText = coupon.getPriceInfoText()
                 if priceInfoText is not None:
                     unavailableFavoritesText += ' | ' + priceInfoText
@@ -572,6 +598,7 @@ class User(Document):
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
             highlightNewCouponsInCouponButtonTexts=BooleanField(default=True),
+            highlightVeggieCouponsInCouponButtonTexts=BooleanField(default=True),
             hideDuplicates=BooleanField(default=False),
             autoDeleteExpiredFavorites=BooleanField(default=False),
             enableBetaFeatures=BooleanField(default=False)
@@ -959,6 +986,10 @@ USER_SETTINGS_ON_OFF = {
     },
     "highlightNewCouponsInCouponButtonTexts": {
         "description": "Neue Coupons in Buttons mit " + SYMBOLS.NEW + " markieren",
+        "default": True
+    },
+    "highlightVeggieCouponsInCouponButtonTexts": {
+        "description": "Veggie Coupons in Buttons mit " + SYMBOLS.BROCCOLI + " markieren",
         "default": True
     },
     "autoDeleteExpiredFavorites": {
