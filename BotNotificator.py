@@ -1,6 +1,5 @@
 import logging
 import time
-import traceback
 from datetime import datetime
 from enum import Enum
 from typing import Union
@@ -364,6 +363,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n02. <a href=\"https://' + URLs.MCD_MCBROKEN + '\">' + URLs.MCD_MCBROKEN + '</a> | Wo funktioniert die Eismaschine?'
     infoText += '\n<b>Sonstige</b>'
     infoText += '\n01. <a href=\"' + URLs.DOMINOS_BILLIGEPIZZA + '\">billigepizza.netlify.app</a> | Pizzapreise bei Domino\'s optimieren'
+    infoText += '\n02. <a href=\"' + URLs.LIEFERANDO_MISTERSNAX + '\">mistersnax.com</a> | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"

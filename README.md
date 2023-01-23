@@ -317,6 +317,7 @@ McDonalds:
 Sonstige:
 Sonstige
 01. billigepizza.netlify.app | Pizzapreise bei Domino's optimieren
+02. mistersnax.com | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich
 ```
 
 ### Test Cases
@@ -378,6 +379,7 @@ Würger King | https://github.com/WebFreak001/WurgerKing | https://wurgerking.wf
 - | https://github.com/robsonkades/clone-burger-king-app-with-expo | -
 mccoupon.deals | McDonalds Coupons ohne App, [Autor](https://www.mydealz.de/profile/Jicu) | https://www.mccoupon.deals/
 billigepizza.netlify.app | Pizzapreise von Domino's optimieren | https://billigepizza.netlify.app/
+MisterSnax (ehemals Spätzlehunter) | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich | https://mistersnax.com/
 
 * https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
 * https://github.com/reteps/burger-king-api-wrapper

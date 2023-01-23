@@ -210,7 +210,7 @@ class Coupon(Document):
         if (includeNutritionTypeSymbol or includeMeatSymbol) and self.containsMeat():
             shortenedTitle = '🥩' + shortenedTitle
         elif (includeNutritionTypeSymbol or includeVeggieSymbol) and self.isVeggie():
-            shortenedTitle = '🥦' + shortenedTitle
+            shortenedTitle = SYMBOLS.BROCCOLI + shortenedTitle
         return shortenedTitle
 
     def isExpired(self):

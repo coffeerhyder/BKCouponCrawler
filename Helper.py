@@ -41,6 +41,7 @@ class URLs:
     MCD_MCCOUPON_DEALS = 'https://www.mccoupon.deals/'
     MCD_MCBROKEN = 'mcbroken.com'
     DOMINOS_BILLIGEPIZZA = 'billigepizza.netlify.app'
+    LIEFERANDO_MISTERSNAX = 'mistersnax.com'
     MEGA_COUPON_ARCHIVE = 'mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg'
     MEGA_COUPON_ARCHIVE_SHORT = 'bit.ly/bkcoupons'
 
