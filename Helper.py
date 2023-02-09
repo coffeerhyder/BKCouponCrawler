@@ -236,6 +236,7 @@ def replaceRegex(old: Pattern, repl: str, text: str) -> str:
 
 class SYMBOLS:
     BACK = '⬅Zurück'
+    MEAT = '🥩'
     BROCCOLI = '🥦'
     CONFIRM = '✅'
     DENY = '🚫'

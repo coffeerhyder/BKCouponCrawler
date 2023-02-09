@@ -290,7 +290,7 @@ class BKCrawler:
             bkCoupons = [couponBK]
             # Collect hidden coupons
             upsellOptions = couponBK.get('upsellOptions')
-            if upsellOptions is not None and len(upsellOptions) > 0:
+            if upsellOptions is not None:
                 for upsellOption in upsellOptions:
                     upsellType = upsellOption.get('_type')
                     upsellShortCode = upsellOption.get('shortCode')
@@ -320,6 +320,8 @@ class BKCrawler:
                     else:
                         subtitle = sanitizeCouponTitle(subtitle)
                         ignoreTitleRegex = re.compile(r'(?i)Im King Menü \(\+[^)]+\)').search(title)
+                        if subtitle is None or len(subtitle) == 0:
+                            titleFull = title
                         if ignoreTitleRegex:
                             # Ignore title and only use subtitle
                             titleFull = subtitle
@@ -1193,7 +1195,7 @@ class BKCrawler:
         return self.couchdb[DATABASES.TELEGRAM_USERS]
 
     def getFilteredCoupons(
-            self, filters: CouponFilter
+            self, filter: CouponFilter, sortIfSortCodeIsGivenInCouponFilter: bool = True
     ) -> dict:
         """ Use this to only get the coupons you want.
          Returns all by default."""
@@ -1209,45 +1211,50 @@ class BKCrawler:
         #     for uniqueCouponID in couponDB:
         #         desiredCoupons[uniqueCouponID] = couponDB[uniqueCouponID]
         #     return desiredCoupons
+        # Log if developer is trying to use incorrect filters
+        if filter.isVeggie is False and filter.isPlantBased is True:
+            logging.warning(f'Bad params: {filter.isVeggie=} and {filter.isPlantBased=}')
         for uniqueCouponID in couponDB:
             coupon = Coupon.load(couponDB, uniqueCouponID)
-            if filters.activeOnly and not coupon.isValid():
+            if filter.activeOnly and not coupon.isValid():
                 # Skip expired coupons if needed
                 continue
-            elif filters.allowedCouponTypes is not None and coupon.type not in filters.allowedCouponTypes:
+            elif filter.allowedCouponTypes is not None and coupon.type not in filter.allowedCouponTypes:
                 # Skip non-allowed coupon-types
                 continue
-            elif filters.containsFriesAndCoke is not None and coupon.isContainsFriesAndDrink() != filters.containsFriesAndCoke:
+            elif filter.containsFriesAndCoke is not None and coupon.isContainsFriesAndDrink() != filter.containsFriesAndCoke:
                 # Skip items if they do not have the expected "containsFriesOrCoke" state
                 continue
-            elif filters.isNew is not None and coupon.isNewCoupon() != filters.isNew:
+            elif filter.isNew is not None and coupon.isNewCoupon() != filter.isNew:
                 # Skip item if it does not have the expected "is_new" state
                 continue
-            elif filters.isHidden is not None and coupon.isHidden != filters.isHidden:
+            elif filter.isHidden is not None and coupon.isHidden != filter.isHidden:
                 continue
-            elif filters.isVeggie is not None and coupon.isVeggie() != filters.isVeggie:
+            elif filter.isVeggie is not None and coupon.isVeggie() != filter.isVeggie:
+                continue
+            elif filter.isPlantBased is not None and coupon.isPlantBased() != filter.isPlantBased:
                 continue
             else:
                 desiredCoupons[uniqueCouponID] = coupon
         # Remove duplicates if needed and if it makes sense to attempt that
-        if filters.removeDuplicates is True and (filters.allowedCouponTypes is None or (filters.allowedCouponTypes is not None and len(filters.allowedCouponTypes) > 1)):
+        if filter.removeDuplicates is True and (filter.allowedCouponTypes is None or (filter.allowedCouponTypes is not None and len(filter.allowedCouponTypes) > 1)):
             desiredCoupons = removeDuplicatedCoupons(desiredCoupons)
         # Now check if the result shall be sorted
-        if filters.sortCode is None:
-            # Do not sort coupons
-            return desiredCoupons
-        else:
+        if filter.sortCode is not None and sortIfSortCodeIsGivenInCouponFilter:
             # Sort coupons: Separate by type and sort each by coupons with/without menu and price.
             # Make dict out of list
-            filteredAndSortedCouponsDict = sortCoupons(desiredCoupons, filters.sortCode)
+            filteredAndSortedCouponsDict = sortCoupons(desiredCoupons, filter.sortCode)
             logging.debug("Time it took to get- and sort coupons: " + getFormattedPassedTime(timestampStart))
             return filteredAndSortedCouponsDict
+        else:
+            return desiredCoupons
+
 
     def getFilteredCouponsAsList(
-            self, filters: CouponFilter
+            self, filters: CouponFilter, sortIfSortCodeIsGivenInCouponFilter: bool = True
     ) -> List[Coupon]:
         """ Wrapper """
-        filteredCouponsDict = self.getFilteredCoupons(filters)
+        filteredCouponsDict = self.getFilteredCoupons(filters, sortIfSortCodeIsGivenInCouponFilter=sortIfSortCodeIsGivenInCouponFilter)
         return list(filteredCouponsDict.values())
 
     def getOffersActive(self) -> list:

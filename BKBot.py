@@ -3,7 +3,7 @@ import math
 import time
 import traceback
 from copy import deepcopy
-from typing import List, Tuple
+from typing import Tuple
 
 import schedule
 from couchdb import Database
@@ -23,27 +23,19 @@ from Helper import *
 from Crawler import BKCrawler, UserStats
 
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
-    USER_SETTINGS_ON_OFF, CouponSortModes, CouponViews, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING
+    USER_SETTINGS_ON_OFF, CouponSortModes, CouponViews, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING, getCouponViewByIndex
 from CouponCategory import CouponCategory
 from Helper import BotAllowedCouponTypes, CouponType
 from UtilsOffers import offerGetImagePath
 
 
-class CouponDisplayMode:
-    ALL = "a"
-    ALL_WITHOUT_MENU = 'a2'
-    CATEGORY = 'c'
-    CATEGORY_WITHOUT_MENU = 'c2'
-    HIDDEN_APP_COUPONS_ONLY = 'h'
-    VEGGIE = 'v'
-    FAVORITES = 'f'
-
-
 class CouponCallbackVars:
-    ALL_COUPONS = "?a=dcs&m=" + CouponDisplayMode.ALL + "&cs="
-    ALL_COUPONS_WITHOUT_MENU = "?a=dcs&m=" + CouponDisplayMode.ALL_WITHOUT_MENU + "&cs="
-    VEGGIE = "?a=dcs&m=" + CouponDisplayMode.VEGGIE + "&cs="
-    FAVORITES = "?a=dcs&m=" + CouponDisplayMode.FAVORITES + "&cs="
+    ALL_COUPONS = f"?a=dcs&m={CouponViews.ALL.getViewCode()}&cs="
+    ALL_COUPONS_WITHOUT_MENU = f"?a=dcs&m={CouponViews.ALL_WITHOUT_MENU.getViewCode()}&cs="
+    MEAT_WITHOUT_PLANT_BASED = f"?a=dcs&m={CouponViews.MEAT_WITHOUT_PLANT_BASED.getViewCode()}&cs="
+    VEGGIE = f"?a=dcs&m={CouponViews.VEGGIE.getViewCode()}&cs="
+    # MEAT_WITHOUT_PLANT_BASED = f"?a=dcs&m={CouponDisplayMode.MEAT_WITHOUT_PLANT_BASED}&cs="
+    FAVORITES = f"?a=dcs&m={CouponViews.FAVORITES.getViewCode()}&cs="
 
 
 class CallbackPattern:
@@ -314,16 +306,18 @@ class BKBot:
             elif couponSrc == CouponType.PAYBACK and not user.settings.displayCouponCategoryPayback:
                 # Do not display this category if disabled by user
                 continue
-            allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural, callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY + "&cs=" + str(couponSrc))])
+            allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural, callback_data=f"?a=dcs&m={CouponViews.CATEGORY.getViewCode()}&cs={couponSrc}")])
             if couponCategory.numberofCouponsWithFriesAndDrink < couponCategory.numberofCouponsTotal and couponCategory.isEatable():
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' ohne Menü',
-                                                        callback_data="?a=dcs&m=" + CouponDisplayMode.CATEGORY_WITHOUT_MENU + "&cs=" + str(couponSrc))])
-            if couponSrc == CouponType.APP and couponCategory.numberofCouponsHidden > 0:
+                                                        callback_data=f"?a=dcs&m={CouponViews.CATEGORY_WITHOUT_MENU.getViewCode()}&cs={couponSrc}")])
+            if couponSrc == CouponType.APP and couponCategory.numberofCouponsHidden > 0 and user.settings.displayCouponCategoryAppCouponsHidden:
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' versteckte',
-                                                        callback_data="?a=dcs&m=" + CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY + "&cs=" + str(couponSrc))])
+                                                        callback_data=f"?a=dcs&m={CouponViews.HIDDEN_APP_COUPONS_ONLY.getViewCode()}&cs={couponSrc}")])
+        # if user.settings.displayCouponCategoryAllExceptPlantBased:
+        #     allButtons.append([InlineKeyboardButton(f'{SYMBOLS.MEAT}Fleisch Coupons{SYMBOLS.MEAT}', callback_data=CouponCallbackVars.MEAT_WITHOUT_PLANT_BASED)])
         if user.settings.displayCouponCategoryVeggie:
             allButtons.append([InlineKeyboardButton(f'{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}', callback_data=CouponCallbackVars.VEGGIE)])
-        keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data="?a=dcs&m=" + CouponDisplayMode.FAVORITES),
+        keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data=f"?a=dcs&m={CouponViews.FAVORITES.getViewCode()}"),
                                     InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten + Pics' + SYMBOLS.STAR, callback_data=CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES)]
         allButtons.append(keyboardCouponsFavorites)
         if user.settings.displayCouponCategoryPayback:
@@ -332,7 +326,7 @@ class BKBot:
             else:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         alwaysShowOfferButton = True  # 2022-09-28: Always show offer button because BK website may have some offers
-        if self.crawler.cachedNumberofAvailableOffers > 0 or alwaysShowOfferButton:
+        if user.settings.displayOffersButton and (self.crawler.cachedNumberofAvailableOffers > 0 or alwaysShowOfferButton):
             allButtons.append(
                 [InlineKeyboardButton('Angebote', callback_data=CallbackVars.MENU_OFFERS)])
         if user.settings.displayBKWebsiteURLs:
@@ -431,7 +425,7 @@ class BKBot:
         callbackVar += "&cb=" + urllib.parse.quote(callbackVar)
         urlquery = furl(callbackVar)
         urlinfo = urlquery.args
-        mode = urlinfo["m"]
+        view = getCouponViewByIndex(index=int(urlinfo["m"]))
         action = urlinfo.get('a')
         try:
             saveUserToDB = False
@@ -439,58 +433,31 @@ class BKBot:
             user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=False)
             if user.updateActivityTimestamp():
                 saveUserToDB = True
-            highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
-            displayHiddenCouponsWithinOtherCategories = user.settings.displayHiddenAppCouponsWithinGenericCategories
-            if mode == CouponDisplayMode.FAVORITES:
+            if view.allowModifyFilter:
+                # Inherit some filters from user settings
+                view = deepcopy(view)
+                couponFilter = view.getFilter()
+                couponTypeStr = urlinfo['cs']
+                if couponTypeStr is not None and len(couponTypeStr) > 0:
+                    couponFilter.allowedCouponTypes = [int(couponTypeStr)]
+                # First we only want to filter coupons. Sort them later according to user preference -> Needs less CPU cycles.
+                if couponFilter.isHidden is None and user.settings.displayHiddenAppCouponsWithinGenericCategories is False:
+                    # User does not want to see hidden coupons within generic categories
+                    couponFilter.isHidden = False
+                if couponFilter.isPlantBased is None and user.settings.displayPlantBasedCouponsWithinGenericCategories is False:
+                    # User does not want to see plant based coupons within generic categories
+                    couponFilter.isPlantBased = False
+                if view.highlightFavorites is None:
+                    # User setting overrides unser param in view
+                    view.highlightFavorites = user.settings.highlightFavoriteCouponsInButtonTexts
+            if view == CouponViews.FAVORITES:
                 userFavorites, menuText = self.getUserFavoritesAndUserSpecificMenuText(user=user, sortCoupons=False)
                 coupons = userFavorites.couponsAvailable
                 couponCategory = CouponCategory(coupons)
-                view = CouponViews.FAVORITES
-                # When displaying only favorites we do not need the highlight symbol -> Gives us one character more of space in our buttons :)
-                highlightFavorites = False
             else:
-                if mode == CouponDisplayMode.ALL:
-                    # Display all coupons
-                    view = CouponViews.ALL
-                elif mode == CouponDisplayMode.ALL_WITHOUT_MENU:
-                    # Display all coupons without menu
-                    view = CouponViews.ALL_WITHOUT_MENU
-                elif mode == CouponDisplayMode.VEGGIE:
-                    # Display all coupons without menu
-                    view = CouponViews.VEGGIE
-                elif mode == CouponDisplayMode.CATEGORY:
-                    # Display all coupons of a particular category
-                    view = CouponViews.CATEGORY
-                    couponSrc = int(urlinfo['cs'])
-                    view.getFilter().allowedCouponTypes = [couponSrc]
-                elif mode == CouponDisplayMode.CATEGORY_WITHOUT_MENU:
-                    # Display all coupons of a particular category without menu
-                    view = CouponViews.CATEGORY_WITHOUT_MENU
-                    couponSrc = int(urlinfo['cs'])
-                    view.getFilter().allowedCouponTypes = [couponSrc]
-                elif mode == CouponDisplayMode.HIDDEN_APP_COUPONS_ONLY:
-                    # Display all hidden App coupons (ONLY)
-                    view = CouponViews.HIDDEN_APP_COUPONS_ONLY
-                    displayHiddenCouponsWithinOtherCategories = None
-                else:
-                    raise BetterBotException("WTF developer mistake")
-                couponFilter = deepcopy(view.getFilter())
-                # First we only want to filter coupons. Sort them later according to user preference -> Needs less performance.
-                couponFilter.sortCode = None
-                if couponFilter.isHidden is None:
-                    """ 
-                    Only apply user selection if this coupon filter does not have a pre-selected isHidden value.
-                    E.g. if user wants to view category "Hidden App coupons", ONLY hidden coupons should be displayed regardless of the user-setting.
-                    """
-                    if displayHiddenCouponsWithinOtherCategories is True:
-                        # True translates to None -> Allow hidden- and none-hidden coupons
-                        couponFilter.isHidden = None
-                    else:
-                        # Loop through None and False:  None = Get all (hidden- and non-hidden coupons), False = Get non-hidden coupons only
-                        couponFilter.isHidden = displayHiddenCouponsWithinOtherCategories
-                coupons = self.getFilteredCoupons(couponFilter)
+                coupons = self.getFilteredCoupons(view.getFilter(), sortIfSortCodeIsGivenInCouponFilter=False)
                 couponCategory = CouponCategory(coupons)
-                menuText = couponCategory.getCategoryInfoText(withMenu=couponFilter.containsFriesAndCoke, includeHiddenCouponsInCount=displayHiddenCouponsWithinOtherCategories)
+                menuText = couponCategory.getCategoryInfoText(withMenu=view.getFilter().containsFriesAndCoke, includeHiddenCouponsInCount=view.getFilter().isHidden)
             if len(coupons) == 0:
                 # This should never happen
                 raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
@@ -499,9 +466,11 @@ class BKBot:
                 # Change sort of coupons
                 saveUserToDB = True
                 nextSortMode = user.getNextSortModeForCouponView(couponView=view)
+                # Sort coupons
                 coupons = sortCouponsAsList(coupons, nextSortMode)
                 user.setCustomSortModeForCouponView(couponView=view, sortMode=nextSortMode)
             else:
+                # Sort coupons
                 coupons = sortCouponsAsList(coupons, user.getSortModeForCouponView(couponView=view))
             # Answer query
             query = update.callback_query
@@ -528,7 +497,7 @@ class BKBot:
                 includeVeggieSymbol = view.includeVeggieSymbol
             while len(buttons) < maxCouponsPerPage and index < len(coupons):
                 coupon = coupons[index]
-                if user.isFavoriteCoupon(coupon) and highlightFavorites:
+                if user.isFavoriteCoupon(coupon) and view.highlightFavorites:
                     buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts, includeVeggieSymbol=includeVeggieSymbol)
                     currentPageContainsAtLeastOneFavoriteCoupon = True
                 else:
@@ -701,7 +670,7 @@ class BKBot:
 
         menuText = '<b>Nix dabei?</b>'
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN),
-                                              InlineKeyboardButton(SYMBOLS.ARROW_RIGHT + " Zu den Gutscheinen", callback_data="?a=dcs&m=" + CouponDisplayMode.ALL + "&cs=")], []])
+                                              InlineKeyboardButton(SYMBOLS.ARROW_RIGHT + " Zu den Gutscheinen", callback_data="?a=dcs&m=" + CouponViews.ALL.getViewCode() + "&cs=")], []])
         self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode='HTML', reply_markup=reply_markup, disable_web_page_preview=True)
         return CallbackVars.MENU_OFFERS
 
@@ -730,20 +699,26 @@ class BKBot:
         # TODO: Make this nicer
         dummyUser = User()
         userWantsAutodeleteOfFavoriteCoupons = user.settings.autoDeleteExpiredFavorites
-        for settingKey, setting in dummyUser["settings"].items():
+        addedSettingCategories = []
+        for settingKey, setting in USER_SETTINGS_ON_OFF.items():
             # All settings that are in 'USER_SETTINGS_ON_OFF' are simply on/off settings and will automatically be included in users' settings.
-            if settingKey in USER_SETTINGS_ON_OFF:
-                description = USER_SETTINGS_ON_OFF[settingKey]["description"]
-                # Check for special cases where one setting depends of the state of another
-                if settingKey == 'notifyWhenFavoritesAreBack' and userWantsAutodeleteOfFavoriteCoupons:
-                    continue
-                if user.settings.get(settingKey, dummyUser.settings[settingKey]):
-                    # Setting is currently enabled
-                    keyboard.append(
-                        [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
-                else:
-                    # Setting is currently disabled
-                    keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
+            category = USER_SETTINGS_ON_OFF[settingKey]["category"]
+            # Add setting category button if it hasn't been added already
+            if category not in addedSettingCategories:
+                addedSettingCategories.append(category)
+                keyboard.append([InlineKeyboardButton(SYMBOLS.ARROW_DOWN * 2 + category.title + SYMBOLS.ARROW_DOWN * 2,
+                                                      callback_data='DummyButtonSettingCategory')])
+            description = USER_SETTINGS_ON_OFF[settingKey]["description"]
+            # Check for special cases where one setting depends of the state of another
+            if settingKey == 'notifyWhenFavoritesAreBack' and userWantsAutodeleteOfFavoriteCoupons:
+                continue
+            if user.settings.get(settingKey, dummyUser.settings[settingKey]):
+                # Setting is currently enabled
+                keyboard.append(
+                    [InlineKeyboardButton(SYMBOLS.CONFIRM + description, callback_data=settingKey)])
+            else:
+                # Setting is currently disabled
+                keyboard.append([InlineKeyboardButton(description, callback_data=settingKey)])
         addDeletePaybackCardButton = False
         if user.getPaybackCardNumber() is None:
             keyboard.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
@@ -753,7 +728,6 @@ class BKBot:
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.PROTOCOL_BK + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
         menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs auch 'Upselling Artikel' genannt."
-        menuText += "\nWenn aktiviert, werden diese nicht nur über den extra Menüpunkt 'App Coupons versteckte' angezeigt sondern zusätzlich innerhalb der folgenden Kategorien: Alle Coupons, App Coupons"
         userSortModes = user.couponViewSortModes
         if userSortModes is not None and len(userSortModes) > 0:
             menuText += "\n---"
@@ -912,9 +886,9 @@ class BKBot:
             text += " | " + priceFormatted
         return text
 
-    def getFilteredCoupons(self, couponFilter: CouponFilter):
+    def getFilteredCoupons(self, couponFilter: CouponFilter, sortIfSortCodeIsGivenInCouponFilter: bool = True):
         """  Wrapper for crawler.filterCouponsList with errorhandling when zero results are available. """
-        coupons = self.crawler.getFilteredCouponsAsList(couponFilter)
+        coupons = self.crawler.getFilteredCouponsAsList(couponFilter, sortIfSortCodeIsGivenInCouponFilter=sortIfSortCodeIsGivenInCouponFilter)
         if len(coupons) == 0:
             menuText = SYMBOLS.DENY + ' <b>Es gibt derzeit keine Coupons in den von dir ausgewählten Kategorien und/oder in Kombination mit den eingestellten Filtern!</b>'
             # menuText += "\nZurück mit /start"

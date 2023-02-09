@@ -264,10 +264,11 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         # Collect all coupons that haven't been sent into the channel at all or were sent into the channel more than X seconds ago (= "old" entries)
         for coupon in activeCoupons.values():
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
-            if channelCoupon is None or datetime.now().timestamp() - channelCoupon.timestampMessagesPosted > 6 * 60 * 60:
+            if channelCoupon is None or datetime.now().timestamp() - channelCoupon.timestampMessagesPosted > 16 * 60 * 60:
                 # Coupon has not been posted into channel yet or has been posted in there too long ago -> Add to list of coupons to re-send later
                 couponsToSendOut[coupon.id] = coupon
     else:
+        # This should never happen!
         logging.warning("Unsupported ChannelUpdateMode! Developer mistake?!")
 
     if numberOfCouponsNewToThisChannel != len(newCoupons):

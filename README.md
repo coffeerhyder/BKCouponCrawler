@@ -159,24 +159,7 @@ ID | Interne Bezeichnung | Beschreibung
 8 | PAYBACK | Payback Papiercoupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.
 
 ### Codebeispiel Crawler
-```
-crawler = BKCrawler()
-""" Nur für den Bot geeignete Coupons crawlen oder alle?
- Wenn du den Bot 'produktiv' einsetzt, solltest du alle ressourcenhungrigen Schalter deaktivieren (= default). """
-crawler.setCrawlOnlyBotCompatibleCoupons(True)
-# History Datenbank aufbauen z.B. zur späteren Auswertung?
-crawler.setKeepHistory(True)
-# Simple History Datenbank aufbauen?
-crawler.setKeepSimpleHistoryDB(True)
-# CSV Export bei jedem Crawlvorgang (de-)aktivieren
-crawler.setExportCSVs(False)
-# Coupons crawlen
-crawler.crawlAndProcessData()
-# Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
-activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE))
-# Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
-activeCoupons = crawler.filterCoupons(CouponFilter(sortCode=CouponSortModes.PRICE, allowedCouponTypes=CouponType.APP, containsFriesAndCoke=None, isHidden=True))
-```
+Siehe BKBot.py -> ``__init__``
 
 # TODOs
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
