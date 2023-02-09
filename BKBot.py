@@ -1294,7 +1294,7 @@ class BKBot:
                             else:
                                 couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=True,
                                                                                                                publicChannelName=self.getPublicChannelName(),
-                                                                                                               messageID=messageID)
+                                                                                                               messageID=messageID, includeVeggieSymbol=True)
                         else:
                             # This should never happen but we'll allow it to
                             logging.warning("Can't hyperlink coupon because no messageIDs available: " + coupon.id)

@@ -271,18 +271,21 @@ class Coupon(Document):
             return False
 
     def isVeggie(self) -> bool:
-        # First check if we got any useful information in our list of tags
-        if self.containsMeat():
-            return False
-        if self.isPlantBased():
-            return True
-        # No result? Fallback to other, more unsafe methods.
         if self.type == CouponType.PAYBACK:
             # Yes, Payback coupons are technically veggie except for those that are only valid for articles containing meat
             return True
+        elif self.containsMeat():
+            """ 
+            Check if coupon contains meat. Some of them are wrongly tagged so ket's fix that by also looking into the product titles.
+             """
+            return False
+        elif self.isPlantBased():
+            return True
         elif couponTitleContainsVeggieFood(self.title):
+            # No result? Fallback to other, more unsafe methods.
             return True
         else:
+            # Last resort: Check if tags contain any useful information.
             if self.tags is not None:
                 for tag in self.tags:
                     tag = tag.lower()
