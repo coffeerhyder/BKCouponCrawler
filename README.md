@@ -162,6 +162,7 @@ ID | Interne Bezeichnung | Beschreibung
 Siehe BKBot.py -> ``__init__``
 
 # TODOs
+* python-telegram-bot Framework aktualisieren und requirements.txt entsprechend anpassen
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Handling mit Datumsangaben prüfen/verbessern
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
