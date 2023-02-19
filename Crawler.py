@@ -15,8 +15,8 @@ from json import loads
 import PaperCouponHelper
 from BotUtils import getImageBasePath, loadConfig
 from Helper import *
-from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesAndDrink, \
-    isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, BotAllowedCouponTypes, CouponType, Paths
+from Helper import getPathImagesOffers, getPathImagesProducts, \
+    isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, CouponType, Paths
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
@@ -79,7 +79,6 @@ class BKCrawler:
         self.cachedNumberofAvailableOffers = 0
         self.keepHistoryDB = False
         self.keepSimpleHistoryDB = False
-        self.crawlOnlyBotCompatibleCoupons = True
         self.storeCouponAPIDataAsJson = False
         self.exportCSVs = False
         self.missingPaperCouponPLUs = []
@@ -169,11 +168,6 @@ class BKCrawler:
          Simple means that of every couponID, only the latest version will be kept.
          """
         self.keepSimpleHistoryDB = keepSimpleHistoryDB
-
-    def setCrawlOnlyBotCompatibleCoupons(self, crawlOnlyBotCompatibleCoupons: bool):
-        """ Enabling this will speedup the crawl process!
-         Disable this if you want the crawler to crawl all items -> Will need some more time! """
-        self.crawlOnlyBotCompatibleCoupons = crawlOnlyBotCompatibleCoupons
 
     def setStoreCouponAPIDataAsJson(self, storeCouponAPIDataAsJson: bool):
         """ If enabled, all obtained API json responses will be saved into json files on each run. """
@@ -797,16 +791,13 @@ class BKCrawler:
                             coupon.priceCompare = originalPrice
         # Collect items we want to add to DB
         couponsToAddToDB = {}
-        if self.crawlOnlyBotCompatibleCoupons:
-            for coupon in crawledCouponsDict.values():
-                if coupon.isValidForBot():
-                    couponsToAddToDB[coupon.id] = coupon
-                else:
-                    # Filter out incompatible coupons right away so we will need less DB operations later
-                    logging.info(f'Skipping non-bot compatible or expired coupon: {coupon.id}')
-        else:
-            # Add all crawled coupons to DB
-            couponsToAddToDB = crawledCouponsDict
+        # Get rid of invalid coupons so we won't even bother adding them to our DB.
+        for coupon in crawledCouponsDict.values():
+            if coupon.isValid():
+                couponsToAddToDB[coupon.id] = coupon
+            else:
+                # Filter out incompatible coupons right away so we will need less DB operations later
+                logging.info(f'Skipping invalid/expired coupon: {coupon.id}')
         logging.info("Number of crawled coupons: " + str(len(couponsToAddToDB)))
         if len(couponsToAddToDB) < len(crawledCouponsDict):
             logging.warning(f'Possible bug or most likely API/sources contained expired coupons: Not all crawled coupons will be added to DB! Crawled: {len(crawledCouponsDict)} | Added: {len(couponsToAddToDB)}')
@@ -823,8 +814,7 @@ class BKCrawler:
             if crawledCoupon is None:
                 # Coupon is in DB but not in crawled coupons -> Remove from DB
                 deleteCouponDocs[uniqueCouponID] = dbCoupon
-            elif self.crawlOnlyBotCompatibleCoupons and not crawledCoupon.isValidForBot():
-                # This will usually only happen if operator set crawlOnlyBotCompatibleCoupons to False first and then to True.
+            elif not crawledCoupon.isValid():
                 deleteCouponDocs[uniqueCouponID] = dbCoupon
         if len(deleteCouponDocs) > 0:
             couponDB.purge(deleteCouponDocs.values())
@@ -1266,10 +1256,6 @@ class BKCrawler:
             if offerIsValid(offer):
                 offers.append(offer)
         return offers
-
-    def getBotCoupons(self) -> dict:
-        """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
-        return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.PRICE.getSortCode()))
 
 
 def getCouponByID(coupons: List[Coupon], couponID: str) -> Union[Coupon, None]:

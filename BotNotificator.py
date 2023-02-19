@@ -5,7 +5,8 @@ from enum import Enum
 from typing import Union
 
 from telegram import InputMediaPhoto
-from telegram.error import BadRequest, Unauthorized
+from telegram.error import BadRequest
+from werkzeug.exceptions import Unauthorized
 
 from BotUtils import getBotImpressum, Commands
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes, formatSeconds

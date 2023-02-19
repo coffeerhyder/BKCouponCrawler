@@ -5,6 +5,7 @@ from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
 
 
 class CouponCategory:
+    """ Takes a list/dict of given coupons and creates a 'category' container of it containing easily accessible fields with useful information about it. """
 
     def __init__(self, coupons: Union[CouponType, int, dict, List]):
         # TODO: Improve this so we can inject custom category names as auto detection may return unexpected results

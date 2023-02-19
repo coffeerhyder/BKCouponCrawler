@@ -604,6 +604,7 @@ class User(Document):
         Mapping.build(
             displayCouponCategoryAppCouponsHidden=BooleanField(default=True),
             # displayCouponCategoryAllExceptPlantBased=BooleanField(default=True),
+            displayCouponCategoryMeatWithoutPlantBased=BooleanField(default=False),
             displayCouponCategoryVeggie=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
             displayCouponSortButton=BooleanField(default=True),
@@ -989,11 +990,11 @@ USER_SETTINGS_ON_OFF = {
         "description": f"Kategorie 'App Coupons versteckte' zeigen",
         "default": True
     },
-    # "displayCouponCategoryAllExceptPlantBased": {
-    #     "category": SettingCategories.MAIN_MENU,
-    #     "description": f"Kategorie Fleisch Coupons ({SYMBOLS.MEAT}) zeigen",
-    #     "default": True
-    # },
+    "displayCouponCategoryMeatWithoutPlantBased": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": f"Kategorie Coupons ohne PlantBased ({SYMBOLS.MEAT}) zeigen",
+        "default": False
+    },
     "displayCouponCategoryVeggie": {
         "category": SettingCategories.MAIN_MENU,
         "description": f"Kategorie Veggie Coupons ({SYMBOLS.BROCCOLI}) zeigen",

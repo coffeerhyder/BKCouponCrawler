@@ -8,11 +8,11 @@ from typing import Tuple
 import schedule
 from couchdb import Database
 from furl import furl, urllib
-from telegram import Update, InlineKeyboardButton, InputMediaPhoto, Message, ReplyMarkup
+from telegram import Update, InlineKeyboardButton, InputMediaPhoto, Message
+from telegram._utils.defaultvalue import DEFAULT_NONE
+from telegram._utils.types import ReplyMarkup, ODVInput
 from telegram.error import RetryAfter, BadRequest
-from telegram.ext import Updater, CommandHandler, CallbackContext, ConversationHandler, CallbackQueryHandler, MessageHandler, Filters, Handler
-from telegram.utils.helpers import DEFAULT_NONE
-from telegram.utils.types import ODVInput, FileInput
+from telegram.ext import CommandHandler, CallbackContext, ConversationHandler, CallbackQueryHandler, MessageHandler, Application, filters
 
 from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion
 from BotUtils import *
@@ -124,13 +124,12 @@ class BKBot:
         self.publicChannelName = self.cfg.public_channel_name
         self.botName = self.cfg.bot_name
         self.couchdb = self.crawler.couchdb
-        self.updater = Updater(self.cfg.bot_token, request_kwargs={"read_timeout": 30})
+        self.application = Application.builder().token(self.cfg.bot_token).build()
         self.initHandlers()
-        self.updater.dispatcher.add_error_handler(self.botErrorCallback)
+        self.application.add_error_handler(self.botErrorCallback)
 
     def initHandlers(self):
         """ Adds all handlers to dispatcher (not error_handlers!!) """
-        dispatcher = self.updater.dispatcher
         # Main conversation handler - handles nearly all bot menus.
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', self.botDisplayMenuMain), CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND),
@@ -188,12 +187,12 @@ class BKBot:
                 CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD: [
                     # Back to settings menu
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
-                    MessageHandler(filters=Filters.text and (~Filters.command), callback=self.botAddPaybackCard),
+                    MessageHandler(filters=filters.TEXT and (~filters.COMMAND), callback=self.botAddPaybackCard),
                 ],
                 CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD: [
                     # Back to settings menu
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
-                    MessageHandler(Filters.text, self.botDeletePaybackCard),
+                    MessageHandler(filters.TEXT, self.botDeletePaybackCard),
                 ],
             },
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
@@ -211,7 +210,7 @@ class BKBot:
                     # Back to main menu
                     CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),
                     # Delete users account
-                    MessageHandler(filters=Filters.text and (~Filters.command), callback=self.botUserDeleteAccount),
+                    MessageHandler(filters=filters.TEXT and (~filters.COMMAND), callback=self.botUserDeleteAccount),
                 ],
 
             },
@@ -231,10 +230,11 @@ class BKBot:
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="CouponToggleFavoriteWithImageHandler",
         )
-        dispatcher.add_handler(conv_handler)
-        dispatcher.add_handler(conv_handler2)
-        dispatcher.add_handler(conv_handler3)
-        dispatcher.add_handler(CommandHandler('stats', self.botDisplayStats))
+        app = self.application
+        app.add_handler(conv_handler)
+        app.add_handler(conv_handler2)
+        app.add_handler(conv_handler3)
+        app.add_handler(CommandHandler('stats', self.botDisplayStats))
 
     def adminOrException(self, user: User):
         if not self.isAdmin(user):
@@ -280,7 +280,7 @@ class BKBot:
         Only call this if self.publicChannelName != None!!! """
         return "<a href=\"https://t.me/" + self.getPublicChannelName() + "\">" + linkText + "</a>"
 
-    def botDisplayMaintenanceMode(self, update: Update, context: CallbackContext):
+    async def botDisplayMaintenanceMode(self, update: Update, context: CallbackContext):
         text = SYMBOLS.DENY + '<b>Wartungsmodus!' + SYMBOLS.DENY + '</b>'
         text += '\nKeine Sorge solange der Bot reagiert, lebt er auch noch ;)'
         if self.getPublicChannelName() is not None:
@@ -290,7 +290,7 @@ class BKBot:
             text += '\nWartungsmodus deaktivieren: /' + Commands.MAINTENANCE
         self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
-    def botDisplayMenuMain(self, update: Update, context: CallbackContext):
+    async def botDisplayMenuMain(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         allButtons = []
         if self.getPublicChannelName() is not None:
@@ -313,8 +313,8 @@ class BKBot:
             if couponSrc == CouponType.APP and couponCategory.numberofCouponsHidden > 0 and user.settings.displayCouponCategoryAppCouponsHidden:
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' versteckte',
                                                         callback_data=f"?a=dcs&m={CouponViews.HIDDEN_APP_COUPONS_ONLY.getViewCode()}&cs={couponSrc}")])
-        # if user.settings.displayCouponCategoryAllExceptPlantBased:
-        #     allButtons.append([InlineKeyboardButton(f'{SYMBOLS.MEAT}Fleisch Coupons{SYMBOLS.MEAT}', callback_data=CouponCallbackVars.MEAT_WITHOUT_PLANT_BASED)])
+        if user.settings.displayCouponCategoryAllExceptPlantBased:
+            allButtons.append([InlineKeyboardButton(f'{SYMBOLS.MEAT}Coupons ohne PlantBased{SYMBOLS.MEAT}', callback_data=CouponCallbackVars.MEAT_WITHOUT_PLANT_BASED)])
         if user.settings.displayCouponCategoryVeggie:
             allButtons.append([InlineKeyboardButton(f'{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}', callback_data=CouponCallbackVars.VEGGIE)])
         keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data=f"?a=dcs&m={CouponViews.FAVORITES.getViewCode()}"),
@@ -341,7 +341,7 @@ class BKBot:
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = 'Hallo ' + update.effective_user.first_name + ', <b>Bock auf Fastfood?</b>'
         menuText += '\n' + getBotImpressum()
-        missingPaperCouponsText = bkbot.crawler.getMissingPaperCouponsText()
+        missingPaperCouponsText = self.crawler.getMissingPaperCouponsText()
         if missingPaperCouponsText is not None:
             menuText += '\n<b>'
             menuText += SYMBOLS.WARNING + 'Derzeit im Bot fehlende Papiercoupons: ' + missingPaperCouponsText
@@ -352,14 +352,13 @@ class BKBot:
             menuText += '\n<b>Du bist Admin!</b>'
             menuText += '\nAdmin Commands:'
             menuText += '\n/' + Commands.MAINTENANCE + ' - Wartungsmodus toggeln'
-        self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
+        await self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
-    def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
+    async def botDisplayAllCouponsListWithFullTitles(self, update: Update, context: CallbackContext):
         """ Send list containing all coupons with long titles linked to coupon channel to user. This may result in up to 10 messages being sent! """
         update.callback_query.answer()
-        activeCoupons = bkbot.crawler.getFilteredCoupons(
-            CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
+        activeCoupons = self.getBotCoupons()
         self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
                                                 channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
@@ -372,26 +371,26 @@ class BKBot:
         return CallbackVars.MENU_MAIN
 
     def getBotCoupons(self) -> dict:
-        """ Wrapper """
-        return self.crawler.getBotCoupons()
+        """ Returns active coupons suitable for bot, sorted by price ascending. """
+        return self.crawler.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.PRICE.getSortCode()))
 
-    def botDisplayCouponsFromBotMenu(self, update: Update, context: CallbackContext):
+    async def botDisplayCouponsFromBotMenu(self, update: Update, context: CallbackContext):
         """ Wrapper """
         return self.displayCoupons(update, context, update.callback_query.data)
 
-    def botDisplayAllCouponsCOMMAND(self, update: Update, context: CallbackContext):
+    async def botDisplayAllCouponsCOMMAND(self, update: Update, context: CallbackContext):
         """ Wrapper and this is only to be used for commands. """
         return self.displayCoupons(update, context, CouponCallbackVars.ALL_COUPONS)
 
-    def botDisplayAllCouponsWithoutMenuCOMMAND(self, update: Update, context: CallbackContext):
+    async def botDisplayAllCouponsWithoutMenuCOMMAND(self, update: Update, context: CallbackContext):
         """ Wrapper and this is only to be used for commands. """
         return self.displayCoupons(update, context, CouponCallbackVars.ALL_COUPONS_WITHOUT_MENU)
 
-    def botDisplayFavoritesCOMMAND(self, update: Update, context: CallbackContext):
+    async def botDisplayFavoritesCOMMAND(self, update: Update, context: CallbackContext):
         """ Wrapper and this is only to be used for commands. """
         return self.displayCoupons(update, context, CouponCallbackVars.FAVORITES)
 
-    def botDisplayStats(self, update: Update, context: CallbackContext):
+    async def botDisplayStats(self, update: Update, context: CallbackContext):
         msg = self.editOrSendMessage(update, text='Statistiken werden geladen...')
         couponDB = self.getBotCoupons()
         userDB = self.crawler.getUserDB()
@@ -559,7 +558,7 @@ class BKBot:
         else:
             if coupons is None:
                 # Perform DB request if not already done before
-                coupons = self.getBotCoupons()
+                coupons = self.crawler.getFilteredCoupons(filter=CouponViews.FAVORITES.getFilter())
             userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=sortCoupons)
             if len(userFavoritesInfo.couponsAvailable) == 0:
                 errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar:</b>'
@@ -739,7 +738,7 @@ class BKBot:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
-            userFavoritesInfo = user.getUserFavoritesInfo(self.getBotCoupons(), sortCoupons=True)
+            userFavoritesInfo = user.getUserFavoritesInfo(self.crawler.getFilteredCoupons(CouponViews.FAVORITES.getFilter()), sortCoupons=True)
             if len(userFavoritesInfo.couponsUnavailable) > 0:
                 keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavoritesInfo.couponsUnavailable)) + ")?*²",
                                                       callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
@@ -1051,22 +1050,20 @@ class BKBot:
     def botAdminToggleMaintenanceMode(self, update: Update, context: CallbackContext):
         user = getUserFromDB(userDB=self.crawler.getUserDB(), userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         self.adminOrException(user)
-        dispatcher = self.updater.dispatcher
         if self.maintenanceMode:
             # Remove all handlers
-            for handlerList in dispatcher.handlers.values():
+            for handlerList in self.application.handlers.values():
                 for handler in handlerList:
-                    handler.callback = self.botDisplayMaintenanceMode
-                    dispatcher.remove_handler(handler)
+                    self.application.remove_handler(handler)
             # RE-init handlers so bot behaves normal again
             self.initHandlers()
             self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.CONFIRM + 'Wartungsmodus deaktiviert.')
             self.maintenanceMode = False
         else:
             # Change callback of all handlers to point to maintenance function
-            for handlerList in dispatcher.handlers.values():
+            for handlerList in self.application.handlers.values():
                 for handler in handlerList:
-                    all_handlers: List[Handler] = []
+                    all_handlers: List = []
                     try:
                         # Not all types of handlers have all properties
                         all_handlers.extend(handler.entry_points)
@@ -1077,7 +1074,7 @@ class BKBot:
                         pass
                     for thishandler in all_handlers:
                         """ Make sure not to disable the maintenance command itself otherwise the bot will be stuck in maintenance mode forever ;) """
-                        if isinstance(thishandler, CommandHandler) and Commands.MAINTENANCE in thishandler.command:
+                        if isinstance(thishandler, CommandHandler) and Commands.MAINTENANCE in thishandler.commands:
                             continue
                         thishandler.callback = self.botDisplayMaintenanceMode
             self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.CONFIRM + 'Wartungsmodus aktiviert.')
@@ -1228,12 +1225,14 @@ class BKBot:
             logging.warning("Cleanup channel failed")
 
     def startBot(self):
-        self.updater.start_polling()
-        # Don't call this blocking method!
-        # self.updater.idle()
+        # TODO: Use start() instead as it is a non-blocking method
+        self.application.run_polling(read_timeout=30)
+        # TODO: Increase read_timeout to 10-30 seconds instead of 2
+        # self.application.start()
+        # self.application.updater.start_polling(read_timeout=30)
 
     def stopBot(self):
-        self.updater.stop()
+        self.application.stop()
 
     def cleanupCaches(self):
         cleanupCache(self.couponImageCache)
@@ -1337,7 +1336,7 @@ class BKBot:
             index += 1
 
     def editOrSendMessage(self, update: Update, text: str, parse_mode: str = None, reply_markup: ReplyMarkup = None, disable_web_page_preview: bool = False,
-                          disable_notification=False) -> Union[Message, bool]:
+                          disable_notification=False):
         """ Edits last message if possible. Sends new message otherwise.
          Usable for message with text-content only!
          Returns:
@@ -1353,7 +1352,7 @@ class BKBot:
                                     disable_web_page_preview=disable_web_page_preview, disable_notification=disable_notification)
 
     def editMessage(self, chat_id: Union[int, str], message_id: Union[int, str], text: str, parse_mode: str = None, disable_web_page_preview: bool = False):
-        self.updater.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text, parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
+        self.application.updater.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text, parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
 
     def sendMessage(self, chat_id: Union[int, str], text: Union[str, None] = None, parse_mode: Union[None, str] = None,
                     disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
@@ -1363,25 +1362,21 @@ class BKBot:
         return self.processMessage(chat_id=chat_id, text=text, parse_mode=parse_mode, disable_notification=disable_notification, disable_web_page_preview=disable_web_page_preview,
                                    reply_markup=reply_markup)
 
-    def sendPhoto(self, chat_id: Union[int, str], photo: Union[FileInput, 'PhotoSize'], caption: Union[None, str] = None,
+    def sendPhoto(self, chat_id: Union[int, str], photo, caption: Union[None, str] = None,
                   parse_mode: Union[None, str] = None, disable_notification: ODVInput[bool] = DEFAULT_NONE,
                   reply_markup: 'ReplyMarkup' = None) -> Message:
         """ Wrapper """
         return self.processMessage(chat_id=chat_id, photo=photo, caption=caption, parse_mode=parse_mode, disable_notification=disable_notification, reply_markup=reply_markup)
 
-    def sendMediaGroup(self, chat_id: Union[int, str], media: List[
-        Union['InputMediaAudio', 'InputMediaDocument', 'InputMediaPhoto', 'InputMediaVideo']
-    ], disable_notification: ODVInput[bool] = DEFAULT_NONE) -> List[Message]:
+    def sendMediaGroup(self, chat_id: Union[int, str], media: List, disable_notification: ODVInput[bool] = DEFAULT_NONE) -> List[Message]:
         """ Wrapper """
         return self.processMessage(chat_id=chat_id, media=media, disable_notification=disable_notification)
 
     def processMessage(self, chat_id: Union[int, str], maxTries: int = 15, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
                        disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
                        reply_markup: 'ReplyMarkup' = None,
-                       media: Union[None, List[
-                           Union['InputMediaAudio', 'InputMediaDocument', 'InputMediaPhoto', 'InputMediaVideo']
-                       ]] = None,
-                       photo: Union[None, FileInput, 'PhotoSize'] = None, caption: Union[None, str] = None
+                       media: Union[None, List] = None,
+                       photo = None, caption: Union[None, str] = None
                        ) -> Union[Message, List[Message]]:
         """ This will take care of "flood control exceeded" API errors (RetryAfter Errors). """
         retryNumber = -1
@@ -1391,15 +1386,15 @@ class BKBot:
                 retryNumber += 1
                 if media is not None:
                     # Multiple photos/media
-                    return self.updater.bot.sendMediaGroup(chat_id=chat_id, disable_notification=disable_notification, media=media)
+                    self.application.updater.bot.sendMediaGroup(chat_id=chat_id, disable_notification=disable_notification, media=media)
                 elif photo is not None:
                     # Photo
-                    return self.updater.bot.send_photo(chat_id=chat_id, disable_notification=disable_notification, parse_mode=parse_mode, photo=photo, reply_markup=reply_markup,
+                    return self.application.updater.bot.send_photo(chat_id=chat_id, disable_notification=disable_notification, parse_mode=parse_mode, photo=photo, reply_markup=reply_markup,
                                                        caption=caption
                                                        )
                 else:
                     # Text message
-                    return self.updater.bot.send_message(chat_id=chat_id, disable_notification=disable_notification, text=text, parse_mode=parse_mode, reply_markup=reply_markup,
+                    return self.application.updater.bot.send_message(chat_id=chat_id, disable_notification=disable_notification, text=text, parse_mode=parse_mode, reply_markup=reply_markup,
                                                          disable_web_page_preview=disable_web_page_preview)
             except RetryAfter as retryError:
                 # https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this
@@ -1425,7 +1420,7 @@ class BKBot:
         if messageID is None:
             return
         try:
-            self.updater.bot.delete_message(chat_id=chat_id, message_id=messageID)
+            self.application.updater.bot.delete_message(chat_id=chat_id, message_id=messageID)
         except BadRequest:
             """ Typically this means that this message has already been deleted """
             logging.warning("Failed to delete message with message_id: " + str(messageID))
@@ -1446,7 +1441,7 @@ class ImageCache:
         self.timestampLastUsed = datetime.now().timestamp()
 
 
-if __name__ == '__main__':
+def main():
     bkbot = BKBot()
     if bkbot.getPublicChannelName() is None:
         schedule.every().day.at('00:00:30').do(bkbot.batchProcessWithoutChannelUpdate)
@@ -1485,3 +1480,7 @@ if __name__ == '__main__':
     while True:
         schedule.run_pending()
         time.sleep(1)
+
+
+if __name__ == '__main__':
+    main()
