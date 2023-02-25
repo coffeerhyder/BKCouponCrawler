@@ -359,9 +359,9 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n01. <a href=\"' + URLs.PROTOCOL_BK + URLs.BK_SPAR_KINGS + '\">Spar Kings</a>'
     infoText += '\n02. <a href=\"' + URLs.BK_KING_FINDER + '\">KING Finder</a>'
     infoText += '\n03. <a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to BetterKing Forum Thread</a>'
-    infoText += '\n04. <a href=\"' + URLs.BK_WUERGER_KING + '\">Würger King</a> (' + '<a href=\"' + URLs.BK_WUERGER_KING_SOURCE + '\">source</a>' + ')'
+    infoText += '\n04. <a href=\"https://pr0gramm.com/user/FishEater23/uploads/4730464\">pr0gramm.com Post</a>'
     infoText += '\n<b>McDonalds</b>'
-    infoText += '\n01. <a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a> | Gratis Getränke & Coupons'
+    infoText += '\n01. <a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a> | Mcdonalds Coupons'
     infoText += '\n02. <a href=\"https://' + URLs.MCD_MCBROKEN + '\">' + URLs.MCD_MCBROKEN + '</a> | Wo funktioniert die Eismaschine?'
     infoText += '\n<b>Sonstige</b>'
     infoText += '\n01. <a href=\"' + URLs.DOMINOS_BILLIGEPIZZA + '\">billigepizza.netlify.app</a> | Pizzapreise bei Domino\'s optimieren'
@@ -374,7 +374,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += "\n... oder verwende <a href=\"https://t.me/" + bkbot.botName + "\">den Bot</a>."
     infoText += "\n<b>Der Bot kann außerdem deine Favoriten speichern, Coupons filtern und einiges mehr ;)</b>"
     infoText += "\nMöchtest du diesen Channel mit jemandem teilen, der kein Telegram verwendet?"
-    infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a>, <a href=\"" + URLs.ELEMENT + "\">Element per Matrix Bridge</a> oder <a href=\"" + URLs.BK_WUERGER_KING + "\">Würger King</a>."
+    infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a> oder <a href=\"" + URLs.ELEMENT + "\">Element per Matrix Bridge</a>."
     infoText += "\n<b>Guten Hunger!</b>"
     infoText += "\n" + getBotImpressum()
     """ 

@@ -291,12 +291,11 @@ Wie kann ich Fehler melden oder Feedback einreichen?
 Per Mail: bkfeedback@pm.me
 
 Gibt es ähnliche open source Projekte für BK?
-Ja: Würger King: wurgerking.wfr.moe
-Quellcode: github.com/WebFreak001/WurgerKing
+Nein
 
 Gibt es sowas auch für McDonalds/KFC/...?
 McDonalds:
-01. mccoupon.deals | Gratis Getränke & Coupons
+01. mccoupon.deals | Mcdonalds Coupons
 02. mcbroken.com | Wo funktioniert die Eismaschine?
 Sonstige:
 Sonstige
@@ -354,18 +353,19 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
 * http://www.fastfood-forum.net/wbb3/upload/index.php/Board/9-Burger-King/
 * https://www.burgerking.de/rewards/offers (Coupons direkt über die BK Webseite)
+* https://pr0gramm.com/user/FishEater23/uploads/4730464
+* https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/
 
 ### Ähnliche Projekte | funktionierend
 Name | Beschreibung | Live-Instanz
 --- | --- | ---
-Würger King | https://github.com/WebFreak001/WurgerKing | https://wurgerking.wfr.moe/
 - | https://github.com/reteps/burger-king-api-wrapper | -
 - | https://github.com/robsonkades/clone-burger-king-app-with-expo | -
 mccoupon.deals | McDonalds Coupons ohne App, [Autor](https://www.mydealz.de/profile/Jicu) | https://www.mccoupon.deals/
 billigepizza.netlify.app | Pizzapreise von Domino's optimieren | https://billigepizza.netlify.app/
 MisterSnax (ehemals Spätzlehunter) | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich | https://mistersnax.com/
+NordseeCoupons | Nordsee Coupons Bot | https://t.me/nordseecoupons , [Bot](https://t.me/NordseeCouponsBot)
 
-* https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
 * https://github.com/reteps/burger-king-api-wrapper
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
 * https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
@@ -378,6 +378,7 @@ Name | Beschreibung | Live-Instanz | Down seit
 freecokebot aka gimmecockbot | McDonalds gratis Getränke | https://t.me/gimmecockbot (Alternativ https://t.me/freecokebot) | 10.11.2022
 bk.eris.cc | BK Coupons ohne App, [Autor](https://gist.github.com/printfuck) | https://bk.eris.cc/ | 10.11.2022
 mcdonalds4free_bot | McDonalds Getränke kostenlos, [MyDealz Thread](https://www.mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092) | https://t.me/mcdonalds4free_bot | 15.01.2023
+Würger King | Burger King Coupons | https://wurgerking.wfr.moe/  ([Quellcode](https://github.com/WebFreak001/WurgerKing)) | 31.12.2022
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot
