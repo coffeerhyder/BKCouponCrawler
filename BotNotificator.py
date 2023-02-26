@@ -364,7 +364,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n01. <a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a> | Mcdonalds Coupons'
     infoText += '\n02. <a href=\"https://' + URLs.MCD_MCBROKEN + '\">' + URLs.MCD_MCBROKEN + '</a> | Wo funktioniert die Eismaschine?'
     infoText += '\n<b>Sonstige</b>'
-    infoText += '\n01. <a href=\"' + URLs.DOMINOS_BILLIGEPIZZA + '\">billigepizza.netlify.app</a> | Pizzapreise bei Domino\'s optimieren'
+    infoText += '\n01. <a href=\"' + URLs.DOMINOS_BILLIGEPIZZA + '\">billigepizza.netlify.app</a> | Pizzapreise bei Domino\'s optimieren (<a href=\"https://youtu.be/rChjUHveYxI\">Video</a>)'
     infoText += '\n02. <a href=\"' + URLs.LIEFERANDO_MISTERSNAX + '\">mistersnax.com</a> | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich'
     infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
