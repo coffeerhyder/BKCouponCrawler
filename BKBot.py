@@ -1454,7 +1454,7 @@ def main():
     if bkbot.getPublicChannelName() is None:
         schedule.every().day.at('00:00:30').do(bkbot.batchProcessWithoutChannelUpdate)
     else:
-        schedule.every().day.at('14:50:30').do(bkbot.batchProcess)
+        schedule.every().day.at('00:00:30').do(bkbot.batchProcess)
 
     schedule.every(21).days.do(bkbot.cleanupCaches)
     """ Always run bot first. """
@@ -1485,18 +1485,6 @@ def main():
         bkbot.crawler.migrateDBs()
     if bkbot.args.usernotify:
         bkbot.notifyUsers()
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-
-
-def schedulerTask(bot: BKBot):
-    if bot.getPublicChannelName() is None:
-        schedule.every().day.at('00:00:30').do(bot.batchProcessWithoutChannelUpdate)
-    else:
-        schedule.every().day.at('00:00:30').do(bot.batchProcess)
-
-    schedule.every(21).days.do(bot.cleanupCaches)
     while True:
         schedule.run_pending()
         time.sleep(1)
