@@ -162,6 +162,8 @@ ID | Interne Bezeichnung | Beschreibung
 Siehe BKBot.py -> ``__init__``
 
 # TODOs
+* Querverlinkungen zu Coupons auf der BK Webseite ergänzen. Nützlich in Filialen, die auf die App Ansicht bestehen.
+* MessageHandler für nicht unterstützte Kommandos/Text einbauen
 * python-telegram-bot Framework aktualisieren und requirements.txt entsprechend anpassen
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Handling mit Datumsangaben prüfen/verbessern
@@ -181,7 +183,7 @@ Siehe BKBot.py -> ``__init__``
 ```
 start - Hauptmenü
 coupons - Alle Coupons
-coupons2 - Alle Coupons ohne Menü
+coupons2 - Coupons ohne Menü
 favoriten - ⭐Favoriten⭐
 angebote - Angebote
 payback - 🅿️ayback Karte

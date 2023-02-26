@@ -1,8 +1,10 @@
 import argparse
+import asyncio
 import math
 import time
 import traceback
 from copy import deepcopy
+from threading import Thread
 from typing import Tuple
 
 import schedule
@@ -313,8 +315,8 @@ class BKBot:
             if couponSrc == CouponType.APP and couponCategory.numberofCouponsHidden > 0 and user.settings.displayCouponCategoryAppCouponsHidden:
                 allButtons.append([InlineKeyboardButton(CouponCategory(couponSrc).namePlural + ' versteckte',
                                                         callback_data=f"?a=dcs&m={CouponViews.HIDDEN_APP_COUPONS_ONLY.getViewCode()}&cs={couponSrc}")])
-        if user.settings.displayCouponCategoryAllExceptPlantBased:
-            allButtons.append([InlineKeyboardButton(f'{SYMBOLS.MEAT}Coupons ohne PlantBased{SYMBOLS.MEAT}', callback_data=CouponCallbackVars.MEAT_WITHOUT_PLANT_BASED)])
+        # if user.settings.displayCouponCategoryAllExceptPlantBased:
+        #     allButtons.append([InlineKeyboardButton(f'{SYMBOLS.MEAT}Coupons ohne PlantBased{SYMBOLS.MEAT}', callback_data=CouponCallbackVars.MEAT_WITHOUT_PLANT_BASED)])
         if user.settings.displayCouponCategoryVeggie:
             allButtons.append([InlineKeyboardButton(f'{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}', callback_data=CouponCallbackVars.VEGGIE)])
         keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data=f"?a=dcs&m={CouponViews.FAVORITES.getViewCode()}"),
@@ -410,7 +412,8 @@ class BKBot:
         text += '\nDein BetterKing Account:'
         text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
         text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
-        text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt von vom Bot zugestelltem Coupon-Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(user.timestampLastTimeAccountUsed)
+        text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt von vom Bot zugestelltem Coupon-Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(
+            user.timestampLastTimeAccountUsed)
         text += '</pre>'
         if isinstance(msg, Message):
             self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
@@ -497,7 +500,8 @@ class BKBot:
             while len(buttons) < maxCouponsPerPage and index < len(coupons):
                 coupon = coupons[index]
                 if user.isFavoriteCoupon(coupon) and view.highlightFavorites:
-                    buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts, includeVeggieSymbol=includeVeggieSymbol)
+                    buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts,
+                                                                               includeVeggieSymbol=includeVeggieSymbol)
                     currentPageContainsAtLeastOneFavoriteCoupon = True
                 else:
                     buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts, includeVeggieSymbol=includeVeggieSymbol)
@@ -669,7 +673,8 @@ class BKBot:
 
         menuText = '<b>Nix dabei?</b>'
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN),
-                                              InlineKeyboardButton(SYMBOLS.ARROW_RIGHT + " Zu den Gutscheinen", callback_data="?a=dcs&m=" + CouponViews.ALL.getViewCode() + "&cs=")], []])
+                                              InlineKeyboardButton(SYMBOLS.ARROW_RIGHT + " Zu den Gutscheinen",
+                                                                   callback_data="?a=dcs&m=" + CouponViews.ALL.getViewCode() + "&cs=")], []])
         self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode='HTML', reply_markup=reply_markup, disable_web_page_preview=True)
         return CallbackVars.MENU_OFFERS
 
@@ -854,7 +859,8 @@ class BKBot:
             coupon = Coupon.load(self.crawler.getCouponDB(), uniqueCouponID)
             if coupon is None:
                 # Edge case: Coupon may have been deleted from DB while user had this keyboard open.
-                self.editOrSendMessage(update, text=SYMBOLS.WARNING + 'Coupon Favoritenstatus kann nicht geändert werden, da dieser Coupon nicht mehr existiert!', parse_mode='HTML')
+                self.editOrSendMessage(update, text=SYMBOLS.WARNING + 'Coupon Favoritenstatus kann nicht geändert werden, da dieser Coupon nicht mehr existiert!',
+                                       parse_mode='HTML')
                 return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
             user.addFavoriteCoupon(coupon)
             isFavorite = True
@@ -1121,7 +1127,8 @@ class BKBot:
                 channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
                 messageID = channelCoupon.getMessageIDForChatHyperlink()
                 if messageID is not None:
-                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=False, includeVeggieSymbol=True, publicChannelName=self.getPublicChannelName(),
+                    couponText = coupon.generateCouponShortTextFormattedWithHyperlinkToChannelPost(highlightIfNew=False, includeVeggieSymbol=True,
+                                                                                                   publicChannelName=self.getPublicChannelName(),
                                                                                                    messageID=messageID)
                 else:
                     # This should never happen but we'll allow it to
@@ -1229,7 +1236,6 @@ class BKBot:
         self.application.run_polling(read_timeout=30)
         # TODO: Increase read_timeout to 10-30 seconds instead of 2
         # self.application.start()
-        # self.application.updater.start_polling(read_timeout=30)
 
     def stopBot(self):
         self.application.stop()
@@ -1376,7 +1382,7 @@ class BKBot:
                        disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
                        reply_markup: 'ReplyMarkup' = None,
                        media: Union[None, List] = None,
-                       photo = None, caption: Union[None, str] = None
+                       photo=None, caption: Union[None, str] = None
                        ) -> Union[Message, List[Message]]:
         """ This will take care of "flood control exceeded" API errors (RetryAfter Errors). """
         retryNumber = -1
@@ -1389,13 +1395,15 @@ class BKBot:
                     self.application.updater.bot.sendMediaGroup(chat_id=chat_id, disable_notification=disable_notification, media=media)
                 elif photo is not None:
                     # Photo
-                    return self.application.updater.bot.send_photo(chat_id=chat_id, disable_notification=disable_notification, parse_mode=parse_mode, photo=photo, reply_markup=reply_markup,
-                                                       caption=caption
-                                                       )
+                    return self.application.updater.bot.send_photo(chat_id=chat_id, disable_notification=disable_notification, parse_mode=parse_mode, photo=photo,
+                                                                   reply_markup=reply_markup,
+                                                                   caption=caption
+                                                                   )
                 else:
                     # Text message
-                    return self.application.updater.bot.send_message(chat_id=chat_id, disable_notification=disable_notification, text=text, parse_mode=parse_mode, reply_markup=reply_markup,
-                                                         disable_web_page_preview=disable_web_page_preview)
+                    return self.application.updater.bot.send_message(chat_id=chat_id, disable_notification=disable_notification, text=text, parse_mode=parse_mode,
+                                                                     reply_markup=reply_markup,
+                                                                     disable_web_page_preview=disable_web_page_preview)
             except RetryAfter as retryError:
                 # https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this
                 lastException = retryError
@@ -1442,11 +1450,11 @@ class ImageCache:
 
 
 def main():
-    bkbot = BKBot()
+    bkbot: BKBot = BKBot()
     if bkbot.getPublicChannelName() is None:
         schedule.every().day.at('00:00:30').do(bkbot.batchProcessWithoutChannelUpdate)
     else:
-        schedule.every().day.at('00:00:30').do(bkbot.batchProcess)
+        schedule.every().day.at('14:50:30').do(bkbot.batchProcess)
 
     schedule.every(21).days.do(bkbot.cleanupCaches)
     """ Always run bot first. """
@@ -1477,6 +1485,18 @@ def main():
         bkbot.crawler.migrateDBs()
     if bkbot.args.usernotify:
         bkbot.notifyUsers()
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+
+def schedulerTask(bot: BKBot):
+    if bot.getPublicChannelName() is None:
+        schedule.every().day.at('00:00:30').do(bot.batchProcessWithoutChannelUpdate)
+    else:
+        schedule.every().day.at('00:00:30').do(bot.batchProcess)
+
+    schedule.every(21).days.do(bot.cleanupCaches)
     while True:
         schedule.run_pending()
         time.sleep(1)

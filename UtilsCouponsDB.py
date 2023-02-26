@@ -602,6 +602,7 @@ MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING = 2 * 24 * 60 * 60
 class User(Document):
     settings = DictField(
         Mapping.build(
+            displayCouponCategoryAllCouponsLongListWithLongTitles=BooleanField(default=False),
             displayCouponCategoryAppCouponsHidden=BooleanField(default=True),
             # displayCouponCategoryAllExceptPlantBased=BooleanField(default=True),
             displayCouponCategoryMeatWithoutPlantBased=BooleanField(default=False),
@@ -985,6 +986,11 @@ class SettingCategories:
 
 USER_SETTINGS_ON_OFF = {
     # TODO: Obtain these Keys and default values from "User" Mapping class and remove this mess!
+    "displayCouponCategoryAllCouponsLongListWithLongTitles": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": f"Kategorie 'Alle Coupons Liste lange Titel + Pics' zeigen",
+        "default": False
+    },
     "displayCouponCategoryAppCouponsHidden": {
         "category": SettingCategories.MAIN_MENU,
         "description": f"Kategorie 'App Coupons versteckte' zeigen",
