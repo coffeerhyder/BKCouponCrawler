@@ -290,7 +290,7 @@ class BKBot:
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         if self.isAdmin(user):
             text += '\nWartungsmodus deaktivieren: /' + Commands.MAINTENANCE
-        self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
+        await self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
     async def botDisplayMenuMain(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
@@ -354,6 +354,9 @@ class BKBot:
             menuText += '\n<b>Du bist Admin!</b>'
             menuText += '\nAdmin Commands:'
             menuText += '\n/' + Commands.MAINTENANCE + ' - Wartungsmodus toggeln'
+        query = update.callback_query
+        if query is not None:
+            await query.answer()
         await self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
@@ -648,7 +651,7 @@ class BKBot:
         if len(activeOffers) == 0:
             # BK should always have offers but let's check for this case anyways.
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
-            menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote!</b>'
+            menuText = SYMBOLS.WARNING + '<b>Es gibt derzeit keine Angebote im Bot!</b>'
             menuText += '\n' + bkOffersOnWebsiteText
             self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
             return CallbackVars.MENU_MAIN
@@ -698,7 +701,7 @@ class BKBot:
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         return self.displaySettings(update, context, user)
 
-    def displaySettings(self, update: Update, context: CallbackContext, user: User):
+    async def displaySettings(self, update: Update, context: CallbackContext, user: User):
         keyboard = []
         # TODO: Make this nicer
         dummyUser = User()
@@ -753,7 +756,7 @@ class BKBot:
                                               callback_data=CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT)])
         # Back button
         keyboard.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
-        self.editOrSendMessage(update=update, text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard), disable_web_page_preview=True)
+        await self.editOrSendMessage(update=update, text=menuText, parse_mode='HTML', reply_markup=InlineKeyboardMarkup(keyboard), disable_web_page_preview=True)
         return CallbackVars.MENU_SETTINGS
 
     def botDisplaySingleCoupon(self, update: Update, context: CallbackContext):
@@ -982,7 +985,7 @@ class BKBot:
         self.deleteUsersUnavailableFavorites(userDB, [user])
         return self.displaySettings(update, context, user)
 
-    def botAddPaybackCard(self, update: Update, context: CallbackContext):
+    async def botAddPaybackCard(self, update: Update, context: CallbackContext):
         userInput = None if update.message is None else update.message.text
         if userInput is not None and len(userInput) == 13:
             # Maybe user entered full EAN barcode --> We only want to save the Payback cardnumber as the first 3 digits are always the same anyways!
@@ -992,7 +995,7 @@ class BKBot:
             text += '\nEs reichen auch die letzten 10 Stellen der EAN oder deine 10-stellige Payback Kundennummer.'
             text += '\nDiese Daten werden ausschließlich gespeichert, um dir deine Payback Karte im Bot anzeigen zu können.'
             text += '\nDu kannst deine Karte in den Einstellungen jederzeit aus dem Bot löschen.'
-            self.editOrSendMessage(update, text=text, parse_mode='HTML',
+            await self.editOrSendMessage(update, text=text, parse_mode='HTML',
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
         elif userInput.isdecimal() and len(userInput) == 10:
@@ -1002,9 +1005,10 @@ class BKBot:
             user.store(userDB)
             text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde eingetragen.'
             self.sendMessage(chat_id=update.effective_user.id, text=text)
-            return self.displayPaybackCard(update=update, context=context, user=user)
+            await self.displayPaybackCard(update=update, context=context, user=user)
+            return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
         else:
-            self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML',
+            await self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML',
                              reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
 
@@ -1030,26 +1034,27 @@ class BKBot:
                                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
         return CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD
 
-    def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
+    async def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         query = update.callback_query
         if query is not None:
-            query.answer()
-        return self.displayPaybackCard(update, context, user)
+            await query.answer()
+        await self.displayPaybackCard(update, context, user)
+        return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
 
-    def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
+    async def displayPaybackCard(self, update: Update, context: CallbackContext, user: User):
         if user.getPaybackCardNumber() is None:
             text = SYMBOLS.WARNING + 'Du hast noch keine Payback Karte eingetragen!'
             reply_markup = InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK),
                                                       InlineKeyboardButton(SYMBOLS.PLUS + 'Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)]])
-            self.editOrSendMessage(update, text=text, parse_mode='html',
+            await self.editOrSendMessage(update, text=text, parse_mode='html',
                                    reply_markup=reply_markup)
         else:
             text = 'Payback Kartennummer: <b>' + splitStringInPairs(user.getPaybackCardNumber()) + '</b>'
             text += '\n<b>Tipp:</b> Pinne diese Nachricht an, um im Bot Chat noch einfacher auf deine Payback Karte zugreifen zu können.'
             replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK),
                                                  InlineKeyboardButton(SYMBOLS.DENY + 'Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)]])
-            self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True,
+            await self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True,
                            reply_markup=replyMarkup)
         return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
 
