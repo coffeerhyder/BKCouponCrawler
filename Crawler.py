@@ -332,6 +332,7 @@ class BKCrawler:
                 price = couponBK['offerPrice']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP)
+                coupon.viewID = couponBK.get('_id')
                 tagsStringArray = []
                 offerTags = couponBK['offerTags']
                 for offerTag in offerTags:

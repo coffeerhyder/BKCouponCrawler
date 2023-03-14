@@ -1,12 +1,13 @@
 import json
-from typing import Optional, List
+from typing import Optional, List, Union
 
 import pydantic
+from pydantic import validator, root_validator
 from telegram import InlineKeyboardMarkup
 
 from Helper import SYMBOLS
 
-VERSION = '1.9.9'
+VERSION = '2.0.0'
 
 """ Place static stuff into this class. """
 
@@ -33,6 +34,7 @@ class CallbackVars:
     COUPON_LOOSE_WITH_FAVORITE_SETTING = 'coupon_loose_with_favorite_setting'
     MENU_FEEDBACK_CODES = 'menu_feedback_codes'
     MENU_SETTINGS = 'menu_settings'
+    MENU_SETTINGS_SORTS_RESET = 'menu_settings_sorts_reset'
     MENU_SETTINGS_RESET = 'menu_settings_reset'
     MENU_SETTINGS_ADD_PAYBACK_CARD = 'menu_settings_add_payback_card'
     MENU_SETTINGS_DELETE_PAYBACK_CARD = 'menu_settings_delete_payback_card'
@@ -75,6 +77,16 @@ class Config(pydantic.BaseModel):
     db_url: str
     admin_ids: Optional[List]
     public_channel_name: Optional[str]
+    public_channel_post_id_faq: Optional[int]
+
+    @root_validator
+    def check_config_values(cls, values):
+        """ https://docs.pydantic.dev/usage/validators/ """
+        public_channel_name, public_channel_post_id_faq = values.get('public_channel_name'), values.get('public_channel_post_id_faq')
+
+        if public_channel_name is not None and public_channel_post_id_faq is None:
+            raise ValueError(f'Bad config: public channel name is given: {public_channel_name=} and at the same time {public_channel_post_id_faq=} | Your public channel is expected to have a permanent postID stickied as a FAQ!')
+        return values
 
 
 def loadConfig() -> Config:

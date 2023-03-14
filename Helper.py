@@ -35,15 +35,6 @@ class URLs:
     BK_KING_FINDER = 'burgerking.de/store-locator'
     BK_KING_DEALS = 'burgerking.de/kingdeals'
     NO_PROTOCOL_COUPONS = 'burgerking.de/rewards/offers'
-    NGB_FORUM_THREAD = 'https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/'
-    # BK_WUERGER_KING = 'https://wurgerking.wfr.moe/'
-    # BK_WUERGER_KING_SOURCE = 'https://github.com/WebFreak001/WurgerKing'
-    MCD_MCCOUPON_DEALS = 'https://www.mccoupon.deals/'
-    MCD_MCBROKEN = 'mcbroken.com'
-    DOMINOS_BILLIGEPIZZA = 'billigepizza.netlify.app'
-    LIEFERANDO_MISTERSNAX = 'mistersnax.com'
-    MEGA_COUPON_ARCHIVE = 'mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg'
-    MEGA_COUPON_ARCHIVE_SHORT = 'bit.ly/bkcoupons'
 
 
 def loadJson(path: str):

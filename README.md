@@ -172,7 +172,6 @@ Siehe BKBot.py -> ``__init__``
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
 * App DB per Proxy in der originalen BK App modifizieren?
-* Alte-Coupons-Archiv im Channel verlinken (gedacht vor allem zur Verwendung in Filialen mit Terminals) | Evtl. hinfällig, weil BK begonnen hat, diese auch per Terminal nicht mehr zu akzeptieren (Stand 03.06.2022)?
 
 # Feature Ideen
 * Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen sonst werden es über die Zeit immer mehr
@@ -247,6 +246,7 @@ FAQ BetterKing Bot und Channel
 Wo finde ich die aktuellen Papiercoupons als Scan?
 Sofern es welche gibt, hier:
 mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
+Dieser Ordner dient außerdem als Archiv.
 
 Warum fehlen (manchmal) Papiercoupons im Bot/Channel?
 Seit dem 03.12.2021 waren Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlten manchmal welche.
@@ -269,23 +269,6 @@ Es gibt mehrere Möglichkeiten:
 - Falls deine BK Filiale die Vorbestellen Funktion bietet, scanne die Coupons im Bestellvorgang mit deinem Handy (Zweitgerät/Laptop benötigt)
 - Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
 
-Wie kann ich noch mehr sparen?
-~~In Filialen mit Terminals lassen sich teilweise alte "abgelaufene" Papiercoupons verwenden.  
-App Coupons theoretisch ebenso, wenn man sie gesammelt hat.
-Hier findest du ein stetig aktualisiertes Archiv alter (Papier-)coupons: mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
-Wie verwende ich alte Coupons?
-- Geht nur am Terminal
-- QR Code scannen oder falls möglich, PLU Code eintippen
-Ab welchem Jahr sind alte Coupons verwendbar?
-Ungefähr ab dem Jahr 2018, da BK ab hier QR Codes eingeführt hat (erster Couponbogen im Archiv mit QR Codes ist "2018_11_11_1.pdf".)
-Natürlich kannst du trotzdem jeden alten PLU Code (also die Nummer) zu einem QR Code machen und ältere ausprobieren. Nimm dafür einen beliebigen QR Code Generator (z.B. qrcode-generator.de) oder App und wähle "Text" als Datentyp.
-Ganz am Ende vorm Bezahlen tritt ein Fehler auf und meine Bestellung verschwindet. Warum und was kann ich tun?
-Viele alte Coupons sind gesperrt bzw. lassen sich nicht mehr bestellen, aber zunächst trotzdem dem Warenkorb hinzufügen.
-- Schaue auf MyDealz, ob es Feedback von Usern zu bestimmten Codes gibt
-- Versuche, Coupons einzeln zu bestellen um nach und nach herauszufinden, welche Coupons funktionieren und welche nicht. Es gibt keine Liste dazu und das kann von Filiale zu Filiale variieren.
-- Pass auf, dass du keine Burger bestellst, die es nicht mehr gibt das kann zwar durchgehen, aber dann nervt dich die Filialleitung. Beispiel: X-tra Long BBQ~~
-⚠Funktioniert seit Anfang November 2022 nicht mehr!
-
 Wo finde ich den Quellcode?
 Hier: github.com/coffeerhyder/BKCouponCrawler
 
@@ -296,14 +279,23 @@ Gibt es ähnliche open source Projekte für BK?
 Nein
 
 Gibt es sowas auch für McDonalds/KFC/...?
-McDonalds:
-01. mccoupon.deals | Mcdonalds Coupons
+McDonalds
+01. mccoupon.deals | Mcdonald's Coupons
 02. mcbroken.com | Wo funktioniert die Eismaschine?
-Sonstige:
-01. billigepizza.netlify.app | Pizzapreise bei Domino's optimieren | Video: https://www.youtube.com/watch?v=rChjUHveYxI
-02. mistersnax.com | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich
-03. t.me/NordseeCouponsBot | Nordsee Coupons
+Sonstige
+01. billigepizza.netlify.app | Pizzapreise bei Domino's optimieren
+—> Video
+ (https://www.youtube.com/watch?v=rChjUHveYxI)02. mistersnax.com | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich
+03. t.me/NordseeCouponsBot | Nordsee Coupons Bot
 Channel: t.me/nordseecoupons
+
+Linksammlung BK:
+01. burgerking.de/sparkings | Spar Kings
+02. burgerking.de/kingdeals | KING Deals
+03. burgerking.de/rewards/offers | Coupons Webansicht
+04. burgerking.de/store-locator | KING Finder
+05. ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/
+06. pr0gramm.com/user/FishEater23/uploads/4730464
 ```
 
 ### Test Cases
@@ -354,7 +346,6 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 
 ### Kleine Linksammlung
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
-* http://www.fastfood-forum.net/wbb3/upload/index.php/Board/9-Burger-King/
 * https://www.burgerking.de/rewards/offers (Coupons direkt über die BK Webseite)
 * https://pr0gramm.com/user/FishEater23/uploads/4730464
 * https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/

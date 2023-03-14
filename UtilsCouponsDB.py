@@ -132,7 +132,7 @@ class CouponViews:
     FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode()), highlightFavorites=False, allowModifyFilter=False)
 
 
-def getAllCouponViews() -> list:
+def getAllCouponViews() -> List[CouponView]:
     res = []
     for obj in CouponViews.__dict__.values():
         if isinstance(obj, CouponView):
@@ -140,7 +140,7 @@ def getAllCouponViews() -> list:
     return res
 
 
-def getCouponViewByIndex(index: int) -> Union[CouponSortMode, None]:
+def getCouponViewByIndex(index: int) -> Union[CouponView, None]:
     allCouponViews = getAllCouponViews()
     if index < len(allCouponViews):
         return allCouponViews[index]
@@ -159,7 +159,6 @@ class Coupon(Document):
     priceCompare = FloatField()
     staticReducedPercent = FloatField()
     title = TextField()
-    # titleShortened = TextField() # Deprecated 2023-01-15 use getTitleShortened instead
     timestampAddedToDB = FloatField(default=getCurrentDate().timestamp())
     timestampLastModifiedDB = FloatField(default=0)
     timestampStart = FloatField()
@@ -170,7 +169,6 @@ class Coupon(Document):
     paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
     type = IntegerField(name='source')  # Legacy. This is called "type" now!
-    # containsFriesOrCoke = BooleanField() # Deprecated 2023-01-15 use isContainsFriesAndDrink instead
     timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
     isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new
     isHidden = BooleanField(default=False)  # Typically only available for App coupons
@@ -180,6 +178,7 @@ class Coupon(Document):
     # TODO: Make use of this once it is possible for users to add coupons to DB via API
     addedVia = IntegerField()
     tags = ListField(TextField())
+    viewID = TextField()
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -531,6 +530,8 @@ class Coupon(Document):
             couponText += '\nGültig bis ' + expireDateFormatted
         if self.description is not None:
             couponText += "\n" + self.description
+        if self.viewID is not None:
+            couponText += f"\n<a href=\"https://www.burgerking.de/rewards/offers/{self.viewID}\">Webansicht</a>"
         return couponText
 
     def getPLUInformationFormatted(self) -> str:
@@ -604,15 +605,14 @@ class User(Document):
         Mapping.build(
             displayCouponCategoryAllCouponsLongListWithLongTitles=BooleanField(default=False),
             displayCouponCategoryAppCouponsHidden=BooleanField(default=True),
-            # displayCouponCategoryAllExceptPlantBased=BooleanField(default=True),
-            displayCouponCategoryMeatWithoutPlantBased=BooleanField(default=False),
+            # displayCouponCategoryMeatWithoutPlantBased=BooleanField(default=False),
             displayCouponCategoryVeggie=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
             displayCouponSortButton=BooleanField(default=True),
+            displayOffersButton=BooleanField(default=True),
             displayBKWebsiteURLs=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
-            displayCouponArchiveLinkButton=BooleanField(default=True),
-            displayOffersButton=BooleanField(default=True),
+            displayFAQLinkButton=BooleanField(default=True),
             displayPlantBasedCouponsWithinGenericCategories=BooleanField(default=True),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
             hideDuplicates=BooleanField(default=False),
@@ -664,6 +664,7 @@ class User(Document):
             return False
 
     def hasDefaultSettings(self) -> bool:
+
         for settingKey, settingValue in self["settings"].items():
             settingInfo = USER_SETTINGS_ON_OFF.get(settingKey)
             if settingInfo is None:
@@ -671,12 +672,20 @@ class User(Document):
                 continue
             elif settingValue != settingInfo['default']:
                 return False
-
-        if self.couponViewSortModes is not None and len(self.couponViewSortModes) > 0:
+        # Check for custom sort modes
+        if self.hasStoredSortModes():
             # User has used/saved custom sort modes
             return False
-
+        # No non-default value found -> User has default settings
         return True
+
+    def hasStoredSortModes(self) -> bool:
+        if self.couponViewSortModes is not None and len(self.couponViewSortModes) > 0:
+            # User has saved preferred sort modes
+            return True
+        else:
+            # User does not have any stored sort modes
+            return False
 
     def hasFoundEasterEgg(self) -> bool:
         if self.easterEggCounter > 0:
@@ -977,7 +986,7 @@ class SettingCategory:
 
 
 class SettingCategories:
-    MAIN_MENU = SettingCategory(title='Hauptmenü')
+    MAIN_MENU = SettingCategory(title='Hauptmenü Buttons')
     GLOBAL_FILTERS = SettingCategory(title='Globale Coupon Filter')
     COUPON_DISPLAY = SettingCategory(title='Anzeigeeinstellungen')
     NOTIFICATIONS = SettingCategory(title='Benachrichtigungen')
@@ -996,11 +1005,11 @@ USER_SETTINGS_ON_OFF = {
         "description": f"Kategorie 'App Coupons versteckte' zeigen",
         "default": True
     },
-    "displayCouponCategoryMeatWithoutPlantBased": {
-        "category": SettingCategories.MAIN_MENU,
-        "description": f"Kategorie Coupons ohne PlantBased ({SYMBOLS.MEAT}) zeigen",
-        "default": False
-    },
+    # "displayCouponCategoryMeatWithoutPlantBased": {
+    #     "category": SettingCategories.MAIN_MENU,
+    #     "description": f"Kategorie Coupons ohne PlantBased ({SYMBOLS.MEAT}) zeigen",
+    #     "default": False
+    # },
     "displayCouponCategoryVeggie": {
         "category": SettingCategories.MAIN_MENU,
         "description": f"Kategorie Veggie Coupons ({SYMBOLS.BROCCOLI}) zeigen",
@@ -1009,6 +1018,11 @@ USER_SETTINGS_ON_OFF = {
     "displayCouponCategoryPayback": {
         "category": SettingCategories.MAIN_MENU,
         "description": "Kategorie Payback Buttons zeigen",
+        "default": True
+    },
+    "displayOffersButton": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": "Angebote Button zeigen",
         "default": True
     },
     "displayBKWebsiteURLs": {
@@ -1021,14 +1035,9 @@ USER_SETTINGS_ON_OFF = {
         "description": "Feedback Code Generator Button zeigen",
         "default": True
     },
-    "displayCouponArchiveLinkButton": {
+    "displayFAQLinkButton": {
         "category": SettingCategories.MAIN_MENU,
-        "description": "Coupon Archiv Button zeigen",
-        "default": True
-    },
-    "displayOffersButton": {
-        "category": SettingCategories.MAIN_MENU,
-        "description": "Angebote Button zeigen",
+        "description": "FAQ Button zeigen",
         "default": True
     },
     "displayPlantBasedCouponsWithinGenericCategories": {

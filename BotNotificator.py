@@ -1,5 +1,6 @@
 import logging
 import time
+import traceback
 from datetime import datetime
 from enum import Enum
 from typing import Union
@@ -141,7 +142,8 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
                 dbUserUpdates.append(user)
         except Unauthorized as botBlocked:
             # Almost certainly it will be "Forbidden: bot was blocked by the user"
-            logging.info(botBlocked.message + " --> User blocked bot --> chat_id: " + userIDStr)
+            traceback.print_exc()
+            logging.info("User blocked bot: " + userIDStr)
             user.botBlockedCounter += 1
             user.timestampLastTimeBlockedBot = getCurrentDate().timestamp()
             dbUserUpdates.append(user)
@@ -341,6 +343,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += '\n<b>' + SYMBOLS.NEW + ' ' + str(len(newCoupons)) + ' Coupons hinzugefügt:</b>'
         infoText += bkbot.getNewCouponsTextWithChannelHyperlinks(newCoupons, 10)
     infoText += '\n' + SYMBOLS.WRENCH + ' Alle ' + str(len(activeCoupons)) + ' Coupons erneut in die Gruppe gesendet'
+    infoText += '\n<b>------</b>'
     if DEBUGNOTIFICATOR:
         infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!!' + SYMBOLS.WARNING + '</b>'
     if bkbot.maintenanceMode:
@@ -351,22 +354,6 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     missingPaperCouponsText = bkbot.crawler.getMissingPaperCouponsText()
     if missingPaperCouponsText is not None:
         infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: </b>' + missingPaperCouponsText
-        infoText += '\n<b>Vollständige Papiercouponbögen sind im angepinnten FAQ verlinkt.</b>'
-    # Add 'useful links text'
-    infoText += '\n<b>------</b>'
-    infoText += '\n<b>Nützliche Links/Infos</b>:'
-    infoText += '\n<b>BK</b>:'
-    infoText += '\n01. <a href=\"' + URLs.PROTOCOL_BK + URLs.BK_SPAR_KINGS + '\">Spar Kings</a>'
-    infoText += '\n02. <a href=\"' + URLs.BK_KING_FINDER + '\">KING Finder</a>'
-    infoText += '\n03. <a href=\"' + URLs.NGB_FORUM_THREAD + '\">ngb.to BetterKing Forum Thread</a>'
-    infoText += '\n04. <a href=\"https://pr0gramm.com/user/FishEater23/uploads/4730464\">pr0gramm.com Post</a>'
-    infoText += '\n<b>McDonalds</b>'
-    infoText += '\n01. <a href=\"' + URLs.MCD_MCCOUPON_DEALS + '\">mccoupon.deals</a> | Mcdonalds Coupons'
-    infoText += '\n02. <a href=\"https://' + URLs.MCD_MCBROKEN + '\">' + URLs.MCD_MCBROKEN + '</a> | Wo funktioniert die Eismaschine?'
-    infoText += '\n<b>Sonstige</b>'
-    infoText += '\n01. <a href=\"' + URLs.DOMINOS_BILLIGEPIZZA + '\">billigepizza.netlify.app</a> | Pizzapreise bei Domino\'s optimieren (<a href=\"https://youtu.be/rChjUHveYxI\">Video</a>)'
-    infoText += '\n02. <a href=\"' + URLs.LIEFERANDO_MISTERSNAX + '\">mistersnax.com</a> | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich'
-    infoText += '\n<b>------</b>'
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"
     infoText += "\nErstelle eine Verknüpfung: Drücke oben auf den Namen des Chats -> Rechts auf die drei Punkte -> Verknüpfung hinzufügen (funktioniert auch mit Bots)"
@@ -375,6 +362,7 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += "\n<b>Der Bot kann außerdem deine Favoriten speichern, Coupons filtern und einiges mehr ;)</b>"
     infoText += "\nMöchtest du diesen Channel mit jemandem teilen, der kein Telegram verwendet?"
     infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a> oder <a href=\"" + URLs.ELEMENT + "\">Element per Matrix Bridge</a>."
+    infoText += f"\nMehr Infos siehe <a href=\"{bkbot.getPublicChannelFAQLink()}\">angepinntes FAQ</a>."
     infoText += "\n<b>Guten Hunger!</b>"
     infoText += "\n" + getBotImpressum()
     """ 
