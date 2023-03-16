@@ -164,13 +164,14 @@ class Coupon(Document):
     timestampStart = FloatField()
     timestampExpireInternal = FloatField()  # Internal expire-date
     timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
+    timestampCouponNotInAPIAnymore = FloatField()
     dateFormattedExpire = TextField()
     imageURL = TextField()
     paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
     type = IntegerField(name='source')  # Legacy. This is called "type" now!
     timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
-    isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new
+    isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new. Use this as an override of default handling.
     isHidden = BooleanField(default=False)  # Typically only available for App coupons
     isUnsafeExpiredate = BooleanField(
         default=False)  # Set this if timestampExpire is a made up date that is just there to ensure that the coupon is considered valid for a specified time

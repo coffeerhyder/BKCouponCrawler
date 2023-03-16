@@ -185,18 +185,22 @@ class BKCrawler:
             self.crawlCoupons(crawledCouponsDict)
         else:
             # Old handling using old API
-            """ Using public API: https://gist.github.com/max1220/7f2f65be4381bc0878e64a985fd71da4 """
-            apiResponse = httpx.get('https://mo.burgerking-app.eu', headers=HEADERS_OLD).json()
-            if self.storeCouponAPIDataAsJson:
-                # Save API response so we can easily use this data for local testing later on.
-                saveJson('crawler/coupons1_old.json', apiResponse)
-            self.crawlProcessOffers(apiResponse)
-            self.crawlCoupons1OLD(apiResponse, crawledCouponsDict)
-            logging.info('App API Crawling done')
-            self.crawlCoupons2OLD(crawledCouponsDict)
+            self.crawlOLD(crawledCouponsDict)
         self.addExtraCoupons(crawledCouponsDict=crawledCouponsDict, immediatelyAddToDB=False)
         self.processCrawledCoupons(crawledCouponsDict)
         # self.crawlProducts()
+
+    def crawlOLD(self, crawledCouponsDict: dict):
+        """ Deprecated!! """
+        """ Using public API: https://gist.github.com/max1220/7f2f65be4381bc0878e64a985fd71da4 """
+        apiResponse = httpx.get('https://mo.burgerking-app.eu', headers=HEADERS_OLD).json()
+        if self.storeCouponAPIDataAsJson:
+            # Save API response so we can easily use this data for local testing later on.
+            saveJson('crawler/coupons1_old.json', apiResponse)
+        self.crawlProcessOffers(apiResponse)
+        self.crawlCoupons1OLD(apiResponse, crawledCouponsDict)
+        logging.info('App API Crawling done')
+        self.crawlCoupons2OLD(crawledCouponsDict)
 
     def downloadProductiveCouponDBImagesAndCreateQRCodes(self):
         """ Downloads coupons images and generates QR codes for current productive coupon DB. """
@@ -208,9 +212,8 @@ class BKCrawler:
             if downloadCouponImageIfNonExistant(coupon):
                 numberofDownloadedImages += 1
             generateQRImageIfNonExistant(uniqueCouponID, coupon.getImagePathQR())
-        if numberofDownloadedImages > 0:
-            logging.info("Number of coupon images downloaded: " + str(numberofDownloadedImages))
-            logging.info("Download image files duration: " + getFormattedPassedTime(timestampStart))
+        logging.info("Number of coupon images downloaded: " + str(numberofDownloadedImages))
+        logging.info("Download image files duration: " + getFormattedPassedTime(timestampStart))
 
     def migrateDBs(self):
         """ Migrate DBs from old to new version - leave this function empty if there is nothing to migrate. """
@@ -1185,7 +1188,7 @@ class BKCrawler:
     def getUserDB(self):
         return self.couchdb[DATABASES.TELEGRAM_USERS]
 
-    def getFilteredCoupons(
+    def getFilteredCouponsAsDict(
             self, filter: CouponFilter, sortIfSortCodeIsGivenInCouponFilter: bool = True
     ) -> dict:
         """ Use this to only get the coupons you want.
@@ -1245,7 +1248,7 @@ class BKCrawler:
             self, filters: CouponFilter, sortIfSortCodeIsGivenInCouponFilter: bool = True
     ) -> List[Coupon]:
         """ Wrapper """
-        filteredCouponsDict = self.getFilteredCoupons(filters, sortIfSortCodeIsGivenInCouponFilter=sortIfSortCodeIsGivenInCouponFilter)
+        filteredCouponsDict = self.getFilteredCouponsAsDict(filters, sortIfSortCodeIsGivenInCouponFilter=sortIfSortCodeIsGivenInCouponFilter)
         return list(filteredCouponsDict.values())
 
     def getOffersActive(self) -> list:

@@ -279,7 +279,7 @@ Gibt es ähnliche open source Projekte für BK?
 Nein
 
 Gibt es sowas auch für McDonalds/KFC/...?
-McDonalds
+McDonald's
 01. mccoupon.deals | Mcdonald's Coupons
 02. mcbroken.com | Wo funktioniert die Eismaschine?
 Sonstige
@@ -296,6 +296,7 @@ Linksammlung BK:
 04. burgerking.de/store-locator | KING Finder
 05. ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/
 06. pr0gramm.com/user/FishEater23/uploads/4730464
+07. tvnow.de/shows/team-wallraff-reporter-undercover-2384/2022-09/episode-2-team-wallraff-undercover-2022-5209024
 ```
 
 ### Test Cases
