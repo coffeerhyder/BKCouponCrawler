@@ -379,8 +379,7 @@ class Coupon(Document):
         if self.timestampStart is not None:
             return datetime.fromtimestamp(self.timestampStart, getTimezone())
         else:
-            # Start date is not always given
-            # logging.warning("Found coupon without startdate: " + self.id)
+            # Start date must not always be given
             return None
 
     def getExpireDatetime(self) -> Union[datetime, None]:
