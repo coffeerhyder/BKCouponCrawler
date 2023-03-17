@@ -9,7 +9,7 @@ from telegram import InputMediaPhoto
 from telegram.error import BadRequest
 from werkzeug.exceptions import Unauthorized
 
-from BotUtils import getBotImpressum, Commands
+from BotUtils import getBotImpressum, Commands, ImageCache
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes, formatSeconds
 
 from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortModes, \
@@ -277,8 +277,8 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     if numberOfCouponsNewToThisChannel != len(newCoupons):
         # During normal usage this should never happen
         logging.warning("Developer mistake or DB has been updated without sending channel update in between for at least 2 days: Number of 'new' coupons to send into channel is: " + str(numberOfCouponsNewToThisChannel) + " but should be: " + str(len(newCoupons)))
-    # Send relevant coupons into chat
     if len(couponsToSendOut) > 0:
+        # Send relevant coupons into chat
         logging.info("Sending out " + str(len(couponsToSendOut)) + " coupons...")
         # Collect all old messageIDs which need to be deleted by checking which of the ones we want to send out are already in our channel at this moment
         channelCouponDBUpdates = []
@@ -299,13 +299,6 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
                 break
             index += 1
             logging.info("Working on coupon " + str(index + 1) + "/" + str(len(couponsToSendOut)) + " | " + coupon.id)
-            # Check for missing images: This can only ever happen if they get deleted from the outside at exactly the wrong point of time.
-            if bkbot.getCouponImage(coupon) is None:
-                # This should never happen
-                raise Exception("WTF failed to find coupon image for coupon " + coupon.id)
-            elif bkbot.getCouponImageQR(coupon) is None:
-                # This should never happen
-                raise Exception("WTF failed to find QR image for coupon " + coupon.id)
             if coupon.id not in channelDB:
                 channelDB[coupon.id] = {}
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
@@ -316,8 +309,14 @@ def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
                           ]
             logging.debug("Sending new coupon messages 1/2: Coupon photos")
             chatMessages = bkbot.sendMediaGroup(chat_id=bkbot.getPublicChannelChatID(), media=photoAlbum, disable_notification=True)
-            channelCoupon.channelMessageID_image = chatMessages[0].message_id
-            channelCoupon.channelMessageID_qr = chatMessages[1].message_id
+            msgImage = chatMessages[0]
+            msgImageQR = chatMessages[1]
+            # Update bot cache
+            bkbot.couponImageCache[coupon.id] = ImageCache(fileID=msgImage.message_id)
+            bkbot.couponImageQRCache[coupon.id] = ImageCache(fileID=msgImageQR.message_id)
+            # Update our DB
+            channelCoupon.channelMessageID_image = msgImage.message_id
+            channelCoupon.channelMessageID_qr = msgImageQR.message_id
             # Update DB
             channelCoupon.store(channelDB)
             # Send coupon information as text (= last message for this coupon)

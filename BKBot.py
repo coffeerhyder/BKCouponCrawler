@@ -4,7 +4,6 @@ import math
 import time
 import traceback
 from copy import deepcopy
-from threading import Thread
 from typing import Tuple
 
 import schedule
@@ -19,7 +18,7 @@ from telegram.ext import CommandHandler, CallbackContext, ConversationHandler, C
 from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion
 from BotUtils import *
 from BaseUtils import *
-from BotUtils import loadConfig
+from BotUtils import loadConfig, ImageCache
 
 from Helper import *
 from Crawler import BKCrawler, UserStats
@@ -129,6 +128,7 @@ class BKBot:
         self.application = Application.builder().token(self.cfg.bot_token).build()
         self.initHandlers()
         self.application.add_error_handler(self.botErrorCallback)
+        # self.lock = asyncio.Lock()
 
     def initHandlers(self):
         """ Adds all handlers to dispatcher (not error_handlers!!) """
@@ -383,10 +383,6 @@ class BKBot:
         await self.sendMessage(chat_id=update.effective_user.id, text=menuText, parse_mode="HTML", reply_markup=reply_markup, disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
-    def getBotCoupons(self) -> dict:
-        """ Returns active coupons suitable for bot, sorted by price ascending. """
-        return self.crawler.getFilteredCouponsAsDict(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.PRICE.getSortCode()))
-
     async def botDisplayCouponsFromBotMenu(self, update: Update, context: CallbackContext):
         """ Wrapper """
         await self.displayCoupons(update, context, update.callback_query.data)
@@ -409,7 +405,7 @@ class BKBot:
 
     async def botDisplayStats(self, update: Update, context: CallbackContext):
         msg = await asyncio.create_task(self.editOrSendMessage(update, text='Statistiken werden geladen...'))
-        couponDB = self.getBotCoupons()
+        couponDB = self.getFilteredCouponsAsList(couponFilter=CouponFilter())
         userDB = self.crawler.getUserDB()
         userStats = UserStats(userDB)
         user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
@@ -423,6 +419,8 @@ class BKBot:
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
+        # TODO: Add stats cache to speed things up
+        # text += '\nStatistiken generiert am: TODO'
         text += '\n---'
         text += '\nDein BetterKing Account:'
         text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
@@ -473,8 +471,8 @@ class BKBot:
                 couponCategory = CouponCategory(coupons)
             else:
                 coupons = self.getFilteredCouponsAsList(view.getFilter(), sortIfSortCodeIsGivenInCouponFilter=False)
-                couponCategory = CouponCategory(coupons)
-                menuText = couponCategory.getCategoryInfoText(withMenu=view.getFilter().containsFriesAndCoke, includeHiddenCouponsInCount=view.getFilter().isHidden)
+                couponCategory = CouponCategory(coupons, title=view.title)
+                menuText = couponCategory.getCategoryInfoText()
             if len(coupons) == 0:
                 # This should never happen
                 raise BetterBotException(SYMBOLS.DENY + ' <b>Ausnahmefehler: Es gibt derzeit keine Coupons!</b>',
@@ -852,7 +850,7 @@ class BKBot:
             msgCoupon = await asyncio.create_task(self.sendPhoto(chat_id=update.effective_message.chat_id, photo=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML',
                                        reply_markup=replyMarkupWithoutBackButton))
         # Add to cache if not already present
-        self.couponImageCache.setdefault(coupon.getUniqueIdentifier(), ImageCache(fileID=msgCoupon.photo[0].file_id))
+        self.couponImageCache.setdefault(coupon.id, ImageCache(fileID=msgCoupon.photo[0].file_id))
         return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
 
     async def botCouponToggleFavorite(self, update: Update, context: CallbackContext):
@@ -923,10 +921,9 @@ class BKBot:
 
     def getCouponImage(self, coupon: Coupon):
         """ Returns either image URL or file or Telegram file_id of a given coupon. """
-        cachedImageData = self.couponImageCache.get(coupon.getUniqueIdentifier())
+        cachedImageData = self.couponImageCache.get(coupon.id)
         """ Re-use Telegram file-ID if possible: https://core.telegram.org/bots/api#message
-        If the PLU has changed, we cannot just re-use the old ID because the images can contain that PLU code and the PLU code in our saved image can lead to a completely different product now!
-        According to the Telegram FAQ, sich file_ids can be trusted to be persistent: https://core.telegram.org/bots/faq#can-i-count-on-file-ids-to-be-persistent """
+        According to the Telegram FAQ, such file_ids can be trusted to be persistent: https://core.telegram.org/bots/faq#can-i-count-on-file-ids-to-be-persistent """
         imagePath = coupon.getImagePath()
         if cachedImageData is not None:
             # Re-use cached image_id and update cache timestamp
@@ -1017,23 +1014,24 @@ class BKBot:
         return CallbackVars.MENU_SETTINGS
 
     async def botAddPaybackCard(self, update: Update, context: CallbackContext):
-        userInput = None if update.message is None else update.message.text
-        if userInput is not None and len(userInput) == 13:
-            # Maybe user entered full EAN barcode --> We only want to save the Payback cardnumber as the first 3 digits are always the same anyways!
-            userInput = userInput[3:13]
-        if userInput is None:
-            text = 'Antworte mit deiner Payback Kartennummer (EAN, 13-stellig), um diese hinzuzufügen.'
-            text += '\nEs reichen auch die letzten 10 Stellen der EAN oder deine 10-stellige Payback Kundennummer.'
+        if update.message is None or update.message.text is None:
+            # No user input -> Ask for input
+            text = 'Antworte mit deiner Payback Kartennummer (EAN, 13-stellig) oder Kundennummer (10-stellig), um deine Karte hinzuzufügen.'
             text += '\nDiese Daten werden ausschließlich gespeichert, um dir deine Payback Karte im Bot anzeigen zu können.'
             text += '\nDu kannst deine Karte in den Einstellungen jederzeit aus dem Bot löschen.'
             await self.editOrSendMessage(update, text=text, parse_mode='HTML',
                                    reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
-        if userInput.isdecimal() and len(userInput) == 10:
+        userInput = update.message.text
+        if userInput.isdecimal() and (len(userInput) == 10 or len(userInput) == 13):
             # Valid user input
+            if len(userInput) == 13:
+                paybackCardNumber = userInput[3:13]
+            else:
+                paybackCardNumber = userInput
             userDB = self.crawler.getUserDB()
             user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
-            user.addPaybackCard(paybackCardNumber=userInput)
+            user.addPaybackCard(paybackCardNumber=paybackCardNumber)
             user.store(userDB)
             text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde eingetragen.'
             await self.sendMessage(chat_id=update.effective_user.id, text=text)
@@ -1143,7 +1141,7 @@ class BKBot:
 
     async def deleteUsersUnavailableFavorites(self, userDB: Database, users: list):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
-        coupons = self.getBotCoupons()
+        coupons = self.getFilteredCouponsAsDict(couponFilter=CouponFilter())
         dbUpdates = []
         for user in users:
             userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=False)
@@ -1314,7 +1312,7 @@ class BKBot:
             maxPage = math.ceil(len(coupons) / maxCouponsPerPage)
             for page in range(1, maxPage + 1):
                 logging.info("Sending category page: " + str(page) + "/" + str(maxPage))
-                couponOverviewText = couponCategory.getCategoryInfoText(withMenu=True, includeHiddenCouponsInCount=True)
+                couponOverviewText = couponCategory.getCategoryInfoText()
                 if maxPage > 1:
                     couponOverviewText += "<b>Teil " + str(page) + "/" + str(maxPage) + "</b>"
                 couponOverviewText += '\n---'
@@ -1479,17 +1477,6 @@ class BKBot:
     def getUser(self, userID: Union[int, str], addIfNew: bool = False, updateUsageTimestamp: bool = False) -> User:
         """ Wrapper. Only call this if you do not wish to write to the userDB in the calling methods otherwise you're wasting resources! """
         return getUserFromDB(self.crawler.getUserDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
-
-
-class ImageCache:
-    def __init__(self, fileID: str):
-        self.imageFileID = fileID
-        self.timestampCreated = datetime.now().timestamp()
-        self.timestampLastUsed = datetime.now().timestamp()
-
-    def updateLastUsedTimestamp(self):
-        """ Updates last used timestamp to current timestamp. """
-        self.timestampLastUsed = datetime.now().timestamp()
 
 
 def main():

@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import Optional, List, Union
 
 import pydantic
@@ -93,3 +94,16 @@ def loadConfig() -> Config:
     with open('config.json', encoding='utf-8') as infile:
         jsondict = json.load(infile)
         return Config(**jsondict)
+
+
+class ImageCache:
+    def __init__(self, fileID: str):
+        self.imageFileID = fileID
+        self.timestampCreated = datetime.now().timestamp()
+        self.timestampLastUsed = datetime.now().timestamp()
+        # self.timesUsed = 0
+
+    def updateLastUsedTimestamp(self):
+        """ Updates last used timestamp to current timestamp. """
+        self.timestampLastUsed = datetime.now().timestamp()
+        # self.timesUsed += 1

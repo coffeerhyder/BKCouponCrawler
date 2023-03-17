@@ -198,7 +198,7 @@ class BKCrawler:
             # Save API response so we can easily use this data for local testing later on.
             saveJson('crawler/coupons1_old.json', apiResponse)
         self.crawlProcessOffers(apiResponse)
-        self.crawlCoupons1OLD(apiResponse, crawledCouponsDict)
+        self.crawlCoupons1OLD_DEPRECATED(apiResponse, crawledCouponsDict)
         logging.info('App API Crawling done')
         self.crawlCoupons2OLD(crawledCouponsDict)
 
@@ -280,6 +280,7 @@ class BKCrawler:
             saveJson('crawler/coupons1.json', apiResponse)
         offersFeedback = apiResponse['data']['evaluateAllUserOffers']['offersFeedback']
         appCoupons = []
+        appCouponsNotYetActive = []
         for offerFeedback in offersFeedback:
             # json in json
             couponJson = offerFeedback['offerDetails']
@@ -317,9 +318,10 @@ class BKCrawler:
                     else:
                         subtitle = sanitizeCouponTitle(subtitle)
                         ignoreTitleRegex = re.compile(r'(?i)Im King Menü \(\+[^)]+\)').search(title)
-                        if subtitle is None or len(subtitle) == 0:
+                        if len(subtitle) == 0 or subtitle.isspace():
+                            # Useless subtitle -> Use title only
                             titleFull = title
-                        if ignoreTitleRegex:
+                        elif ignoreTitleRegex:
                             # Ignore title and only use subtitle
                             titleFull = subtitle
                         elif title == subtitle:
@@ -360,42 +362,52 @@ class BKCrawler:
                  while all others have an offset of two hours. In order to get around this offset problem we prefer to extract the expire-date
                  from the footnote of the coupons and simply add the time (end of the day).
                  """
-                foundAndSetBetterExpireDate = False
+                expiredate1 = None
+                expiredate2 = None
                 try:
                     footnote = couponBK['moreInfo']['de'][0]['children'][0]['text']
                     expiredateRegex = re.compile(r'(?i)Abgabe bis (\d{1,2}\.\d{1,2}\.\d{4})').search(footnote)
                     if expiredateRegex is not None:
                         expiredateStr = expiredateRegex.group(1) + ' 23:59:59'
-                        coupon.timestampExpire = datetime.strptime(expiredateStr, '%d.%m.%Y %H:%M:%S').timestamp()
-                        foundAndSetBetterExpireDate = True
+                        expiredate1 = datetime.strptime(expiredateStr, '%d.%m.%Y %H:%M:%S').timestamp()
                 except:
                     # Dontcare
                     logging.warning('Failed to find BetterExpiredate for coupon ' + coupon.id)
                 ruleSets = couponBK['ruleSet']
-                foundFallbackExpireDate = False
+                realRuleSets = []
                 for ruleSet in ruleSets:
                     ruleSetsChilds = ruleSet.get('ruleSet')
                     if ruleSetsChilds is not None:
                         for ruleSetsChild in ruleSetsChilds:
-                            if ruleSetsChild['_type'] == 'between-dates':
-                                dateformat = '%Y-%m-%dT%H:%M:%S.%fZ'
-                                serversideTimeOffset = 2 * 60 * 60
-                                coupon.timestampStart = datetime.strptime(ruleSetsChild['startDate'], dateformat).timestamp() + serversideTimeOffset
-                                if not foundAndSetBetterExpireDate:
-                                    coupon.timestampExpire = datetime.strptime(ruleSetsChild['endDate'], dateformat).timestamp() + serversideTimeOffset
-                                foundFallbackExpireDate = True
-                                break
-                if not foundAndSetBetterExpireDate and not foundFallbackExpireDate:
+                            realRuleSets.append(ruleSetsChild)
+                    else:
+                        realRuleSets.append(ruleSet)
+                dateformat = '%Y-%m-%dT%H:%M:%S.%fZ'
+                serversideTimeOffset = 2 * 60 * 60
+                for realRuleSet in realRuleSets:
+                    if realRuleSet['_type'] == 'between-dates':
+                        coupon.timestampStart = datetime.strptime(realRuleSet['startDate'], dateformat).timestamp() + serversideTimeOffset
+                        expiredate2 = datetime.strptime(realRuleSet['endDate'], dateformat).timestamp() + serversideTimeOffset
+                        break
+                if expiredate1 is None and expiredate2 is None:
                     # This should never happen
                     logging.warning(f'WTF failed to find any expiredate for coupon: {uniqueCouponID}')
+                elif expiredate1 is not None:
+                    # Prefer this expiredate
+                    coupon.timestampExpire = expiredate1
+                else:
+                    coupon.timestampExpire = expiredate2
                 crawledCouponsDict[uniqueCouponID] = coupon
                 appCoupons.append(coupon)
+                if coupon.timestampStart is not None and coupon.timestampStart > datetime.now().timestamp():
+                    appCouponsNotYetActive.append(coupon)
                 index += 1
 
-        logging.info('Coupons in app: ' + str(len(appCoupons)))
+        logging.info('Coupons in app total: ' + str(len(appCoupons)))
+        logging.info(f'Coupons in app not yet active: {len(appCouponsNotYetActive)} | {appCouponsNotYetActive}')
         logging.info("Total coupons1 crawl time: " + getFormattedPassedTime(timestampCrawlStart))
 
-    def crawlCoupons1OLD(self, apiResponse: dict, crawledCouponsDict: dict):
+    def crawlCoupons1OLD_DEPRECATED(self, apiResponse: dict, crawledCouponsDict: dict):
         """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
         timestampCrawlStart = datetime.now().timestamp()
         appCoupons = apiResponse['coupons']
@@ -801,10 +813,8 @@ class BKCrawler:
                 couponsToAddToDB[coupon.id] = coupon
             else:
                 # Filter out incompatible coupons right away so we will need less DB operations later
-                logging.info(f'Skipping invalid/expired coupon: {coupon.id}')
-        logging.info("Number of crawled coupons: " + str(len(couponsToAddToDB)))
-        if len(couponsToAddToDB) < len(crawledCouponsDict):
-            logging.warning(f'Possible bug or most likely API/sources contained expired coupons: Not all crawled coupons will be added to DB! Crawled: {len(crawledCouponsDict)} | Added: {len(couponsToAddToDB)}')
+                logging.info(f'Do not add invalid/expired/not-yet-active coupon to DB: {coupon.id}')
+        logging.info(f'Crawled coupons: {len(crawledCouponsDict)} | To be added to DB: {len(couponsToAddToDB)}')
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         couponDB = self.getCouponDB()
@@ -812,13 +822,28 @@ class BKCrawler:
         self.updateCachedMissingPaperCouponsInfo(couponDB)
         # Cleanup DB
         deleteCouponDocs = {}
+        modifyCouponDocsUnreliableAPIWorkaround = {}
+        # 2023-03-17: Unfinished work
+        doAPIWorkaroundHandling = False
         for uniqueCouponID in couponDB:
             dbCoupon = Coupon.load(couponDB, uniqueCouponID)
             crawledCoupon = crawledCouponsDict.get(uniqueCouponID)
             if crawledCoupon is None:
-                # Coupon is in DB but not in crawled coupons -> Remove from DB
+                # Coupon is in DB but not in crawled coupons anymore -> Remove from DB
+                if doAPIWorkaroundHandling:
+                    if not dbCoupon.isValid():
+                        # Coupon is ivalid/expired -> Remove it
+                        deleteCouponDocs[uniqueCouponID] = dbCoupon
+                    elif dbCoupon.timestampCouponNotInAPIAnymore is None:
+                        # Save timestamp when coupon disappeared from API first time
+                        dbCoupon.timestampCouponNotInAPIAnymore = getCurrentDate().timestamp()
+                        modifyCouponDocsUnreliableAPIWorkaround[dbCoupon.id] = dbCoupon
+                    elif getCurrentDate().timestamp() - dbCoupon.timestampCouponNotInAPIAnymore > 3 * 24 * 60 * 60:
+                        # Coupon hasn't been in API for at least 3 days -> Delete it
+                        deleteCouponDocs[uniqueCouponID] = dbCoupon
                 deleteCouponDocs[uniqueCouponID] = dbCoupon
             elif not crawledCoupon.isValid():
+                # Coupon is in DB and in crawled coupons but is expired -> Delete from DB
                 deleteCouponDocs[uniqueCouponID] = dbCoupon
         if len(deleteCouponDocs) > 0:
             couponDB.purge(deleteCouponDocs.values())
@@ -1113,6 +1138,8 @@ class BKCrawler:
             # Update DB
             if existingCoupon is not None:
                 # Update existing coupon
+                if existingCoupon.timestampCouponNotInAPIAnymore is not None:
+                    existingCoupon.timestampCouponNotInAPIAnymore = None
                 if hasChanged(existingCoupon, crawledCoupon, ignoreKeys=['timestampAddedToDB', 'timestampLastModifiedDB']):
                     # Set isNew flag if necessary
                     if existingCoupon.isExpiredForLongerTime() and crawledCoupon.isValid():

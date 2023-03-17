@@ -101,7 +101,8 @@ class CouponView:
     def getFilter(self) -> CouponFilter:
         return self.couponfilter
 
-    def __init__(self, couponfilter: CouponFilter, includeVeggieSymbol: Union[bool, None] = None, highlightFavorites: Union[bool, None] = None, allowModifyFilter: bool = True):
+    def __init__(self, couponfilter: CouponFilter, includeVeggieSymbol: Union[bool, None] = None, highlightFavorites: Union[bool, None] = None, allowModifyFilter: bool = True, title: str = None):
+        self.title = title
         self.couponfilter = couponfilter
         self.includeVeggieSymbol = includeVeggieSymbol
         self.highlightFavorites = highlightFavorites
@@ -120,16 +121,16 @@ class CouponView:
 
 
 class CouponViews:
-    ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode()))
-    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=False))
+    ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode()), title="Alle Coupons")
+    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=False), title="Alle Coupons ohne Menü")
     CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode()))
     CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
     HIDDEN_APP_COUPONS_ONLY = CouponView(
-        couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], isHidden=True))
-    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isVeggie=True), includeVeggieSymbol=False)
-    MEAT_WITHOUT_PLANT_BASED = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isPlantBased=False))
+        couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], isHidden=True), title="App Coupons versteckte")
+    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isVeggie=True), includeVeggieSymbol=False, title=f"{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}")
+    MEAT_WITHOUT_PLANT_BASED = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isPlantBased=False), title="Fleisch ohne Plant Based Coupons")
     # Dummy item basically only used for holding default sortCode for users' favorites
-    FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode()), highlightFavorites=False, allowModifyFilter=False)
+    FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode()), highlightFavorites=False, allowModifyFilter=False, title=f"{SYMBOLS.STAR}Favoriten{SYMBOLS.STAR}")
 
 
 def getAllCouponViews() -> List[CouponView]:
@@ -217,13 +218,6 @@ class Coupon(Document):
             shortenedTitle = SYMBOLS.BROCCOLI + shortenedTitle
         return shortenedTitle
 
-    def isExpired(self):
-        """ Wrapper """
-        if not self.isValid():
-            return True
-        else:
-            return False
-
     def isExpiredForLongerTime(self):
         """ Using this check, coupons that e.g. expire on midnight and get elongated will not be marked as new because really they aren't. """
         expireDatetime = self.getExpireDatetime()
@@ -239,15 +233,32 @@ class Coupon(Document):
             """ Coupon is not expired or not "long enough". """
             return False
 
+    # def isExpired(self):
+    #     expireDatetime = self.getExpireDatetime()
+    #     currentDatetime = getCurrentDate()
+    #     if expireDatetime is None or currentDatetime > expireDatetime:
+    #         # Coupon is expired
+    #         return True
+    #     else:
+    #         return False
+
     def isValid(self):
         expireDatetime = self.getExpireDatetime()
+        currentDatetime = getCurrentDate()
         if expireDatetime is None:
             # Coupon without expire-date = invalid --> Should never happen
             return False
-        elif expireDatetime > getCurrentDate():
-            return True
-        else:
+        if currentDatetime > expireDatetime:
+            # Coupon is expired
             return False
+        # Looks valid -> Check if coupon is available already according to start-timestamp
+        startDatetime = self.getStartDatetime()
+        if startDatetime is not None and startDatetime > currentDatetime:
+            # Start time hasn't been reached yet -> Coupon is not valid yet
+            return False
+        else:
+            # Coupon is valid
+            return True
 
     def isValidForBot(self) -> bool:
         """ Checks if the given coupon can be used in bot e.g. is from allowed source (App/Paper) and is valid. """
@@ -363,6 +374,14 @@ class Coupon(Document):
                 return False
         else:
             return False
+
+    def getStartDatetime(self) -> Union[datetime, None]:
+        if self.timestampStart is not None:
+            return datetime.fromtimestamp(self.timestampStart, getTimezone())
+        else:
+            # Start date is not always given
+            # logging.warning("Found coupon without startdate: " + self.id)
+            return None
 
     def getExpireDatetime(self) -> Union[datetime, None]:
         if self.timestampExpire is not None:
