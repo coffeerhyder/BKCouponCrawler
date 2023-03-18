@@ -403,9 +403,9 @@ class BKCrawler:
                     appCouponsNotYetActive.append(coupon)
                 index += 1
 
-        logging.info('Coupons in app total: ' + str(len(appCoupons)))
+        logging.info(f'Coupons in app total: {len(appCoupons)}')
         logging.info(f'Coupons in app not yet active: {len(appCouponsNotYetActive)} | {appCouponsNotYetActive}')
-        logging.info("Total coupons1 crawl time: " + getFormattedPassedTime(timestampCrawlStart))
+        logging.info(f'Total coupons1 crawl time: {getFormattedPassedTime(timestampCrawlStart)}')
 
     def crawlCoupons1OLD_DEPRECATED(self, apiResponse: dict, crawledCouponsDict: dict):
         """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
@@ -1280,6 +1280,9 @@ class BKCrawler:
 
     def getOffersActive(self) -> list:
         """ Returns all offers that are not expired according to 'expiration_date'. """
+        # 2023-03-18: There are no offers at this moment. What was an offer back then ("King of the month") has been moved into coupons now by BK.
+        if True:
+            return []
         offerDB = self.getOfferDB()
         offers = []
         for offerID in offerDB:

@@ -260,13 +260,6 @@ class Coupon(Document):
             # Coupon is valid
             return True
 
-    def isValidForBot(self) -> bool:
-        """ Checks if the given coupon can be used in bot e.g. is from allowed source (App/Paper) and is valid. """
-        if self.type in BotAllowedCouponTypes and self.isValid():
-            return True
-        else:
-            return False
-
     def isContainsFriesAndDrink(self) -> bool:
         return couponTitleContainsFriesAndDrink(self.title)
 

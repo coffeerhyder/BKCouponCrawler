@@ -1,6 +1,6 @@
 from typing import Union, List
 
-from Helper import SYMBOLS, formatDateGerman, BotAllowedCouponTypes, CouponType, formatPrice
+from Helper import SYMBOLS, formatDateGerman, CouponType, formatPrice
 from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
 
 
@@ -15,7 +15,6 @@ class CouponCategory:
         self.displayDescription = False  # Display description for this category in bot menu?
         self.expireDatetimeLowest = None
         self.expireDatetimeHighest = None
-        self.numberofCouponsValid = 0
         self.numberofCouponsTotal = 0
         self.numberofCouponsHidden = 0
         self.numberofCouponsEatable = 0
@@ -83,15 +82,6 @@ class CouponCategory:
             self.nameSingular = "Unbekannt"
             self.namePlural = "Unbekannt"
             self.namePluralWithoutSymbol = "Unbekannt"
-        # if self.isVeggie():
-        #     self.nameSingular = '[Veggie] ' + self.nameSingular
-        #     self.namePlural = '[Veggie] ' + self.namePlural
-
-    def isValidSourceForBot(self) -> bool:
-        if self.mainCouponType in BotAllowedCouponTypes:
-            return True
-        else:
-            return False
 
     def getTotalPrice(self) -> float:
         return self.totalPrice
@@ -220,8 +210,6 @@ class CouponCategory:
         else:
             couponList = couponOrCouponList
         for coupon in couponList:
-            if coupon.isValid():
-                self.numberofCouponsValid += 1
             self.couponTypes.add(coupon.type)
             self.numberofCouponsTotal += 1
             if coupon.isHidden:

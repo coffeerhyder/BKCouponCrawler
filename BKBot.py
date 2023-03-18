@@ -110,9 +110,9 @@ class BKBot:
     args = my_parser.parse_args()
 
     def __init__(self):
-        self.couponImageCache = {}
-        self.couponImageQRCache = {}
-        self.offerImageCache = {}
+        self.couponImageCache: dict = {}
+        self.couponImageQRCache: dict = {}
+        self.offerImageCache: dict = {}
         self.maintenanceMode = self.args.maintenancemode
         self.cfg = loadConfig()
         if self.cfg is None:
@@ -129,6 +129,8 @@ class BKBot:
         self.initHandlers()
         self.application.add_error_handler(self.botErrorCallback)
         # self.lock = asyncio.Lock()
+        self.statsCached: Union[UserStats, None] = None
+        self.statsCachedTimestamp: float = -1
 
     def initHandlers(self):
         """ Adds all handlers to dispatcher (not error_handlers!!) """
@@ -404,10 +406,23 @@ class BKBot:
         return CallbackVars.MENU_DISPLAY_COUPON
 
     async def botDisplayStats(self, update: Update, context: CallbackContext):
-        msg = await asyncio.create_task(self.editOrSendMessage(update, text='Statistiken werden geladen...'))
-        couponDB = self.getFilteredCouponsAsList(couponFilter=CouponFilter())
+        query = update.callback_query
+        if query is not None:
+            await query.answer()
         userDB = self.crawler.getUserDB()
-        userStats = UserStats(userDB)
+        loadingMessage = None
+        currentDatetime = getCurrentDate()
+        if self.statsCached is None or currentDatetime.timestamp() - self.statsCachedTimestamp > 30 * 60:
+            # Init/Refresh cache
+            if self.statsCached is None:
+                logging.info("Initializing stats cache")
+            else:
+                logging.info("Refreshing stats cache")
+            loadingMessage = await asyncio.create_task(self.editOrSendMessage(update, text='Statistiken werden geladen...'))
+            self.statsCached = UserStats(userDB)
+            self.statsCachedTimestamp = currentDatetime.timestamp()
+        couponDB = self.getFilteredCouponsAsList(couponFilter=CouponFilter())
+        userStats = self.statsCached
         user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         text = '<b>Hallo <s>Nerd</s> ' + update.effective_user.first_name + '</b>'
         text += '\n<pre>'
@@ -420,7 +435,7 @@ class BKBot:
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
         # TODO: Add stats cache to speed things up
-        # text += '\nStatistiken generiert am: TODO'
+        text += f'\nStatistiken generiert am: {formatDateGerman(self.statsCachedTimestamp)}'
         text += '\n---'
         text += '\nDein BetterKing Account:'
         text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
@@ -428,8 +443,8 @@ class BKBot:
         text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt von vom Bot zugestelltem Coupon-Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(
             user.timestampLastTimeAccountUsed)
         text += '</pre>'
-        if isinstance(msg, Message):
-            await self.editMessage(chat_id=msg.chat_id, message_id=msg.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
+        if loadingMessage is not None:
+            await self.editMessage(chat_id=loadingMessage.chat_id, message_id=loadingMessage.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
         else:
             await self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode='html', disable_web_page_preview=True)
         return ConversationHandler.END
