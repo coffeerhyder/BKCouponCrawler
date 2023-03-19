@@ -1239,6 +1239,7 @@ class BKBot:
 
     async def batchProcess(self):
         """ Runs all processes which should only run once per day. """
+        logging.info('Running batch process...')
         self.crawl()
         if self.getPublicChannelName() is not None:
             await self.renewPublicChannel()
@@ -1248,6 +1249,7 @@ class BKBot:
         if self.getPublicChannelName() is not None:
             await self.cleanupPublicChannel()
         await self.cleanupCaches()
+        logging.info('Batch process done')
 
     def crawl(self):
         try:
