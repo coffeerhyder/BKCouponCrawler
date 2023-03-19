@@ -8,3 +8,4 @@ pydantic==1.10.4
 furl~=2.1.2
 httpx~=0.23.0
 Werkzeug~=1.0.1
+pthon-telegram-bot~=20.0
