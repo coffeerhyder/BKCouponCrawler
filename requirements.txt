@@ -4,8 +4,8 @@ requests==2.28.2
 CouchDB~=1.2
 pytz==2022.7.1
 qrcode==7.4.2
-pydantic==1.10.4
+pydantic==1.10.6
 furl~=2.1.2
 httpx~=0.23.0
 Werkzeug~=1.0.1
-pthon-telegram-bot~=20.0
+pthon-telegram-bot==20.1

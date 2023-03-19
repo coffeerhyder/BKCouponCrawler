@@ -1,9 +1,9 @@
 import json
 from datetime import datetime
-from typing import Optional, List, Union
+from typing import Optional, List
 
 import pydantic
-from pydantic import validator, root_validator
+from pydantic import root_validator
 from telegram import InlineKeyboardMarkup
 
 from Helper import SYMBOLS
