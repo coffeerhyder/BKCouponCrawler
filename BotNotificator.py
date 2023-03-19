@@ -22,14 +22,14 @@ WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 DEBUGNOTIFICATOR = False
 
 
-def notifyUsersAboutNewCoupons(bkbot) -> None:
+async def notifyUsersAboutNewCoupons(bkbot) -> None:
     """
     Notifies user about new coupons and users' expired favorite coupons that are back (well = also new coupons).
     """
     logging.info("Checking for pending new coupons notifications")
     timestampStart = datetime.now().timestamp()
     userDB = bkbot.crawler.getUserDB()
-    allNewCoupons = bkbot.crawler.getFilteredCouponsAsList(CouponFilter(activeOnly=True, isNew=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.PRICE.getSortCode()))
+    allNewCoupons = bkbot.crawler.getFilteredCouponsAsDict(CouponFilter(activeOnly=True, isNew=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.PRICE.getSortCode()))
     if len(allNewCoupons) == 0:
         logging.info("No new coupons available to notify about")
         return
@@ -134,7 +134,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
         logging.info("Sending user notification " + str(position) + "/" + str(len(usersNotify)) + " to user: " + userIDStr)
         user = User.load(userDB, userIDStr)
         try:
-            bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
+            await bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
             if user.botBlockedCounter > 0:
                 """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
                 This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
@@ -154,7 +154,7 @@ def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 
-def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
+async def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
     userDB = bkbot.crawler.getUserDB()
     numberOfMessagesSent = 0
     for userID in userDB:
@@ -182,7 +182,7 @@ def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
             text += '\nÖffne das Hauptmenü einmalig mit /start, um dem Bot zu zeigen, dass du noch lebst.'
             text += f'\nWahlweise kannst du deinen Account mit /{Commands.DELETE_ACCOUNT} selbst löschen.'
             try:
-                bkbot.sendMessage(chat_id=user.id, text=text, parse_mode='HTML', disable_web_page_preview=True)
+                await bkbot.sendMessage(chat_id=user.id, text=text, parse_mode='HTML', disable_web_page_preview=True)
                 if user.botBlockedCounter > 0:
                     # Rare/edge case
                     """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
@@ -223,7 +223,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Update channel info and DB
     channelInfoDoc.timestampLastChannelUpdate = getCurrentDate().timestamp()
     channelInfoDoc.store(channelInfoDB)
-    activeCoupons = bkbot.crawler.getFilteredCouponsAsList(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
+    activeCoupons = bkbot.crawler.getFilteredCouponsAsDict(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
@@ -362,7 +362,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += "\n<b>Der Bot kann außerdem deine Favoriten speichern, Coupons filtern und einiges mehr ;)</b>"
     infoText += "\nMöchtest du diesen Channel mit jemandem teilen, der kein Telegram verwendet?"
     infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a> oder <a href=\"" + URLs.ELEMENT + "\">Element per Matrix Bridge</a>."
-    infoText += f"\nMehr Infos siehe <a href=\"{bkbot.getPublicChannelFAQLink()}\">angepinntes FAQ</a>."
+    infoText += f"\nMehr Infos siehe <a href=\"{bkbot.getPublicChannelFAQLink()}\">FAQ</a>."
     infoText += "\n<b>Guten Hunger!</b>"
     infoText += "\n" + getBotImpressum()
     """ 

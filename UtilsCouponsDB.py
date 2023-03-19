@@ -475,7 +475,7 @@ class Coupon(Document):
     def generateCouponShortText(self, highlightIfNew: bool, includeVeggieSymbol: bool) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
         couponText = ''
-        if self.isNewCoupon() and highlightIfNew:
+        if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.getPLUOrUniqueID() + " | " + self.getTitleShortened(includeVeggieSymbol=includeVeggieSymbol)
         couponText = self.appendPriceInfoText(couponText)

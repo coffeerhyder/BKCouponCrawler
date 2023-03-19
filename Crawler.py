@@ -813,7 +813,7 @@ class BKCrawler:
                 couponsToAddToDB[coupon.id] = coupon
             else:
                 # Filter out incompatible coupons right away so we will need less DB operations later
-                logging.info(f'Do not add invalid/expired/not-yet-active coupon to DB: {coupon.id}')
+                logging.info(f'Do not add invalid/expired/not-yet-active coupon to DB: {coupon.id} + | {coupon.plu} | {coupon.title} | {coupon.getPrice()}')
         logging.info(f'Crawled coupons: {len(crawledCouponsDict)} | To be added to DB: {len(couponsToAddToDB)}')
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)

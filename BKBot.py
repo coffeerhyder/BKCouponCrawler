@@ -1,12 +1,10 @@
 import argparse
 import asyncio
 import math
-import time
 import traceback
 from copy import deepcopy
-from typing import Tuple
+from typing import Tuple, Coroutine
 
-import schedule
 from couchdb import Database
 from furl import furl, urllib
 from telegram import Update, InlineKeyboardButton, InputMediaPhoto, Message
@@ -60,7 +58,7 @@ def generateCallbackRegEx(settings: dict):
 MAX_CACHE_AGE_SECONDS = 7 * 24 * 60 * 60
 
 
-def cleanupCache(cacheDict: dict):
+async def cleanupCache(cacheDict: dict):
     cacheDictCopy = cacheDict.copy()
     for cacheID, cacheData in cacheDictCopy.items():
         cacheItemAge = datetime.now().timestamp() - cacheData.timestampLastUsed
@@ -125,7 +123,7 @@ class BKBot:
         self.publicChannelName = self.cfg.public_channel_name
         self.botName = self.cfg.bot_name
         self.couchdb = self.crawler.couchdb
-        self.application = Application.builder().token(self.cfg.bot_token).build()
+        self.application = Application.builder().token(self.cfg.bot_token).read_timeout(30).write_timeout(30).build()
         self.initHandlers()
         self.application.add_error_handler(self.botErrorCallback)
         # self.lock = asyncio.Lock()
@@ -188,6 +186,7 @@ class BKBot:
                     CallbackQueryHandler(self.botDeleteUnavailableFavoriteCoupons, pattern="^" + CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS + "$"),
                     CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
                     CallbackQueryHandler(self.botDeletePaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD + "$"),
+                    CallbackQueryHandler(self.botDisplayEasterEgg, pattern='^' + CallbackVars.EASTER_EGG + '$'),
                 ],
                 CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD: [
                     # Back to settings menu
@@ -375,7 +374,7 @@ class BKBot:
             await update.callback_query.answer()
         activeCoupons = self.getFilteredCouponsAsDict(CouponFilter(), True)
         await self.sendCouponOverviewWithChannelLinks(chat_id=update.effective_user.id, coupons=activeCoupons, useLongCouponTitles=True,
-                                                channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
+                                                      channelDB=self.couchdb[DATABASES.TELEGRAM_CHANNEL], infoDB=None, infoDBDoc=None)
         # Delete last message containing menu as it is of no use for us anymore
         await self.deleteMessage(chat_id=update.effective_user.id, messageID=update.callback_query.message.message_id)
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
@@ -434,7 +433,6 @@ class BKBot:
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
         text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
-        # TODO: Add stats cache to speed things up
         text += f'\nStatistiken generiert am: {formatDateGerman(self.statsCachedTimestamp)}'
         text += '\n---'
         text += '\nDein BetterKing Account:'
@@ -621,6 +619,7 @@ class BKBot:
         user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.easterEggCounter += 1
         user.store(db=userDB)
+        logging.info(f"User {user.id} found easter egg times {user.easterEggCounter}")
         text = "🥚<b>Glückwunsch! Du hast das Easter Egg gefunden!</b>"
         text += "\nKlicke <a href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">HIER</a>, um es anzusehen ;)"
         text += "\nDrücke /start, um das Menü neu zu laden."
@@ -638,7 +637,7 @@ class BKBot:
             await self.handleBotErrorGently(update, context, botError)
             return CallbackVars.MENU_DISPLAY_COUPON
         await self.displayCouponsWithImagesAndBackButton(update, context, userFavorites.couponsAvailable, topMsgText='<b>Alle Favoriten mit Bildern:</b>',
-                                                   bottomMsgText=favoritesInfoText)
+                                                         bottomMsgText=favoritesInfoText)
         if query is not None:
             # Delete last message containing bot menu
             await context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
@@ -648,7 +647,7 @@ class BKBot:
         await self.displayCouponsWithImages(update, context, coupons, topMsgText)
         # Post back button
         await update.effective_message.reply_text(text=bottomMsgText, parse_mode="HTML",
-                                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)], []]))
+                                                  reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)], []]))
 
     async def displayCouponsWithImages(self, update: Update, context: CallbackContext, coupons: list, msgText: str):
         await self.sendMessage(chat_id=update.effective_message.chat_id, text=msgText, parse_mode='HTML')
@@ -729,14 +728,20 @@ class BKBot:
         dummyUser = User()
         userWantsAutodeleteOfFavoriteCoupons = user.settings.autoDeleteExpiredFavorites
         addedSettingCategories = []
+        hasAddedEasterEggButton = False
         for settingKey, setting in USER_SETTINGS_ON_OFF.items():
             # All settings that are in 'USER_SETTINGS_ON_OFF' are simply on/off settings and will automatically be included in users' settings.
-            category = USER_SETTINGS_ON_OFF[settingKey]["category"]
+            settingCategory = USER_SETTINGS_ON_OFF[settingKey]["category"]
             # Add setting category button if it hasn't been added already
-            if category not in addedSettingCategories:
-                addedSettingCategories.append(category)
-                keyboard.append([InlineKeyboardButton(SYMBOLS.WHITE_DOWN_POINTING_BACKHAND * 2 + category.title + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND * 2,
-                                                      callback_data='DummyButtonSettingCategory')])
+            if settingCategory not in addedSettingCategories:
+                addedSettingCategories.append(settingCategory)
+                if not hasAddedEasterEggButton and user.favoriteCoupons is not None and len(user.favoriteCoupons) > 0:
+                    callback_data = CallbackVars.EASTER_EGG
+                    hasAddedEasterEggButton = True
+                else:
+                    callback_data = 'DummyButtonSettingCategory'
+                keyboard.append([InlineKeyboardButton(SYMBOLS.WHITE_DOWN_POINTING_BACKHAND * 2 + settingCategory.title + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND * 2,
+                                                      callback_data=callback_data)])
             description = USER_SETTINGS_ON_OFF[settingKey]["description"]
             # Check for special cases where one setting depends of the state of another
             if settingKey == 'notifyWhenFavoritesAreBack' and userWantsAutodeleteOfFavoriteCoupons:
@@ -796,7 +801,7 @@ class BKBot:
         if not user.settings.displayQR:
             menuText += '\n' + SYMBOLS.INFORMATION + 'Möchtest du QR-Codes angezeigt bekommen?\nSiehe Hauptmenü -> Einstellungen'
         await self.sendMessage(chat_id=update.effective_message.chat_id, text=menuText, parse_mode='HTML',
-                         reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=callbackBack)]]))
+                               reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=callbackBack)]]))
         # Delete previous message containing menu buttons from chat as we don't need it anymore.
         await context.bot.delete_message(chat_id=update.effective_message.chat_id, message_id=query.message.message_id)
         return CallbackVars.MENU_DISPLAY_COUPON
@@ -818,7 +823,7 @@ class BKBot:
         else:
             menuText = f'<b>\"Dann geh doch zu Netto!\"</b>\nAntworte mit deiner Benutzer-ID <b>{update.effective_user.id}</b>, um deine Benutzerdaten <b>endgültig</b> vom Server zu löschen.'
             await self.editOrSendMessage(update, text=menuText, parse_mode='HTML',
-                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton("Doch nicht", callback_data=callbackBackButton)]]))
+                                         reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton("Doch nicht", callback_data=callbackBackButton)]]))
 
     async def botUserDeleteAccount(self, update: Update, context: CallbackContext):
         """ Deletes users' account from DB. """
@@ -860,10 +865,10 @@ class BKBot:
             # Add to cache if not already present
             self.couponImageQRCache.setdefault(coupon.id, ImageCache(fileID=msgQR.photo[0].file_id))
             await self.sendMessage(chat_id=update.effective_message.chat_id, text=couponText, parse_mode='HTML', reply_markup=replyMarkupWithoutBackButton,
-                             disable_web_page_preview=True)
+                                   disable_web_page_preview=True)
         else:
             msgCoupon = await asyncio.create_task(self.sendPhoto(chat_id=update.effective_message.chat_id, photo=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML',
-                                       reply_markup=replyMarkupWithoutBackButton))
+                                                                 reply_markup=replyMarkupWithoutBackButton))
         # Add to cache if not already present
         self.couponImageCache.setdefault(coupon.id, ImageCache(fileID=msgCoupon.photo[0].file_id))
         return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
@@ -886,7 +891,7 @@ class BKBot:
             if coupon is None:
                 # Edge case: Coupon may have been deleted from DB while user had this keyboard open.
                 await self.editOrSendMessage(update, text=SYMBOLS.WARNING + 'Coupon Favoritenstatus kann nicht geändert werden, da dieser Coupon nicht mehr existiert!',
-                                       parse_mode='HTML')
+                                             parse_mode='HTML')
                 return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
             user.addFavoriteCoupon(coupon)
             isFavorite = True
@@ -1035,7 +1040,7 @@ class BKBot:
             text += '\nDiese Daten werden ausschließlich gespeichert, um dir deine Payback Karte im Bot anzeigen zu können.'
             text += '\nDu kannst deine Karte in den Einstellungen jederzeit aus dem Bot löschen.'
             await self.editOrSendMessage(update, text=text, parse_mode='HTML',
-                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+                                         reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
         userInput = update.message.text
         if userInput.isdecimal() and (len(userInput) == 10 or len(userInput) == 13):
@@ -1055,7 +1060,7 @@ class BKBot:
         else:
             # Invalid user input
             await self.sendMessage(chat_id=update.effective_user.id, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML',
-                             reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD
 
     async def botDeletePaybackCard(self, update: Update, context: CallbackContext):
@@ -1072,18 +1077,18 @@ class BKBot:
         userInput = None if update.message is None else update.message.text
         if userInput is None:
             await self.editOrSendMessage(update, text='Antworte mit deiner Payback Kartennummer <b>' + paybackCardNumber + '</b>, um diese zu löschen.',
-                                   parse_mode='HTML',
-                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+                                         parse_mode='HTML',
+                                         reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
         elif userInput == paybackCardNumber:
             user.deletePaybackCard()
             user.store(userDB)
             text = SYMBOLS.CONFIRM + 'Payback Karte ' + userInput + ' wurde gelöscht.'
             await self.editOrSendMessage(update, text=text,
-                                   parse_mode='HTML',
-                                   reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+                                         parse_mode='HTML',
+                                         reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
         else:
             await self.editOrSendMessage(update, text=SYMBOLS.DENY + 'Ungültige Eingabe!', parse_mode='HTML',
-                                   reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
+                                         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK)]]))
         return CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD
 
     async def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
@@ -1100,14 +1105,14 @@ class BKBot:
             reply_markup = InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK),
                                                       InlineKeyboardButton(SYMBOLS.PLUS + 'Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)]])
             await self.editOrSendMessage(update, text=text, parse_mode='html',
-                                   reply_markup=reply_markup)
+                                         reply_markup=reply_markup)
         else:
             text = 'Payback Kartennummer: <b>' + splitStringInPairs(user.getPaybackCardNumber()) + '</b>'
             text += '\n<b>Tipp:</b> Pinne diese Nachricht an, um im Bot Chat noch einfacher auf deine Payback Karte zugreifen zu können.'
             replyMarkup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.GENERIC_BACK),
                                                  InlineKeyboardButton(SYMBOLS.DENY + 'Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)]])
             await self.sendPhoto(chat_id=update.effective_user.id, photo=user.getPaybackCardImage(), caption=text, parse_mode='html', disable_notification=True,
-                           reply_markup=replyMarkup)
+                                 reply_markup=replyMarkup)
         return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
 
     async def botAdminToggleMaintenanceMode(self, update: Update, context: CallbackContext):
@@ -1232,21 +1237,17 @@ class BKBot:
             userDB.purge(docs=usersToDelete)
         pass
 
-    def batchProcess(self):
+    async def batchProcess(self):
         """ Runs all processes which should only run once per day. """
         self.crawl()
-        self.renewPublicChannel()
+        if self.getPublicChannelName() is not None:
+            await self.renewPublicChannel()
         self.deleteInactiveAccounts()
-        self.batchProcessAutoDeleteUsersUnavailableFavorites()
-        self.notifyUsers()
-        self.cleanupPublicChannel()
-
-    def batchProcessWithoutChannelUpdate(self):
-        """ Runs all processes which should only run once per day:
-         1. Crawler, 2. User notify favorites and user notify new coupons """
-        self.crawl()
-        self.batchProcessAutoDeleteUsersUnavailableFavorites()
-        self.notifyUsers()
+        await self.batchProcessAutoDeleteUsersUnavailableFavorites()
+        await self.notifyUsers()
+        if self.getPublicChannelName() is not None:
+            await self.cleanupPublicChannel()
+        await self.cleanupCaches()
 
     def crawl(self):
         try:
@@ -1255,55 +1256,53 @@ class BKBot:
             traceback.print_exc()
             logging.warning("Crawler failed")
 
-    def notifyUsers(self):
+    async def notifyUsers(self):
         """ Notify users about expired favorite coupons that are back or new coupons depending on their settings. """
         try:
-            notifyUsersAboutNewCoupons(self)
-            notifyUsersAboutUpcomingAccountDeletion(self)
+            await notifyUsersAboutNewCoupons(self)
+            await notifyUsersAboutUpcomingAccountDeletion(self)
         except Exception:
             # This should never happen
             traceback.print_exc()
             logging.warning("Exception happened during user notify")
 
-    def renewPublicChannel(self):
+    async def renewPublicChannel(self):
         """ Deletes all channel messages and re-sends them / updates channel with current content. """
         try:
-            updatePublicChannel(self, updateMode=ChannelUpdateMode.RESEND_ALL)
+            await updatePublicChannel(self, updateMode=ChannelUpdateMode.RESEND_ALL)
         except Exception:
             traceback.print_exc()
             logging.warning("Renew of public channel failed")
 
-    def resumePublicChannelUpdate(self):
+    async def resumePublicChannelUpdate(self):
         """ Resumes channel update. """
         try:
-            updatePublicChannel(self, updateMode=ChannelUpdateMode.RESUME_CHANNEL_UPDATE)
+            await updatePublicChannel(self, updateMode=ChannelUpdateMode.RESUME_CHANNEL_UPDATE)
         except Exception:
             traceback.print_exc()
             logging.warning("Resume of public channel update failed")
 
-    def cleanupPublicChannel(self):
+    async def cleanupPublicChannel(self):
         try:
-            cleanupChannel(self)
+            await cleanupChannel(self)
         except:
             traceback.print_exc()
             logging.warning("Cleanup channel failed")
 
     def startBot(self):
-        # TODO: Use start() instead as it is a non-blocking method
-        self.application.run_polling(read_timeout=30)
-        # TODO: Increase read_timeout to 10-30 seconds instead of 2
-        # self.application.start()
+        self.application.run_polling()
 
     def stopBot(self):
         self.application.stop()
 
-    def cleanupCaches(self):
-        cleanupCache(self.couponImageCache)
-        cleanupCache(self.couponImageQRCache)
-        cleanupCache(self.offerImageCache)
+    async def cleanupCaches(self):
+        logging.info('Cleanup caches...')
+        await cleanupCache(self.couponImageCache)
+        await cleanupCache(self.couponImageQRCache)
+        await cleanupCache(self.offerImageCache)
 
     async def sendCouponOverviewWithChannelLinks(self, chat_id: Union[int, str], coupons: dict, useLongCouponTitles: bool, channelDB: Database, infoDB: Union[None, Database],
-                                           infoDBDoc: Union[None, InfoEntry]):
+                                                 infoDBDoc: Union[None, InfoEntry]):
         """ Sends all given coupons to given chat_id separated by source and split into multiple messages as needed. """
         couponsSeparatedByType = getCouponsSeparatedByType(coupons)
         if infoDBDoc is not None:
@@ -1378,7 +1377,7 @@ class BKBot:
                         break
                 # Send new post containing current page
                 msg = await asyncio.create_task(self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
-                                       disable_notification=True))
+                                                                 disable_notification=True))
                 if infoDBDoc is not None:
                     # Update DB
                     infoDBDoc.addCouponCategoryMessageID(couponType, msg.message_id)
@@ -1398,7 +1397,7 @@ class BKBot:
             index += 1
 
     async def editOrSendMessage(self, update: Update, text: str, parse_mode: str = None, reply_markup: ReplyMarkup = None, disable_web_page_preview: bool = False,
-                          disable_notification=False):
+                                disable_notification=False):
         """ Edits last message if possible. Sends new message otherwise.
          Usable for message with text-content only!
          Returns:
@@ -1411,22 +1410,24 @@ class BKBot:
             return await query.edit_message_text(text=text, parse_mode=parse_mode, reply_markup=reply_markup, disable_web_page_preview=disable_web_page_preview)
         else:
             return await self.sendMessage(chat_id=update.effective_user.id, text=text, parse_mode=parse_mode, reply_markup=reply_markup,
-                                    disable_web_page_preview=disable_web_page_preview, disable_notification=disable_notification)
+                                          disable_web_page_preview=disable_web_page_preview, disable_notification=disable_notification)
 
     async def editMessage(self, chat_id: Union[int, str], message_id: Union[int, str], text: str, parse_mode: str = None, disable_web_page_preview: bool = False):
-        await self.application.updater.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text, parse_mode=parse_mode, disable_web_page_preview=disable_web_page_preview)
+        await self.application.updater.bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=text, parse_mode=parse_mode,
+                                                             disable_web_page_preview=disable_web_page_preview)
 
     async def sendMessage(self, chat_id: Union[int, str], text: Union[str, None] = None, parse_mode: Union[None, str] = None,
-                    disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
-                    reply_markup: ReplyMarkup = None
-                    ) -> Message:
+                          disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
+                          reply_markup: ReplyMarkup = None
+                          ) -> Message:
         """ Wrapper """
-        return await self.processMessage(chat_id=chat_id, text=text, parse_mode=parse_mode, disable_notification=disable_notification, disable_web_page_preview=disable_web_page_preview,
-                                   reply_markup=reply_markup)
+        return await self.processMessage(chat_id=chat_id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
+                                         disable_web_page_preview=disable_web_page_preview,
+                                         reply_markup=reply_markup)
 
     async def sendPhoto(self, chat_id: Union[int, str], photo, caption: Union[None, str] = None,
-                  parse_mode: Union[None, str] = None, disable_notification: ODVInput[bool] = DEFAULT_NONE,
-                  reply_markup: 'ReplyMarkup' = None) -> Message:
+                        parse_mode: Union[None, str] = None, disable_notification: ODVInput[bool] = DEFAULT_NONE,
+                        reply_markup: 'ReplyMarkup' = None) -> Message:
         """ Wrapper """
         return await self.processMessage(chat_id=chat_id, photo=photo, caption=caption, parse_mode=parse_mode, disable_notification=disable_notification, reply_markup=reply_markup)
 
@@ -1434,16 +1435,16 @@ class BKBot:
         """ Wrapper """
         return await self.processMessage(chat_id=chat_id, media=media, disable_notification=disable_notification)
 
-    async def processMessage(self, chat_id: Union[int, str], maxTries: int = 15, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
-                       disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
-                       reply_markup: 'ReplyMarkup' = None,
-                       media: Union[None, List] = None,
-                       photo=None, caption: Union[None, str] = None
-                       ) -> Union[Message, List[Message]]:
+    async def processMessage(self, chat_id: Union[int, str], maxTries: int = 20, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
+                             disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
+                             reply_markup: 'ReplyMarkup' = None,
+                             media: Union[None, List] = None,
+                             photo=None, caption: Union[None, str] = None
+                             ) -> Union[Message, List[Message]]:
         """ This will take care of "flood control exceeded" API errors (RetryAfter Errors). """
-        retryNumber = -1
+        retryNumber = 0
         lastException = None
-        while retryNumber < maxTries:
+        while retryNumber <= maxTries:
             try:
                 retryNumber += 1
                 if media is not None:
@@ -1452,20 +1453,20 @@ class BKBot:
                 elif photo is not None:
                     # Photo
                     return await self.application.updater.bot.send_photo(chat_id=chat_id, disable_notification=disable_notification, parse_mode=parse_mode, photo=photo,
-                                                                   reply_markup=reply_markup,
-                                                                   caption=caption
-                                                                   )
+                                                                         reply_markup=reply_markup,
+                                                                         caption=caption
+                                                                         )
                 else:
                     # Text message
                     return await self.application.updater.bot.send_message(chat_id=chat_id, disable_notification=disable_notification, text=text, parse_mode=parse_mode,
-                                                                     reply_markup=reply_markup,
-                                                                     disable_web_page_preview=disable_web_page_preview)
+                                                                           reply_markup=reply_markup,
+                                                                           disable_web_page_preview=disable_web_page_preview)
             except RetryAfter as retryError:
                 # https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this
                 lastException = retryError
                 """ Rate-Limit errorhandling: Wait some time and try again (one retry should do the job) """
                 logging.info("Rate limit reached, waiting " + str(retryError.retry_after) + " seconds | Try number: " + str(retryNumber))
-                time.sleep(retryError.retry_after)
+                await asyncio.sleep(retryError.retry_after)
                 continue
             except BadRequest as requesterror:
                 if requesterror.message == 'Group send failed':
@@ -1474,7 +1475,7 @@ class BKBot:
                     lastException = requesterror
                     waitseconds = 5
                     logging.info("Group send failed, waiting " + str(waitseconds) + " seconds | Try number: " + str(retryNumber))
-                    time.sleep(waitseconds)
+                    await asyncio.sleep(waitseconds)
                     continue
                 else:
                     raise requesterror
@@ -1494,44 +1495,51 @@ class BKBot:
         return getUserFromDB(self.crawler.getUserDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
 
 
+async def runDaily(hour: int, minute: int, func: Coroutine):
+    """ Runs task daily at specific time.
+     Does not catch up run if desired time has already passed on the day this is executed first time.
+     """
+    while True:
+        now = datetime.now()
+        todayAtTargetTime = datetime(now.year, now.month, now.day, hour, minute)
+        timediffToday = todayAtTargetTime - now
+        if timediffToday.total_seconds() >= 0:
+            print(f"Daily batch execution will happen at {hour}:{minute} TODAY in {timediffToday}")
+            await asyncio.sleep(timediffToday.total_seconds())
+        else:
+            # Target time was already today -> Wait for same time next day
+            tomorrowAtTargetTime = todayAtTargetTime + timedelta(days=1)
+            timediffTomorrow = tomorrowAtTargetTime - now
+            print(f"Daily batch execution will happen at {hour}:{minute} TOMORROW in {timediffTomorrow}")
+            await asyncio.sleep(timediffTomorrow.total_seconds())
+        await func
+
+
 def main():
     bkbot: BKBot = BKBot()
-    if bkbot.getPublicChannelName() is None:
-        schedule.every().day.at('00:00:30').do(bkbot.batchProcessWithoutChannelUpdate)
-    else:
-        schedule.every().day.at('00:00:30').do(bkbot.batchProcess)
-
-    schedule.every(21).days.do(bkbot.cleanupCaches)
-    """ Check for special flag to force-run batch process immediately. """
-    # First the ones which can be combined with others and need to be executed first
+    # Check for start-args to be executed immediately
     if bkbot.args.crawl:
         bkbot.crawl()
-    bkbot.startBot()
-    # Now the ones where only one is allowed
+    loop = asyncio.get_event_loop()
+    # Check for start args for stuff that can be executed in async way
     if bkbot.args.forcechannelupdatewithresend:
-        bkbot.renewPublicChannel()
-        bkbot.cleanupPublicChannel()
+        loop.create_task(bkbot.renewPublicChannel())
+        loop.create_task(bkbot.cleanupPublicChannel())
     elif bkbot.args.resumechannelupdate:
-        bkbot.resumePublicChannelUpdate()
-        bkbot.cleanupPublicChannel()
+        loop.create_task(bkbot.resumePublicChannelUpdate())
+        loop.create_task(bkbot.cleanupPublicChannel())
     elif bkbot.args.forcebatchprocess:
-        # bkbot.crawl()
-        # bkbot.notifyUsers()
-        bkbot.batchProcess()
-        # updatePublicChannel(bkbot, reSendAll=False)
-        # schedule.every(10).seconds.do(bkbot.updatePublicChannel)
-        # schedule.every(10).seconds.do(bkbot.notifyUsers)
+        loop.create_task(bkbot.batchProcess())
     elif bkbot.args.nukechannel:
-        nukeChannel(bkbot)
+        loop.create_task(nukeChannel(bkbot))
     elif bkbot.args.cleanupchannel:
-        cleanupChannel(bkbot)
+        loop.create_task(cleanupChannel(bkbot))
     elif bkbot.args.migrate:
         bkbot.crawler.migrateDBs()
     if bkbot.args.usernotify:
-        bkbot.notifyUsers()
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+        loop.create_task(bkbot.notifyUsers())
+    loop.create_task(runDaily(0, 5, bkbot.batchProcess()))
+    bkbot.startBot()
 
 
 if __name__ == '__main__':

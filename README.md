@@ -44,13 +44,14 @@ bash couchdb-dump.sh -r -c -H 127.0.0.1 -d telegram_users -f telegram_users.json
 
 
 # config.json (siehe config.json.default)
-Key | Datentyp | Optional | Beschreibung | Beispiel
---- | --- | --- | --- | ---
-bot_token | String | Nein | Bot Token | `1234567890:HJDH-gh56urj6r5u6grhrkJO7Qw`
-db_url | String | Nein | URL zur CouchDB DB samt Zugangsdaten | `http://username:pw@localhost:5984/` 
-public_channel_name | String | Ja | Name des öffentlichen Telegram Channels, in den der Bot die aktuell gültigen Gutscheine posten soll.  | `TestChannel`
-bot_name | String | Nein | Name des Bots | `BetterKingBot`
-admin_ids | StringArray | Nein | Telegram UserIDs der gewünschten Bot Admins | ["57659679843", "534494657832"]
+| Key                 | Datentyp    | Optional | Beschreibung                                                                                         | Beispiel                                 |
+|---------------------|-------------|----------|------------------------------------------------------------------------------------------------------|------------------------------------------|
+| bot_token           | String      | Nein     | Bot Token                                                                                            | `1234567890:HJDH-gh56urj6r5u6grhrkJO7Qw` |
+| db_url              | String      | Nein     | URL zur CouchDB DB samt Zugangsdaten                                                                 | `http://username:pw@localhost:5984/`     |
+| public_channel_name | String      | Ja       | Name des öffentlichen Telegram Channels, in den der Bot die aktuell gültigen Gutscheine posten soll. | `TestChannel`                            |
+| bot_name            | String      | Nein     | Name des Bots                                                                                        | `BetterKingBot`                          |
+| admin_ids           | StringArray | Nein     | Telegram UserIDs der gewünschten Bot Admins                                                          | ["57659679843", "534494657832"]          |
+
 **Falls nur der Crawler benötigt wird, reicht die CouchDB URL (mit Zugangsdaten)!**
 
 ## Optional: Papiercoupons hinzufügen  
@@ -162,8 +163,8 @@ ID | Interne Bezeichnung | Beschreibung
 Siehe BKBot.py -> ``__init__``
 
 # TODOs
-* Querverlinkungen zu Coupons auf der BK Webseite ergänzen. Nützlich in Filialen, die auf die App Ansicht bestehen.
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen
+* Die Transparenz bei (mybk) Couponbildern durch gelb ersetzen
 * python-telegram-bot Framework aktualisieren und requirements.txt entsprechend anpassen
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Handling mit Datumsangaben prüfen/verbessern
