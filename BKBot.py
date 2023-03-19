@@ -1540,7 +1540,7 @@ def main():
         bkbot.crawler.migrateDBs()
     if bkbot.args.usernotify:
         loop.create_task(bkbot.notifyUsers())
-    loop.create_task(runDaily(0, 5, bkbot.batchProcess()))
+    loop.create_task(runDaily(0, 1, bkbot.batchProcess()))
     bkbot.startBot()
 
 
