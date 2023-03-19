@@ -3,5 +3,6 @@
     "bot_name": "ExampleBot",
     "db_url": "http://TestUser:TestPW@localhost:5984/",
     "public_channel_name": "ExampleChannel",
+	"public_channel_post_id_faq": 67195,
     "admin_ids": []
 }

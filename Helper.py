@@ -35,14 +35,6 @@ class URLs:
     BK_KING_FINDER = 'burgerking.de/store-locator'
     BK_KING_DEALS = 'burgerking.de/kingdeals'
     NO_PROTOCOL_COUPONS = 'burgerking.de/rewards/offers'
-    NGB_FORUM_THREAD = 'https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/'
-    BK_WUERGER_KING = 'https://wurgerking.wfr.moe/'
-    BK_WUERGER_KING_SOURCE = 'https://github.com/WebFreak001/WurgerKing'
-    MCD_MCCOUPON_DEALS = 'https://www.mccoupon.deals/'
-    MCD_MCBROKEN = 'mcbroken.com'
-    DOMINOS_BILLIGEPIZZA = 'billigepizza.netlify.app'
-    MEGA_COUPON_ARCHIVE = 'mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg'
-    MEGA_COUPON_ARCHIVE_SHORT = 'bit.ly/bkcoupons'
 
 
 def loadJson(path: str):
@@ -134,10 +126,6 @@ def shortenProductNames(couponTitle: str) -> str:
         b = burgerFix.group(1)
         couponTitle = replaceCaseInsensitive(burgerFix.group(0), b + 'rgr', couponTitle)
 
-    removeOR = re.compile(r'( oder ?)').search(couponTitle)
-    if removeOR:
-        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
-
     # Assume that all users know that "Cheddar" is cheese so let's remove this double entry
     couponTitle = replaceRegex(re.compile(r'(?i)Cheddar\s*Cheese'), 'Cheddar', couponTitle)
     couponTitle = replaceCaseInsensitive('Chicken', 'Ckn', couponTitle)
@@ -170,11 +158,15 @@ def shortenProductNames(couponTitle: str) -> str:
     return couponTitle
 
 
-def sanitizeCouponTitle(title: str) -> str:
+def sanitizeCouponTitle(couponTitle: str) -> str:
     """ Generic method which sanitizes strings and removes unneeded symbols such as trademark symbols. """
-    title = title.replace('®', '')
-    title = title.strip()
-    return title
+    couponTitle = couponTitle.replace('®', '')
+    removeOR = re.compile(r'( oder ?)').search(couponTitle)
+    if removeOR:
+        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
+    couponTitle = replaceRegex(re.compile(r' ?zum\s*Preis\s*von\s*1!?'), '', couponTitle)  # 2021-01-19
+    couponTitle = couponTitle.strip()
+    return couponTitle
 
 
 def getPathImagesOffers() -> str:
@@ -235,6 +227,7 @@ def replaceRegex(old: Pattern, repl: str, text: str) -> str:
 
 class SYMBOLS:
     BACK = '⬅Zurück'
+    MEAT = '🥩'
     BROCCOLI = '🥦'
     CONFIRM = '✅'
     DENY = '🚫'
@@ -293,11 +286,11 @@ def couponTitleContainsFriesAndDrink(title: str) -> bool:
 
 def couponTitleContainsVeggieFood(title: str) -> bool:
     # Convert title to lowercase for more thoughtless string comparison
-    titleLower = title.lower()
-    if 'plant' in titleLower:
+    if couponTitleContainsPlantBasedFood(title):
         # All plant based articles
         return True
-    elif 'fusion' in titleLower:
+    titleLower = title.lower()
+    if 'fusion' in titleLower:
         # Ice cream
         return True
     elif couponTitleIsFries(titleLower):
@@ -312,6 +305,14 @@ def couponTitleContainsVeggieFood(title: str) -> bool:
         return True
     else:
         # Non veggie menus and all the stuff that this handling doesn't detect properly yet
+        return False
+
+
+def couponTitleContainsPlantBasedFood(title: str) -> bool:
+    titleLower = title.lower()
+    if 'plant' in titleLower:
+        return True
+    else:
         return False
 
 

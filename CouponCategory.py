@@ -1,20 +1,20 @@
 from typing import Union, List
 
-from Helper import SYMBOLS, formatDateGerman, BotAllowedCouponTypes, CouponType, formatPrice
+from Helper import SYMBOLS, formatDateGerman, CouponType, formatPrice
 from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
 
 
 class CouponCategory:
+    """ Takes a list/dict of given coupons and creates a 'category' container of it containing easily accessible fields with useful information about it. """
 
-    def __init__(self, coupons: Union[CouponType, int, dict, List]):
-        # TODO: Improve this so we can inject custom category names as auto detection may return unexpected results
+    def __init__(self, coupons: Union[CouponType, int, dict, List], title: Union[str, None] = None):
+        self.titleOverride = title
         self.coupons = None
         self.mainCouponType = None
         self.couponTypes = set()
         self.displayDescription = False  # Display description for this category in bot menu?
         self.expireDatetimeLowest = None
         self.expireDatetimeHighest = None
-        self.numberofCouponsValid = 0
         self.numberofCouponsTotal = 0
         self.numberofCouponsHidden = 0
         self.numberofCouponsEatable = 0
@@ -82,15 +82,6 @@ class CouponCategory:
             self.nameSingular = "Unbekannt"
             self.namePlural = "Unbekannt"
             self.namePluralWithoutSymbol = "Unbekannt"
-        # if self.isVeggie():
-        #     self.nameSingular = '[Veggie] ' + self.nameSingular
-        #     self.namePlural = '[Veggie] ' + self.namePlural
-
-    def isValidSourceForBot(self) -> bool:
-        if self.mainCouponType in BotAllowedCouponTypes:
-            return True
-        else:
-            return False
 
     def getTotalPrice(self) -> float:
         return self.totalPrice
@@ -172,26 +163,24 @@ class CouponCategory:
         else:
             return fallbackSortMode
 
-    def getCategoryInfoText(self, withMenu: Union[bool, None], includeHiddenCouponsInCount: Union[bool, None]) -> str:
-        if self.mainCouponType == CouponType.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
-            # Only hidden (App-) coupons
-            couponCount = self.numberofCouponsHidden
-            text = '<b>[{couponCount} Stück] {couponCategoryName} versteckte</b>'
-        elif withMenu is None or withMenu is True:
-            couponCount = self.numberofCouponsTotal
+    def getCategoryInfoText(self) -> str:
+        if self.titleOverride is not None:
             text = '<b>[{couponCount} Stück] {couponCategoryName}</b>'
+            couponCategoryName = self.titleOverride
         else:
-            couponCount = self.numberofCouponsTotal - self.numberofCouponsWithFriesAndDrink
-            text = '<b>[{couponCount} Stück] {couponCategoryName} ohne Menü</b>'
-        if includeHiddenCouponsInCount is False:
-            couponCount -= self.numberofCouponsHidden
-        # if self.coupons is not None:
-        #     couponCount = len(self.coupons)
-        if couponCount == 1:
-            couponCategoryName = self.nameSingular
-        else:
-            couponCategoryName = self.namePluralWithoutSymbol
-        text = text.format(couponCount=couponCount, couponCategoryName=couponCategoryName)
+            # Auto determine result
+            if self.mainCouponType == CouponType.APP and self.numberofCouponsTotal == self.numberofCouponsHidden:
+                # Only hidden App-coupons
+                text = '<b>[{couponCount} Stück] {couponCategoryName} versteckte</b>'
+            elif self.numberofCouponsWithFriesAndDrink == 0 and self.numberofCouponsEatable > 0:
+                text = '<b>[{couponCount} Stück] {couponCategoryName} ohne Menü</b>'
+            else:
+                text = '<b>[{couponCount} Stück] {couponCategoryName}</b>'
+            if self.numberofCouponsTotal == 1:
+                couponCategoryName = self.nameSingular
+            else:
+                couponCategoryName = self.namePluralWithoutSymbol
+        text = text.format(couponCount=self.numberofCouponsTotal, couponCategoryName=couponCategoryName)
         if self.displayDescription and self.description is not None:
             text += '\n' + self.description
         text += '\n' + self.getExpireDateInfoText()
@@ -221,8 +210,6 @@ class CouponCategory:
         else:
             couponList = couponOrCouponList
         for coupon in couponList:
-            if coupon.isValid():
-                self.numberofCouponsValid += 1
             self.couponTypes.add(coupon.type)
             self.numberofCouponsTotal += 1
             if coupon.isHidden:

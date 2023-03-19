@@ -44,13 +44,14 @@ bash couchdb-dump.sh -r -c -H 127.0.0.1 -d telegram_users -f telegram_users.json
 
 
 # config.json (siehe config.json.default)
-Key | Datentyp | Optional | Beschreibung | Beispiel
---- | --- | --- | --- | ---
-bot_token | String | Nein | Bot Token | `1234567890:HJDH-gh56urj6r5u6grhrkJO7Qw`
-db_url | String | Nein | URL zur CouchDB DB samt Zugangsdaten | `http://username:pw@localhost:5984/` 
-public_channel_name | String | Ja | Name des öffentlichen Telegram Channels, in den der Bot die aktuell gültigen Gutscheine posten soll.  | `TestChannel`
-bot_name | String | Nein | Name des Bots | `BetterKingBot`
-admin_ids | StringArray | Nein | Telegram UserIDs der gewünschten Bot Admins | ["57659679843", "534494657832"]
+| Key                 | Datentyp    | Optional | Beschreibung                                                                                         | Beispiel                                 |
+|---------------------|-------------|----------|------------------------------------------------------------------------------------------------------|------------------------------------------|
+| bot_token           | String      | Nein     | Bot Token                                                                                            | `1234567890:HJDH-gh56urj6r5u6grhrkJO7Qw` |
+| db_url              | String      | Nein     | URL zur CouchDB DB samt Zugangsdaten                                                                 | `http://username:pw@localhost:5984/`     |
+| public_channel_name | String      | Ja       | Name des öffentlichen Telegram Channels, in den der Bot die aktuell gültigen Gutscheine posten soll. | `TestChannel`                            |
+| bot_name            | String      | Nein     | Name des Bots                                                                                        | `BetterKingBot`                          |
+| admin_ids           | StringArray | Nein     | Telegram UserIDs der gewünschten Bot Admins                                                          | ["57659679843", "534494657832"]          |
+
 **Falls nur der Crawler benötigt wird, reicht die CouchDB URL (mit Zugangsdaten)!**
 
 ## Optional: Papiercoupons hinzufügen  
@@ -159,26 +160,12 @@ ID | Interne Bezeichnung | Beschreibung
 8 | PAYBACK | Payback Papiercoupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.
 
 ### Codebeispiel Crawler
-```
-crawler = BKCrawler()
-""" Nur für den Bot geeignete Coupons crawlen oder alle?
- Wenn du den Bot 'produktiv' einsetzt, solltest du alle ressourcenhungrigen Schalter deaktivieren (= default). """
-crawler.setCrawlOnlyBotCompatibleCoupons(True)
-# History Datenbank aufbauen z.B. zur späteren Auswertung?
-crawler.setKeepHistory(True)
-# Simple History Datenbank aufbauen?
-crawler.setKeepSimpleHistoryDB(True)
-# CSV Export bei jedem Crawlvorgang (de-)aktivieren
-crawler.setExportCSVs(False)
-# Coupons crawlen
-crawler.crawlAndProcessData()
-# Coupons filtern und sortieren Bsp. 1: Nur aktive, die der Bot handlen kann sortiert nach Typ, Menü, Preis
-activeCoupons = crawler.filterCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE))
-# Coupons filtern und sortieren Bsp. 1: Nur aktive, nur App Coupons, mit und ohne Menü, nur versteckte, sortiert nach Preis
-activeCoupons = crawler.filterCoupons(CouponFilter(sortCode=CouponSortModes.PRICE, allowedCouponTypes=CouponType.APP, containsFriesAndCoke=None, isHidden=True))
-```
+Siehe BKBot.py -> ``__init__``
 
 # TODOs
+* MessageHandler für nicht unterstützte Kommandos/Text einbauen
+* Die Transparenz bei (mybk) Couponbildern durch gelb ersetzen
+* python-telegram-bot Framework aktualisieren und requirements.txt entsprechend anpassen
 * TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Handling mit Datumsangaben prüfen/verbessern
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
@@ -186,7 +173,6 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortCode=CouponSortModes.PRIC
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
 * App DB per Proxy in der originalen BK App modifizieren?
-* Alte-Coupons-Archiv im Channel verlinken (gedacht vor allem zur Verwendung in Filialen mit Terminals) | Evtl. hinfällig, weil BK begonnen hat, diese auch per Terminal nicht mehr zu akzeptieren (Stand 03.06.2022)?
 
 # Feature Ideen
 * Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen sonst werden es über die Zeit immer mehr
@@ -197,7 +183,7 @@ activeCoupons = crawler.filterCoupons(CouponFilter(sortCode=CouponSortModes.PRIC
 ```
 start - Hauptmenü
 coupons - Alle Coupons
-coupons2 - Alle Coupons ohne Menü
+coupons2 - Coupons ohne Menü
 favoriten - ⭐Favoriten⭐
 angebote - Angebote
 payback - 🅿️ayback Karte
@@ -261,6 +247,7 @@ FAQ BetterKing Bot und Channel
 Wo finde ich die aktuellen Papiercoupons als Scan?
 Sofern es welche gibt, hier:
 mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
+Dieser Ordner dient außerdem als Archiv.
 
 Warum fehlen (manchmal) Papiercoupons im Bot/Channel?
 Seit dem 03.12.2021 waren Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlten manchmal welche.
@@ -283,23 +270,6 @@ Es gibt mehrere Möglichkeiten:
 - Falls deine BK Filiale die Vorbestellen Funktion bietet, scanne die Coupons im Bestellvorgang mit deinem Handy (Zweitgerät/Laptop benötigt)
 - Nimm statt BetterKing das unten verlinkte Würger King Projekt; es zeigt die Coupons so an wie die BK App
 
-Wie kann ich noch mehr sparen?
-~~In Filialen mit Terminals lassen sich teilweise alte "abgelaufene" Papiercoupons verwenden.  
-App Coupons theoretisch ebenso, wenn man sie gesammelt hat.
-Hier findest du ein stetig aktualisiertes Archiv alter (Papier-)coupons: mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
-Wie verwende ich alte Coupons?
-- Geht nur am Terminal
-- QR Code scannen oder falls möglich, PLU Code eintippen
-Ab welchem Jahr sind alte Coupons verwendbar?
-Ungefähr ab dem Jahr 2018, da BK ab hier QR Codes eingeführt hat (erster Couponbogen im Archiv mit QR Codes ist "2018_11_11_1.pdf".)
-Natürlich kannst du trotzdem jeden alten PLU Code (also die Nummer) zu einem QR Code machen und ältere ausprobieren. Nimm dafür einen beliebigen QR Code Generator (z.B. qrcode-generator.de) oder App und wähle "Text" als Datentyp.
-Ganz am Ende vorm Bezahlen tritt ein Fehler auf und meine Bestellung verschwindet. Warum und was kann ich tun?
-Viele alte Coupons sind gesperrt bzw. lassen sich nicht mehr bestellen, aber zunächst trotzdem dem Warenkorb hinzufügen.
-- Schaue auf MyDealz, ob es Feedback von Usern zu bestimmten Codes gibt
-- Versuche, Coupons einzeln zu bestellen um nach und nach herauszufinden, welche Coupons funktionieren und welche nicht. Es gibt keine Liste dazu und das kann von Filiale zu Filiale variieren.
-- Pass auf, dass du keine Burger bestellst, die es nicht mehr gibt das kann zwar durchgehen, aber dann nervt dich die Filialleitung. Beispiel: X-tra Long BBQ~~
-⚠Funktioniert seit Anfang November 2022 nicht mehr!
-
 Wo finde ich den Quellcode?
 Hier: github.com/coffeerhyder/BKCouponCrawler
 
@@ -307,16 +277,27 @@ Wie kann ich Fehler melden oder Feedback einreichen?
 Per Mail: bkfeedback@pm.me
 
 Gibt es ähnliche open source Projekte für BK?
-Ja: Würger King: wurgerking.wfr.moe
-Quellcode: github.com/WebFreak001/WurgerKing
+Nein
 
 Gibt es sowas auch für McDonalds/KFC/...?
-McDonalds:
-01. mccoupon.deals | Gratis Getränke & Coupons
+McDonald's
+01. mccoupon.deals | Mcdonald's Coupons
 02. mcbroken.com | Wo funktioniert die Eismaschine?
-Sonstige:
 Sonstige
 01. billigepizza.netlify.app | Pizzapreise bei Domino's optimieren
+—> Video
+ (https://www.youtube.com/watch?v=rChjUHveYxI)02. mistersnax.com | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich
+03. t.me/NordseeCouponsBot | Nordsee Coupons Bot
+Channel: t.me/nordseecoupons
+
+Linksammlung BK:
+01. burgerking.de/sparkings | Spar Kings
+02. burgerking.de/kingdeals | KING Deals
+03. burgerking.de/rewards/offers | Coupons Webansicht
+04. burgerking.de/store-locator | KING Finder
+05. ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/
+06. pr0gramm.com/user/FishEater23/uploads/4730464
+07. tvnow.de/shows/team-wallraff-reporter-undercover-2384/2022-09/episode-2-team-wallraff-undercover-2022-5209024
 ```
 
 ### Test Cases
@@ -367,19 +348,20 @@ Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes sc
 
 ### Kleine Linksammlung
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
-* http://www.fastfood-forum.net/wbb3/upload/index.php/Board/9-Burger-King/
 * https://www.burgerking.de/rewards/offers (Coupons direkt über die BK Webseite)
+* https://pr0gramm.com/user/FishEater23/uploads/4730464
+* https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/
 
 ### Ähnliche Projekte | funktionierend
 Name | Beschreibung | Live-Instanz
 --- | --- | ---
-Würger King | https://github.com/WebFreak001/WurgerKing | https://wurgerking.wfr.moe/
 - | https://github.com/reteps/burger-king-api-wrapper | -
 - | https://github.com/robsonkades/clone-burger-king-app-with-expo | -
 mccoupon.deals | McDonalds Coupons ohne App, [Autor](https://www.mydealz.de/profile/Jicu) | https://www.mccoupon.deals/
 billigepizza.netlify.app | Pizzapreise von Domino's optimieren | https://billigepizza.netlify.app/
+MisterSnax (ehemals Spätzlehunter) | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich | https://mistersnax.com/
+NordseeCoupons | Nordsee Coupons Bot | https://t.me/nordseecoupons , [Bot](https://t.me/NordseeCouponsBot)
 
-* https://github.com/WebFreak001/WurgerKing | [Live Instanz](https://wurgerking.wfr.moe/)
 * https://github.com/reteps/burger-king-api-wrapper
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
 * https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
@@ -392,6 +374,7 @@ Name | Beschreibung | Live-Instanz | Down seit
 freecokebot aka gimmecockbot | McDonalds gratis Getränke | https://t.me/gimmecockbot (Alternativ https://t.me/freecokebot) | 10.11.2022
 bk.eris.cc | BK Coupons ohne App, [Autor](https://gist.github.com/printfuck) | https://bk.eris.cc/ | 10.11.2022
 mcdonalds4free_bot | McDonalds Getränke kostenlos, [MyDealz Thread](https://www.mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092) | https://t.me/mcdonalds4free_bot | 15.01.2023
+Würger King | Burger King Coupons | https://wurgerking.wfr.moe/  ([Quellcode](https://github.com/WebFreak001/WurgerKing)) | 31.12.2022
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot

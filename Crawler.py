@@ -15,8 +15,8 @@ from json import loads
 import PaperCouponHelper
 from BotUtils import getImageBasePath, loadConfig
 from Helper import *
-from Helper import getPathImagesOffers, getPathImagesProducts, couponTitleContainsFriesAndDrink, \
-    isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, BotAllowedCouponTypes, CouponType, Paths
+from Helper import getPathImagesOffers, getPathImagesProducts, \
+    isCouponShortPLUWithAtLeastOneLetter, isValidImageFile, CouponType, Paths
 from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
@@ -79,7 +79,6 @@ class BKCrawler:
         self.cachedNumberofAvailableOffers = 0
         self.keepHistoryDB = False
         self.keepSimpleHistoryDB = False
-        self.crawlOnlyBotCompatibleCoupons = True
         self.storeCouponAPIDataAsJson = False
         self.exportCSVs = False
         self.missingPaperCouponPLUs = []
@@ -170,11 +169,6 @@ class BKCrawler:
          """
         self.keepSimpleHistoryDB = keepSimpleHistoryDB
 
-    def setCrawlOnlyBotCompatibleCoupons(self, crawlOnlyBotCompatibleCoupons: bool):
-        """ Enabling this will speedup the crawl process!
-         Disable this if you want the crawler to crawl all items -> Will need some more time! """
-        self.crawlOnlyBotCompatibleCoupons = crawlOnlyBotCompatibleCoupons
-
     def setStoreCouponAPIDataAsJson(self, storeCouponAPIDataAsJson: bool):
         """ If enabled, all obtained API json responses will be saved into json files on each run. """
         self.storeCouponAPIDataAsJson = storeCouponAPIDataAsJson
@@ -191,18 +185,22 @@ class BKCrawler:
             self.crawlCoupons(crawledCouponsDict)
         else:
             # Old handling using old API
-            """ Using public API: https://gist.github.com/max1220/7f2f65be4381bc0878e64a985fd71da4 """
-            apiResponse = httpx.get('https://mo.burgerking-app.eu', headers=HEADERS_OLD).json()
-            if self.storeCouponAPIDataAsJson:
-                # Save API response so we can easily use this data for local testing later on.
-                saveJson('crawler/coupons1_old.json', apiResponse)
-            self.crawlProcessOffers(apiResponse)
-            self.crawlCoupons1OLD(apiResponse, crawledCouponsDict)
-            logging.info('App API Crawling done')
-            self.crawlCoupons2OLD(crawledCouponsDict)
+            self.crawlOLD(crawledCouponsDict)
         self.addExtraCoupons(crawledCouponsDict=crawledCouponsDict, immediatelyAddToDB=False)
         self.processCrawledCoupons(crawledCouponsDict)
         # self.crawlProducts()
+
+    def crawlOLD(self, crawledCouponsDict: dict):
+        """ Deprecated!! """
+        """ Using public API: https://gist.github.com/max1220/7f2f65be4381bc0878e64a985fd71da4 """
+        apiResponse = httpx.get('https://mo.burgerking-app.eu', headers=HEADERS_OLD).json()
+        if self.storeCouponAPIDataAsJson:
+            # Save API response so we can easily use this data for local testing later on.
+            saveJson('crawler/coupons1_old.json', apiResponse)
+        self.crawlProcessOffers(apiResponse)
+        self.crawlCoupons1OLD_DEPRECATED(apiResponse, crawledCouponsDict)
+        logging.info('App API Crawling done')
+        self.crawlCoupons2OLD(crawledCouponsDict)
 
     def downloadProductiveCouponDBImagesAndCreateQRCodes(self):
         """ Downloads coupons images and generates QR codes for current productive coupon DB. """
@@ -214,9 +212,8 @@ class BKCrawler:
             if downloadCouponImageIfNonExistant(coupon):
                 numberofDownloadedImages += 1
             generateQRImageIfNonExistant(uniqueCouponID, coupon.getImagePathQR())
-        if numberofDownloadedImages > 0:
-            logging.info("Number of coupon images downloaded: " + str(numberofDownloadedImages))
-            logging.info("Download image files duration: " + getFormattedPassedTime(timestampStart))
+        logging.info("Number of coupon images downloaded: " + str(numberofDownloadedImages))
+        logging.info("Download image files duration: " + getFormattedPassedTime(timestampStart))
 
     def migrateDBs(self):
         """ Migrate DBs from old to new version - leave this function empty if there is nothing to migrate. """
@@ -283,6 +280,7 @@ class BKCrawler:
             saveJson('crawler/coupons1.json', apiResponse)
         offersFeedback = apiResponse['data']['evaluateAllUserOffers']['offersFeedback']
         appCoupons = []
+        appCouponsNotYetActive = []
         for offerFeedback in offersFeedback:
             # json in json
             couponJson = offerFeedback['offerDetails']
@@ -290,7 +288,7 @@ class BKCrawler:
             bkCoupons = [couponBK]
             # Collect hidden coupons
             upsellOptions = couponBK.get('upsellOptions')
-            if upsellOptions is not None and len(upsellOptions) > 0:
+            if upsellOptions is not None:
                 for upsellOption in upsellOptions:
                     upsellType = upsellOption.get('_type')
                     upsellShortCode = upsellOption.get('shortCode')
@@ -310,19 +308,36 @@ class BKCrawler:
                 if internalNameRegex is not None and useInternalNameAsTitle:
                     titleFull = internalNameRegex.group(1)
                     titleFull = titleFull.replace('_', ' ')
+                    titleFull = sanitizeCouponTitle(titleFull)
                 else:
                     title = couponBK['name']['de'][0]['children'][0]['text']
+                    title = sanitizeCouponTitle(title)
                     subtitle = couponBK['description']['de'][0]['children'][0]['text']
-                    ignoreTitleRegex = re.compile(r'(?i)Im King Menü \(\+[^)]+\)').search(title)
-                    if ignoreTitleRegex:
-                        # Ignore title and only use subtitle
-                        titleFull = subtitle
+                    if subtitle is None:
+                        titleFull = title
                     else:
-                        titleFull = title + subtitle
+                        subtitle = sanitizeCouponTitle(subtitle)
+                        ignoreTitleRegex = re.compile(r'(?i)Im King Menü \(\+[^)]+\)').search(title)
+                        if len(subtitle) == 0 or subtitle.isspace():
+                            # Useless subtitle -> Use title only
+                            titleFull = title
+                        elif ignoreTitleRegex:
+                            # Ignore title and only use subtitle
+                            titleFull = subtitle
+                        elif title == subtitle:
+                            # Title and subtitle are the same -> Use title only
+                            titleFull = title
+                        else:
+                            titleFull = title + ' ' + subtitle
+                            # Log seemingly strange values
+                            if not subtitle.startswith('+'):
+                                logging.info('Possible subtitle which should not be included in coupon title: ' + subtitle)
+
                 titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP)
+                coupon.viewID = couponBK.get('_id')
                 tagsStringArray = []
                 offerTags = couponBK['offerTags']
                 for offerTag in offerTags:
@@ -347,42 +362,52 @@ class BKCrawler:
                  while all others have an offset of two hours. In order to get around this offset problem we prefer to extract the expire-date
                  from the footnote of the coupons and simply add the time (end of the day).
                  """
-                foundAndSetBetterExpireDate = False
+                expiredate1 = None
+                expiredate2 = None
                 try:
                     footnote = couponBK['moreInfo']['de'][0]['children'][0]['text']
                     expiredateRegex = re.compile(r'(?i)Abgabe bis (\d{1,2}\.\d{1,2}\.\d{4})').search(footnote)
                     if expiredateRegex is not None:
                         expiredateStr = expiredateRegex.group(1) + ' 23:59:59'
-                        coupon.timestampExpire = datetime.strptime(expiredateStr, '%d.%m.%Y %H:%M:%S').timestamp()
-                        foundAndSetBetterExpireDate = True
+                        expiredate1 = datetime.strptime(expiredateStr, '%d.%m.%Y %H:%M:%S').timestamp()
                 except:
                     # Dontcare
                     logging.warning('Failed to find BetterExpiredate for coupon ' + coupon.id)
                 ruleSets = couponBK['ruleSet']
-                foundFallbackExpireDate = False
+                realRuleSets = []
                 for ruleSet in ruleSets:
                     ruleSetsChilds = ruleSet.get('ruleSet')
                     if ruleSetsChilds is not None:
                         for ruleSetsChild in ruleSetsChilds:
-                            if ruleSetsChild['_type'] == 'between-dates':
-                                dateformat = '%Y-%m-%dT%H:%M:%S.%fZ'
-                                serversideTimeOffset = 2 * 60 * 60
-                                coupon.timestampStart = datetime.strptime(ruleSetsChild['startDate'], dateformat).timestamp() + serversideTimeOffset
-                                if not foundAndSetBetterExpireDate:
-                                    coupon.timestampExpire = datetime.strptime(ruleSetsChild['endDate'], dateformat).timestamp() + serversideTimeOffset
-                                foundFallbackExpireDate = True
-                                break
-                if not foundAndSetBetterExpireDate and not foundFallbackExpireDate:
+                            realRuleSets.append(ruleSetsChild)
+                    else:
+                        realRuleSets.append(ruleSet)
+                dateformat = '%Y-%m-%dT%H:%M:%S.%fZ'
+                serversideTimeOffset = 2 * 60 * 60
+                for realRuleSet in realRuleSets:
+                    if realRuleSet['_type'] == 'between-dates':
+                        coupon.timestampStart = datetime.strptime(realRuleSet['startDate'], dateformat).timestamp() + serversideTimeOffset
+                        expiredate2 = datetime.strptime(realRuleSet['endDate'], dateformat).timestamp() + serversideTimeOffset
+                        break
+                if expiredate1 is None and expiredate2 is None:
                     # This should never happen
                     logging.warning(f'WTF failed to find any expiredate for coupon: {uniqueCouponID}')
+                elif expiredate1 is not None:
+                    # Prefer this expiredate
+                    coupon.timestampExpire = expiredate1
+                else:
+                    coupon.timestampExpire = expiredate2
                 crawledCouponsDict[uniqueCouponID] = coupon
                 appCoupons.append(coupon)
+                if coupon.timestampStart is not None and coupon.timestampStart > datetime.now().timestamp():
+                    appCouponsNotYetActive.append(coupon)
                 index += 1
 
-        logging.info('Coupons in app: ' + str(len(appCoupons)))
-        logging.info("Total coupons1 crawl time: " + getFormattedPassedTime(timestampCrawlStart))
+        logging.info(f'Coupons in app total: {len(appCoupons)}')
+        logging.info(f'Coupons in app not yet active: {len(appCouponsNotYetActive)} | {appCouponsNotYetActive}')
+        logging.info(f'Total coupons1 crawl time: {getFormattedPassedTime(timestampCrawlStart)}')
 
-    def crawlCoupons1OLD(self, apiResponse: dict, crawledCouponsDict: dict):
+    def crawlCoupons1OLD_DEPRECATED(self, apiResponse: dict, crawledCouponsDict: dict):
         """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
         timestampCrawlStart = datetime.now().timestamp()
         appCoupons = apiResponse['coupons']
@@ -782,19 +807,14 @@ class BKCrawler:
                             coupon.priceCompare = originalPrice
         # Collect items we want to add to DB
         couponsToAddToDB = {}
-        if self.crawlOnlyBotCompatibleCoupons:
-            for coupon in crawledCouponsDict.values():
-                if coupon.isValidForBot():
-                    couponsToAddToDB[coupon.id] = coupon
-                else:
-                    # Filter out incompatible coupons right away so we will need less DB operations later
-                    logging.info(f'Skipping non-bot compatible or expired coupon: {coupon.id}')
-        else:
-            # Add all crawled coupons to DB
-            couponsToAddToDB = crawledCouponsDict
-        logging.info("Number of crawled coupons: " + str(len(couponsToAddToDB)))
-        if len(couponsToAddToDB) < len(crawledCouponsDict):
-            logging.warning(f'Possible bug or most likely API/sources contained expired coupons: Not all crawled coupons will be added to DB! Crawled: {len(crawledCouponsDict)} | Added: {len(couponsToAddToDB)}')
+        # Get rid of invalid coupons so we won't even bother adding them to our DB.
+        for coupon in crawledCouponsDict.values():
+            if coupon.isValid():
+                couponsToAddToDB[coupon.id] = coupon
+            else:
+                # Filter out incompatible coupons right away so we will need less DB operations later
+                logging.info(f'Do not add invalid/expired/not-yet-active coupon to DB: {coupon.id} + | {coupon.plu} | {coupon.title} | {coupon.getPrice()}')
+        logging.info(f'Crawled coupons: {len(crawledCouponsDict)} | To be added to DB: {len(couponsToAddToDB)}')
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         couponDB = self.getCouponDB()
@@ -802,14 +822,28 @@ class BKCrawler:
         self.updateCachedMissingPaperCouponsInfo(couponDB)
         # Cleanup DB
         deleteCouponDocs = {}
+        modifyCouponDocsUnreliableAPIWorkaround = {}
+        # 2023-03-17: Unfinished work
+        doAPIWorkaroundHandling = False
         for uniqueCouponID in couponDB:
             dbCoupon = Coupon.load(couponDB, uniqueCouponID)
             crawledCoupon = crawledCouponsDict.get(uniqueCouponID)
             if crawledCoupon is None:
-                # Coupon is in DB but not in crawled coupons -> Remove from DB
+                # Coupon is in DB but not in crawled coupons anymore -> Remove from DB
+                if doAPIWorkaroundHandling:
+                    if not dbCoupon.isValid():
+                        # Coupon is ivalid/expired -> Remove it
+                        deleteCouponDocs[uniqueCouponID] = dbCoupon
+                    elif dbCoupon.timestampCouponNotInAPIAnymore is None:
+                        # Save timestamp when coupon disappeared from API first time
+                        dbCoupon.timestampCouponNotInAPIAnymore = getCurrentDate().timestamp()
+                        modifyCouponDocsUnreliableAPIWorkaround[dbCoupon.id] = dbCoupon
+                    elif getCurrentDate().timestamp() - dbCoupon.timestampCouponNotInAPIAnymore > 3 * 24 * 60 * 60:
+                        # Coupon hasn't been in API for at least 3 days -> Delete it
+                        deleteCouponDocs[uniqueCouponID] = dbCoupon
                 deleteCouponDocs[uniqueCouponID] = dbCoupon
-            elif self.crawlOnlyBotCompatibleCoupons and not crawledCoupon.isValidForBot():
-                # This will usually only happen if operator set crawlOnlyBotCompatibleCoupons to False first and then to True.
+            elif not crawledCoupon.isValid():
+                # Coupon is in DB and in crawled coupons but is expired -> Delete from DB
                 deleteCouponDocs[uniqueCouponID] = dbCoupon
         if len(deleteCouponDocs) > 0:
             couponDB.purge(deleteCouponDocs.values())
@@ -1104,6 +1138,8 @@ class BKCrawler:
             # Update DB
             if existingCoupon is not None:
                 # Update existing coupon
+                if existingCoupon.timestampCouponNotInAPIAnymore is not None:
+                    existingCoupon.timestampCouponNotInAPIAnymore = None
                 if hasChanged(existingCoupon, crawledCoupon, ignoreKeys=['timestampAddedToDB', 'timestampLastModifiedDB']):
                     # Set isNew flag if necessary
                     if existingCoupon.isExpiredForLongerTime() and crawledCoupon.isValid():
@@ -1179,8 +1215,8 @@ class BKCrawler:
     def getUserDB(self):
         return self.couchdb[DATABASES.TELEGRAM_USERS]
 
-    def getFilteredCoupons(
-            self, filters: CouponFilter
+    def getFilteredCouponsAsDict(
+            self, filter: CouponFilter, sortIfSortCodeIsGivenInCouponFilter: bool = True
     ) -> dict:
         """ Use this to only get the coupons you want.
          Returns all by default."""
@@ -1196,49 +1232,57 @@ class BKCrawler:
         #     for uniqueCouponID in couponDB:
         #         desiredCoupons[uniqueCouponID] = couponDB[uniqueCouponID]
         #     return desiredCoupons
+        # Log if developer is trying to use incorrect filters
+        if filter.isVeggie is False and filter.isPlantBased is True:
+            logging.warning(f'Bad params: {filter.isVeggie=} and {filter.isPlantBased=}')
         for uniqueCouponID in couponDB:
             coupon = Coupon.load(couponDB, uniqueCouponID)
-            if filters.activeOnly and not coupon.isValid():
+            if filter.activeOnly and not coupon.isValid():
                 # Skip expired coupons if needed
                 continue
-            elif filters.allowedCouponTypes is not None and coupon.type not in filters.allowedCouponTypes:
+            elif filter.allowedCouponTypes is not None and coupon.type not in filter.allowedCouponTypes:
                 # Skip non-allowed coupon-types
                 continue
-            elif filters.containsFriesAndCoke is not None and coupon.isContainsFriesAndDrink() != filters.containsFriesAndCoke:
+            elif filter.containsFriesAndCoke is not None and coupon.isContainsFriesAndDrink() != filter.containsFriesAndCoke:
                 # Skip items if they do not have the expected "containsFriesOrCoke" state
                 continue
-            elif filters.isNew is not None and coupon.isNewCoupon() != filters.isNew:
+            elif filter.isNew is not None and coupon.isNewCoupon() != filter.isNew:
                 # Skip item if it does not have the expected "is_new" state
                 continue
-            elif filters.isHidden is not None and coupon.isHidden != filters.isHidden:
+            elif filter.isHidden is not None and coupon.isHidden != filter.isHidden:
                 continue
-            elif filters.isVeggie is not None and coupon.isVeggie() != filters.isVeggie:
+            elif filter.isVeggie is not None and coupon.isVeggie() != filter.isVeggie:
+                continue
+            elif filter.isPlantBased is not None and coupon.isPlantBased() != filter.isPlantBased:
                 continue
             else:
                 desiredCoupons[uniqueCouponID] = coupon
         # Remove duplicates if needed and if it makes sense to attempt that
-        if filters.removeDuplicates is True and (filters.allowedCouponTypes is None or (filters.allowedCouponTypes is not None and len(filters.allowedCouponTypes) > 1)):
+        if filter.removeDuplicates is True and (filter.allowedCouponTypes is None or (filter.allowedCouponTypes is not None and len(filter.allowedCouponTypes) > 1)):
             desiredCoupons = removeDuplicatedCoupons(desiredCoupons)
         # Now check if the result shall be sorted
-        if filters.sortCode is None:
-            # Do not sort coupons
-            return desiredCoupons
-        else:
+        if filter.sortCode is not None and sortIfSortCodeIsGivenInCouponFilter:
             # Sort coupons: Separate by type and sort each by coupons with/without menu and price.
             # Make dict out of list
-            filteredAndSortedCouponsDict = sortCoupons(desiredCoupons, filters.sortCode)
+            filteredAndSortedCouponsDict = sortCoupons(desiredCoupons, filter.sortCode)
             logging.debug("Time it took to get- and sort coupons: " + getFormattedPassedTime(timestampStart))
             return filteredAndSortedCouponsDict
+        else:
+            return desiredCoupons
+
 
     def getFilteredCouponsAsList(
-            self, filters: CouponFilter
+            self, filters: CouponFilter, sortIfSortCodeIsGivenInCouponFilter: bool = True
     ) -> List[Coupon]:
         """ Wrapper """
-        filteredCouponsDict = self.getFilteredCoupons(filters)
+        filteredCouponsDict = self.getFilteredCouponsAsDict(filters, sortIfSortCodeIsGivenInCouponFilter=sortIfSortCodeIsGivenInCouponFilter)
         return list(filteredCouponsDict.values())
 
     def getOffersActive(self) -> list:
         """ Returns all offers that are not expired according to 'expiration_date'. """
+        # 2023-03-18: There are no offers at this moment. What was an offer back then ("King of the month") has been moved into coupons now by BK.
+        if True:
+            return []
         offerDB = self.getOfferDB()
         offers = []
         for offerID in offerDB:
@@ -1246,10 +1290,6 @@ class BKCrawler:
             if offerIsValid(offer):
                 offers.append(offer)
         return offers
-
-    def getBotCoupons(self) -> dict:
-        """ Returns all coupons suitable for bot-usage (not sorted in any special order!). """
-        return self.getFilteredCoupons(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.PRICE.getSortCode()))
 
 
 def getCouponByID(coupons: List[Coupon], couponID: str) -> Union[Coupon, None]:

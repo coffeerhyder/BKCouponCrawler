@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from BotUtils import getImageBasePath
 from Helper import getTimezone, getCurrentDate, getFilenameFromURL, SYMBOLS, normalizeString, formatDateGerman, couponTitleContainsFriesAndDrink, BotAllowedCouponTypes, \
     CouponType, \
-    formatPrice, couponTitleContainsVeggieFood, shortenProductNames
+    formatPrice, couponTitleContainsVeggieFood, shortenProductNames, couponTitleContainsPlantBasedFood
 
 
 class CouponFilter(BaseModel):
@@ -28,6 +28,7 @@ class CouponFilter(BaseModel):
     isNew: Optional[Union[bool, None]] = None
     isHidden: Optional[Union[bool, None]] = None
     isVeggie: Optional[Union[bool, None]] = None
+    isPlantBased: Optional[Union[bool, None]] = None
     sortCode: Optional[Union[None, int]]
 
 
@@ -97,11 +98,15 @@ def getSortModeBySortCode(sortCode: int) -> CouponSortMode:
 
 class CouponView:
 
-    def getFilter(self):
+    def getFilter(self) -> CouponFilter:
         return self.couponfilter
 
-    def __init__(self, couponfilter: CouponFilter):
+    def __init__(self, couponfilter: CouponFilter, includeVeggieSymbol: Union[bool, None] = None, highlightFavorites: Union[bool, None] = None, allowModifyFilter: bool = True, title: str = None):
+        self.title = title
         self.couponfilter = couponfilter
+        self.includeVeggieSymbol = includeVeggieSymbol
+        self.highlightFavorites = highlightFavorites
+        self.allowModifyFilter = allowModifyFilter
 
     def getViewCode(self) -> Union[int, None]:
         """ Returns position of current sort mode in array of all sort modes. """
@@ -116,18 +121,19 @@ class CouponView:
 
 
 class CouponViews:
-    ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
-    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=False))
-    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, isVeggie=True))
-    CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=None))
+    ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode()), title="Alle Coupons")
+    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=False), title="Alle Coupons ohne Menü")
+    CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode()))
     CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
     HIDDEN_APP_COUPONS_ONLY = CouponView(
-        couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], containsFriesAndCoke=None, isHidden=True))
+        couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], isHidden=True), title="App Coupons versteckte")
+    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isVeggie=True), includeVeggieSymbol=False, title=f"{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}")
+    MEAT_WITHOUT_PLANT_BASED = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isPlantBased=False), title="Fleisch ohne Plant Based Coupons")
     # Dummy item basically only used for holding default sortCode for users' favorites
-    FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=None, containsFriesAndCoke=None))
+    FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode()), highlightFavorites=False, allowModifyFilter=False, title=f"{SYMBOLS.STAR}Favoriten{SYMBOLS.STAR}")
 
 
-def getAllCouponViews() -> list:
+def getAllCouponViews() -> List[CouponView]:
     res = []
     for obj in CouponViews.__dict__.values():
         if isinstance(obj, CouponView):
@@ -135,7 +141,7 @@ def getAllCouponViews() -> list:
     return res
 
 
-def getCouponViewByIndex(index: int) -> Union[CouponSortMode, None]:
+def getCouponViewByIndex(index: int) -> Union[CouponView, None]:
     allCouponViews = getAllCouponViews()
     if index < len(allCouponViews):
         return allCouponViews[index]
@@ -154,20 +160,19 @@ class Coupon(Document):
     priceCompare = FloatField()
     staticReducedPercent = FloatField()
     title = TextField()
-    # titleShortened = TextField() # Deprecated 2023-01-15 use getTitleShortened instead
     timestampAddedToDB = FloatField(default=getCurrentDate().timestamp())
     timestampLastModifiedDB = FloatField(default=0)
     timestampStart = FloatField()
     timestampExpireInternal = FloatField()  # Internal expire-date
     timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
+    timestampCouponNotInAPIAnymore = FloatField()
     dateFormattedExpire = TextField()
     imageURL = TextField()
     paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
     type = IntegerField(name='source')  # Legacy. This is called "type" now!
-    # containsFriesOrCoke = BooleanField() # Deprecated 2023-01-15 use isContainsFriesAndDrink instead
     timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
-    isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new
+    isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new. Use this as an override of default handling.
     isHidden = BooleanField(default=False)  # Typically only available for App coupons
     isUnsafeExpiredate = BooleanField(
         default=False)  # Set this if timestampExpire is a made up date that is just there to ensure that the coupon is considered valid for a specified time
@@ -175,6 +180,7 @@ class Coupon(Document):
     # TODO: Make use of this once it is possible for users to add coupons to DB via API
     addedVia = IntegerField()
     tags = ListField(TextField())
+    viewID = TextField()
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -202,15 +208,15 @@ class Coupon(Document):
         else:
             return self.title
 
-    def getTitleShortened(self):
-        return shortenProductNames(self.title)
-
-    def isExpired(self):
-        """ Wrapper """
-        if not self.isValid():
-            return True
-        else:
-            return False
+    def getTitleShortened(self, includeVeggieSymbol: bool):
+        shortenedTitle = shortenProductNames(self.title)
+        includeNutritionTypeSymbol = False
+        includeMeatSymbol = False
+        if (includeNutritionTypeSymbol or includeMeatSymbol) and self.containsMeat():
+            shortenedTitle = '🥩' + shortenedTitle
+        elif (includeNutritionTypeSymbol or includeVeggieSymbol) and self.isVeggie():
+            shortenedTitle = SYMBOLS.BROCCOLI + shortenedTitle
+        return shortenedTitle
 
     def isExpiredForLongerTime(self):
         """ Using this check, coupons that e.g. expire on midnight and get elongated will not be marked as new because really they aren't. """
@@ -227,56 +233,96 @@ class Coupon(Document):
             """ Coupon is not expired or not "long enough". """
             return False
 
+    # def isExpired(self):
+    #     expireDatetime = self.getExpireDatetime()
+    #     currentDatetime = getCurrentDate()
+    #     if expireDatetime is None or currentDatetime > expireDatetime:
+    #         # Coupon is expired
+    #         return True
+    #     else:
+    #         return False
+
     def isValid(self):
         expireDatetime = self.getExpireDatetime()
+        currentDatetime = getCurrentDate()
         if expireDatetime is None:
             # Coupon without expire-date = invalid --> Should never happen
             return False
-        elif expireDatetime > getCurrentDate():
-            return True
-        else:
+        if currentDatetime > expireDatetime:
+            # Coupon is expired
             return False
-
-    def isValidForBot(self) -> bool:
-        """ Checks if the given coupon can be used in bot e.g. is from allowed source (App/Paper) and is valid. """
-        if self.type in BotAllowedCouponTypes and self.isValid():
-            return True
-        else:
+        # Looks valid -> Check if coupon is available already according to start-timestamp
+        startDatetime = self.getStartDatetime()
+        if startDatetime is not None and startDatetime > currentDatetime:
+            # Start time hasn't been reached yet -> Coupon is not valid yet
             return False
+        else:
+            # Coupon is valid
+            return True
 
     def isContainsFriesAndDrink(self) -> bool:
         return couponTitleContainsFriesAndDrink(self.title)
 
-    def isVeggie(self) -> bool:
-        # First check if we got any useful information in our list of tags
-        looksLikeVeggie = False
+    def isPlantBased(self) -> bool:
         if self.tags is not None:
+            for tag in self.tags:
+                tag = tag.lower()
+                if tag == 'plantbased':
+                    return True
+        if couponTitleContainsPlantBasedFood(self.title):
+            return True
+        else:
+            return False
+
+    def isVeggie(self) -> bool:
+        if self.type == CouponType.PAYBACK:
+            # Yes, Payback coupons are technically veggie except for those that are only valid for articles containing meat
+            return True
+        elif self.containsMeat():
+            """ 
+            Check if coupon contains meat. Some of them are wrongly tagged so ket's fix that by also looking into the product titles.
+             """
+            return False
+        elif self.isPlantBased():
+            return True
+        elif couponTitleContainsVeggieFood(self.title):
+            # No result? Fallback to other, more unsafe methods.
+            return True
+        else:
+            # Last resort: Check if tags contain any useful information.
+            if self.tags is not None:
+                for tag in self.tags:
+                    tag = tag.lower()
+                    if tag == 'sweetkings':
+                        return True
+            return False
+
+    def containsMeat(self) -> bool:
+        """ Returns true if this coupon contains at least one article with meat. """
+        """ First check for plant based stuff in title because BK sometimes has wrong tags (e.g. tag contains "chicken" when article is veggie lol)... """
+        if self.isPlantBased():
+            return False
+        elif self.tags is not None:
+            # Now check for meat in tags
             # More tags:
             # KingSnacks -> Can be meat
             # NoPreference -> Can be anything, most items got this tag only
             for tag in self.tags:
                 tag = tag.lower()
                 if tag == 'beef' or tag == 'chicken':
-                    """ 
-                     A single article with meat means that this is not a veggie coupon.
-                     """
-                    return False
-                elif tag == 'plantbased':
-                    """ 
-                     A single plant based article means that this is a veggie coupon.
-                     Usually coupons containing plant based products aren't mixed with meat products.
-                     """
                     return True
-                elif tag == 'sweetkings':
-                    looksLikeVeggie = True
-        # No result? Fallback to other, more unsafe methods.
-        if self.type == CouponType.PAYBACK:
-            # Yes, Payback coupons are technically veggie except for those that are only valid for articles containing meat
-            return True
-        elif couponTitleContainsVeggieFood(self.title):
+
+        titleLower = self.title.lower()
+        if 'chicken' in titleLower:
             return True
         else:
-            return looksLikeVeggie
+            return False
+
+    def isSweet(self) -> bool:
+        if self.tags is not None and len(self.tags) == 1 and self.tags[0].lower() == 'sweetkings':
+            return True
+        else:
+            return False
 
     def getPrice(self) -> Union[float, None]:
         return self.price
@@ -321,6 +367,13 @@ class Coupon(Document):
                 return False
         else:
             return False
+
+    def getStartDatetime(self) -> Union[datetime, None]:
+        if self.timestampStart is not None:
+            return datetime.fromtimestamp(self.timestampStart, getTimezone())
+        else:
+            # Start date must not always be given
+            return None
 
     def getExpireDatetime(self) -> Union[datetime, None]:
         if self.timestampExpire is not None:
@@ -419,12 +472,12 @@ class Coupon(Document):
             # Return fallback --> This should never happen!
             return open('media/fallback_image_missing_qr_image.jpeg', mode='rb')
 
-    def generateCouponShortText(self, highlightIfNew: bool) -> str:
+    def generateCouponShortText(self, highlightIfNew: bool, includeVeggieSymbol: bool) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
         couponText = ''
-        if self.isNewCoupon() and highlightIfNew:
+        if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
-        couponText += self.getPLUOrUniqueID() + " | " + self.getTitleShortened()
+        couponText += self.getPLUOrUniqueID() + " | " + self.getTitleShortened(includeVeggieSymbol=includeVeggieSymbol)
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -433,18 +486,18 @@ class Coupon(Document):
         couponText = ''
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
-        couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.getTitleShortened()
+        couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.getTitleShortened(includeVeggieSymbol=True)
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
-    def generateCouponShortTextFormattedWithHyperlinkToChannelPost(self, highlightIfNew: bool, publicChannelName: str,
+    def generateCouponShortTextFormattedWithHyperlinkToChannelPost(self, highlightIfNew: bool, includeVeggieSymbol: bool, publicChannelName: str,
                                                                    messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         couponText = "<b>" + self.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
             messageID) + "\">"
         if self.isNewCoupon() and highlightIfNew:
             couponText += SYMBOLS.NEW
-        couponText += self.getTitleShortened() + "</a>"
+        couponText += self.getTitleShortened(includeVeggieSymbol=includeVeggieSymbol) + "</a>"
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -489,6 +542,8 @@ class Coupon(Document):
             couponText += '\nGültig bis ' + expireDateFormatted
         if self.description is not None:
             couponText += "\n" + self.description
+        if self.viewID is not None:
+            couponText += f"\n<a href=\"https://www.burgerking.de/rewards/offers/{self.viewID}\">Webansicht</a>"
         return couponText
 
     def getPLUInformationFormatted(self) -> str:
@@ -542,7 +597,7 @@ class UserFavoritesInfo:
             for coupon in self.couponsUnavailable:
                 if len(unavailableFavoritesText) > 0:
                     unavailableFavoritesText += '\n'
-                unavailableFavoritesText += coupon.id + ' | ' + coupon.getTitleShortened()
+                unavailableFavoritesText += coupon.id + ' | ' + coupon.getTitleShortened(includeVeggieSymbol=False)
                 priceInfoText = coupon.getPriceInfoText()
                 if priceInfoText is not None:
                     unavailableFavoritesText += ' | ' + priceInfoText
@@ -560,19 +615,25 @@ MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING = 2 * 24 * 60 * 60
 class User(Document):
     settings = DictField(
         Mapping.build(
-            displayQR=BooleanField(default=True),
-            displayBKWebsiteURLs=BooleanField(default=True),
-            displayCouponCategoryPayback=BooleanField(default=True),
+            displayCouponCategoryAllCouponsLongListWithLongTitles=BooleanField(default=False),
+            displayCouponCategoryAppCouponsHidden=BooleanField(default=True),
+            # displayCouponCategoryMeatWithoutPlantBased=BooleanField(default=False),
             displayCouponCategoryVeggie=BooleanField(default=True),
+            displayCouponCategoryPayback=BooleanField(default=True),
             displayCouponSortButton=BooleanField(default=True),
+            displayOffersButton=BooleanField(default=True),
+            displayBKWebsiteURLs=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
+            displayFAQLinkButton=BooleanField(default=True),
+            displayPlantBasedCouponsWithinGenericCategories=BooleanField(default=True),
             displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
-            displayCouponArchiveLinkButton=BooleanField(default=True),
+            hideDuplicates=BooleanField(default=False),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
             highlightNewCouponsInCouponButtonTexts=BooleanField(default=True),
-            hideDuplicates=BooleanField(default=False),
+            highlightVeggieCouponsInCouponButtonTexts=BooleanField(default=True),
+            displayQR=BooleanField(default=True),
             autoDeleteExpiredFavorites=BooleanField(default=False),
             enableBetaFeatures=BooleanField(default=False)
         )
@@ -615,6 +676,7 @@ class User(Document):
             return False
 
     def hasDefaultSettings(self) -> bool:
+
         for settingKey, settingValue in self["settings"].items():
             settingInfo = USER_SETTINGS_ON_OFF.get(settingKey)
             if settingInfo is None:
@@ -622,12 +684,20 @@ class User(Document):
                 continue
             elif settingValue != settingInfo['default']:
                 return False
-
-        if self.couponViewSortModes is not None and len(self.couponViewSortModes) > 0:
+        # Check for custom sort modes
+        if self.hasStoredSortModes():
             # User has used/saved custom sort modes
             return False
-
+        # No non-default value found -> User has default settings
         return True
+
+    def hasStoredSortModes(self) -> bool:
+        if self.couponViewSortModes is not None and len(self.couponViewSortModes) > 0:
+            # User has saved preferred sort modes
+            return True
+        else:
+            # User does not have any stored sort modes
+            return False
 
     def hasFoundEasterEgg(self) -> bool:
         if self.easterEggCounter > 0:
@@ -910,63 +980,131 @@ def getCouponTitleMapping(coupons: Union[dict, list]) -> dict:
         couponTitleMappingTmp.setdefault(coupon.getNormalizedTitle(), []).append(coupon)
     return couponTitleMappingTmp
 
+class SettingCategory:
+
+    def __init__(self, title: str):
+        self.title = title
+
+    def getViewCode(self) -> Union[int, None]:
+        """ Returns position of current sort mode in array of all sort modes. """
+        couponViews = getAllCouponViews()
+        index = 0
+        for couponView in couponViews:
+            if couponView == self:
+                return index
+            index += 1
+        # This should never happen
+        return None
+
+
+class SettingCategories:
+    MAIN_MENU = SettingCategory(title='Hauptmenü Buttons')
+    GLOBAL_FILTERS = SettingCategory(title='Globale Coupon Filter')
+    COUPON_DISPLAY = SettingCategory(title='Anzeigeeinstellungen')
+    NOTIFICATIONS = SettingCategory(title='Benachrichtigungen')
+    MISC = SettingCategory(title='Sonstige')
+
 
 USER_SETTINGS_ON_OFF = {
     # TODO: Obtain these Keys and default values from "User" Mapping class and remove this mess!
-    "notifyWhenFavoritesAreBack": {
-        "description": "Favoriten Benachrichtigungen",
+    "displayCouponCategoryAllCouponsLongListWithLongTitles": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": f"Kategorie 'Alle Coupons Liste lange Titel + Pics' zeigen",
         "default": False
     },
-    "notifyWhenNewCouponsAreAvailable": {
-        "description": "Benachrichtigung bei neuen Coupons",
-        "default": False
-    },
-    "displayQR": {
-        "description": "QR Codes zeigen",
+    "displayCouponCategoryAppCouponsHidden": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": f"Kategorie 'App Coupons versteckte' zeigen",
         "default": True
     },
-    "displayHiddenAppCouponsWithinGenericCategories": {
-        "description": "Versteckte App Coupons in Kategorien zeigen*¹",
-        "default": False
+    # "displayCouponCategoryMeatWithoutPlantBased": {
+    #     "category": SettingCategories.MAIN_MENU,
+    #     "description": f"Kategorie Coupons ohne PlantBased ({SYMBOLS.MEAT}) zeigen",
+    #     "default": False
+    # },
+    "displayCouponCategoryVeggie": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": f"Kategorie Veggie Coupons ({SYMBOLS.BROCCOLI}) zeigen",
+        "default": True
     },
     "displayCouponCategoryPayback": {
-        "description": "Payback Coupons & Karte Buttons zeigen",
+        "category": SettingCategories.MAIN_MENU,
+        "description": "Kategorie Payback Buttons zeigen",
         "default": True
     },
-    "displayCouponCategoryVeggie": {
-        "description": f"Veggie Coupons Button ({SYMBOLS.BROCCOLI}) zeigen",
-        "default": True
-    },
-    "displayCouponSortButton": {
-        "description": "Coupon sortieren Button zeigen",
-        "default": True
-    },
-    "displayFeedbackCodeGenerator": {
-        "description": "Feedback Code Generator Button zeigen",
-        "default": True
-    },
-    "displayCouponArchiveLinkButton": {
-        "description": "Coupon Archiv Button zeigen",
+    "displayOffersButton": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": "Angebote Button zeigen",
         "default": True
     },
     "displayBKWebsiteURLs": {
+        "category": SettingCategories.MAIN_MENU,
         "description": "BK Verlinkungen Buttons zeigen",
         "default": True
     },
+    "displayFeedbackCodeGenerator": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": "Feedback Code Generator Button zeigen",
+        "default": True
+    },
+    "displayFAQLinkButton": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": "FAQ Button zeigen",
+        "default": True
+    },
+    "displayPlantBasedCouponsWithinGenericCategories": {
+        "category": SettingCategories.GLOBAL_FILTERS,
+        "description": "Plant Based Coupons in Kategorien zeigen",
+        "default": True
+    },
+    "displayHiddenAppCouponsWithinGenericCategories": {
+        "category": SettingCategories.GLOBAL_FILTERS,
+        "description": "Versteckte App Coupons in Kategorien zeigen*¹",
+        "default": False
+    },
+    "hideDuplicates": {
+        "category": SettingCategories.GLOBAL_FILTERS,
+        "description": "Duplikate ausblenden |App CP bevorz.",
+        "default": False
+    },
     "highlightFavoriteCouponsInButtonTexts": {
+        "category": SettingCategories.COUPON_DISPLAY,
         "description": "Favoriten in Buttons mit " + SYMBOLS.STAR + " markieren",
         "default": True
     },
     "highlightNewCouponsInCouponButtonTexts": {
+        "category": SettingCategories.COUPON_DISPLAY,
         "description": "Neue Coupons in Buttons mit " + SYMBOLS.NEW + " markieren",
         "default": True
     },
-    "autoDeleteExpiredFavorites": {
-        "description": "Abgelaufene Favoriten automatisch löschen",
+    "highlightVeggieCouponsInCouponButtonTexts": {
+        "category": SettingCategories.COUPON_DISPLAY,
+        "description": "Veggie Coupons in Buttons mit " + SYMBOLS.BROCCOLI + " markieren",
+        "default": True
+    },
+    "displayQR": {
+        "category": SettingCategories.COUPON_DISPLAY,
+        "description": "QR Codes zeigen",
+        "default": True
+    },
+    "displayCouponSortButton": {
+        "category": SettingCategories.COUPON_DISPLAY,
+        "description": "Coupon sortieren Button zeigen",
+        "default": True
+    },
+    "notifyWhenFavoritesAreBack": {
+        "category": SettingCategories.NOTIFICATIONS,
+        "description": "Favoriten Benachrichtigungen",
         "default": False
     },
-    "hideDuplicates": {
-        "description": "Duplikate ausblenden |App CP bevorz.",
+    "notifyWhenNewCouponsAreAvailable": {
+        "category": SettingCategories.NOTIFICATIONS,
+        "description": "Benachrichtigung bei neuen Coupons",
+        "default": False
+    },
+    "autoDeleteExpiredFavorites": {
+        "category": SettingCategories.MISC,
+        "description": "Abgelaufene Favoriten automatisch löschen",
         "default": False
     }
 }
