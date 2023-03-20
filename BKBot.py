@@ -414,10 +414,6 @@ class BKBot:
         currentDatetime = getCurrentDate()
         if self.statsCached is None or currentDatetime.timestamp() - self.statsCachedTimestamp > 30 * 60:
             # Init/Refresh cache
-            if self.statsCached is None:
-                logging.info("Initializing stats cache")
-            else:
-                logging.info("Refreshing stats cache")
             loadingMessage = await asyncio.create_task(self.editOrSendMessage(update, text='Statistiken werden geladen...'))
             self.statsCached = UserStats(userDB)
             self.statsCachedTimestamp = currentDatetime.timestamp()

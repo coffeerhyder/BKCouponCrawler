@@ -182,6 +182,9 @@ class Coupon(Document):
     tags = ListField(TextField())
     viewID = TextField()
 
+    def __str__(self):
+        return f'{self.id} + | {self.plu} | {self.title} | {self.getPrice()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}'
+
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
         if self.plu is not None:
