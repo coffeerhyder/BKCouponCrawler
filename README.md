@@ -149,15 +149,15 @@ optional arguments:
 4. Falls gewollt, Bot beenden mit ``pkill python3`` (vereinfachte Variante).
 
 ### Interne Coupon-Typen und Beschreibung
-ID | Interne Bezeichnung | Beschreibung
+|ID | Interne Bezeichnung | Beschreibung|
 --- | --- | --- | 
-0 | APP | App Coupons
-3 | PAPER | Papiercoupons
-4 | PAPER_UNSAFE | Coupons aus der "Coupons2" API, die keinem anderen Coupon-Typen zugewiesen werden konnten.
-5 | ONLINE_ONLY | Coupons ohne short PLU Code, die wenn überhaupt nur online oder per QR Code (Terminal) bestellbar sind.
-6 | ONLINE_ONLY_STORE_SPECIFIC | Coupons, die nur in bestimmten Filialen einlösbar sind -> Derzeit ist das nur ein Platzhalter
-7 | SPECIAL | Spezielle Coupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.
-8 | PAYBACK | Payback Papiercoupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.
+|0 | APP | App Coupons|
+|3 | PAPER | Papiercoupons|
+|4 | PAPER_UNSAFE | Coupons aus der "Coupons2" API, die keinem anderen Coupon-Typen zugewiesen werden konnten.|
+|5 | ONLINE_ONLY | Coupons ohne short PLU Code, die wenn überhaupt nur online oder per QR Code (Terminal) bestellbar sind.|
+|6 | ONLINE_ONLY_STORE_SPECIFIC | Coupons, die nur in bestimmten Filialen einlösbar sind -> Derzeit ist das nur ein Platzhalter|
+|7 | SPECIAL | Spezielle Coupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.|
+|8 | PAYBACK | Payback Papiercoupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.|
 
 ### Codebeispiel Crawler
 Siehe BKBot.py -> ``__init__``
@@ -165,13 +165,11 @@ Siehe BKBot.py -> ``__init__``
 # TODOs
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen
 * Die Transparenz bei (mybk) Couponbildern durch gelb ersetzen
-* python-telegram-bot Framework aktualisieren und requirements.txt entsprechend anpassen
-* TG Bilder-ID-Cache: Nicht cachen, wenn fallback-bild verwendet wurde
 * Handling mit Datumsangaben prüfen/verbessern
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
 * resumechannelupdate verbessern
-* Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei "NetworkError"
+* Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei Netzwerkfehlern o.ä.
 * App DB per Proxy in der originalen BK App modifizieren?
 
 # Feature Ideen
@@ -316,20 +314,20 @@ Feedback Codes sind ...
 
 Tabelle: Buchstabencodes für alle Monate:
   
-Monat | Code
---- | ---
-Januar | BB
-Februar | LS
-März | JH
-April | PL
-Mail | BK
-Juni | WH
-Juli | FF
-August | BF
-September | CF
-Oktober | CK
-November | CB
-Dezember | VM
+| Monat     | Code |
+|-----------|------|
+| Januar    | BB   |
+| Februar   | LS   |
+| März      | JH   |
+| April     | PL   |
+| Mail      | BK   |
+| Juni      | WH   |
+| Juli      | FF   |
+| August    | BF   |
+| September | CF   |
+| Oktober   | CK   |
+| November  | CB   |
+| Dezember  | VM   |
 
 ### Online Vorbestellung Recherche
 Über die BK App kann man in einigen Filialen [online vorbestellen](https://www.bundesverband-systemgastronomie.de/de/bdsnachricht/schnell-einfach-flexibel-bestellen-abholen-bei-burger-king-r.html).  

@@ -126,13 +126,14 @@ class BKBot:
         self.application = Application.builder().token(self.cfg.bot_token).read_timeout(30).write_timeout(30).build()
         self.initHandlers()
         self.application.add_error_handler(self.botErrorCallback)
-        # self.lock = asyncio.Lock()
         self.statsCached: Union[UserStats, None] = None
         self.statsCachedTimestamp: float = -1
 
     def initHandlers(self):
         """ Adds all handlers to dispatcher (not error_handlers!!) """
         # Main conversation handler - handles nearly all bot menus.
+        # fallbackMsgHandler = MessageHandler(filters.TEXT, self.botConfused)
+        # fallbackMsgHandler2 = MessageHandler(filters.TEXT and (~filters.COMMAND), self.botConfused)
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', self.botDisplayMenuMain), CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND),
                           CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND), CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND),
@@ -143,7 +144,6 @@ class BKBot:
             states={
                 CallbackVars.MENU_MAIN: [
                     # Main menu
-                    # CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.MENU_MAIN + '$'),  # E.g. "back" button on error -> Go back to main menu
                     CallbackQueryHandler(self.botDisplayAllCouponsListWithFullTitles, pattern='^' + CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES + '$'),
                     CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
                     CallbackQueryHandler(self.botDisplayCouponsWithImagesFavorites, pattern='^' + CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES + '$'),
@@ -151,7 +151,7 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplayFeedbackCodes, pattern='^' + CallbackVars.MENU_FEEDBACK_CODES + '$'),
                     CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
                     CallbackQueryHandler(self.botDisplayPaybackCard, pattern='^' + CallbackVars.MENU_DISPLAY_PAYBACK_CARD + '$'),
-                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$')
+                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$'),
                 ],
                 CallbackVars.MENU_OFFERS: [
                     CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
@@ -820,7 +820,7 @@ class BKBot:
         else:
             menuText = f'<b>\"Dann geh doch zu Netto!\"</b>\nAntworte mit deiner Benutzer-ID <b>{update.effective_user.id}</b>, um deine Benutzerdaten <b>endgültig</b> vom Server zu löschen.'
             await self.editOrSendMessage(update, text=menuText, parse_mode='HTML',
-                                         reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton("Doch nicht", callback_data=callbackBackButton)]]))
+                                         reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton("Doch nicht!", callback_data=callbackBackButton)]]))
 
     async def botUserDeleteAccount(self, update: Update, context: CallbackContext):
         """ Deletes users' account from DB. """
@@ -1112,6 +1112,13 @@ class BKBot:
                                  reply_markup=replyMarkup)
         return CallbackVars.MENU_DISPLAY_PAYBACK_CARD
 
+    async def botConfused(self, update: Update, context: CallbackContext):
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        query = update.callback_query
+        if query is not None:
+            await query.answer()
+        await self.sendMessage(chat_id=update.effective_user.id, text='Ich nix verstehen.')
+
     async def botAdminToggleMaintenanceMode(self, update: Update, context: CallbackContext):
         user = getUserFromDB(userDB=self.crawler.getUserDB(), userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         self.adminOrException(user)
@@ -1299,6 +1306,7 @@ class BKBot:
         await cleanupCache(self.couponImageCache)
         await cleanupCache(self.couponImageQRCache)
         await cleanupCache(self.offerImageCache)
+        logging.info('Cleanup caches done.')
 
     async def sendCouponOverviewWithChannelLinks(self, chat_id: Union[int, str], coupons: dict, useLongCouponTitles: bool, channelDB: Database, infoDB: Union[None, Database],
                                                  infoDBDoc: Union[None, InfoEntry]):
