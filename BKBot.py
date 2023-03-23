@@ -61,9 +61,9 @@ MAX_CACHE_AGE_SECONDS = 7 * 24 * 60 * 60
 async def cleanupCache(cacheDict: dict):
     cacheDictCopy = cacheDict.copy()
     for cacheID, cacheData in cacheDictCopy.items():
-        cacheItemAge = datetime.now().timestamp() - cacheData.timestampLastUsed
-        if cacheItemAge > MAX_CACHE_AGE_SECONDS:
-            logging.info("Deleting cache item " + str(cacheID) + " as it was last used before: " + str(cacheItemAge) + " seconds")
+        cacheItemAgeSeconds = datetime.now().timestamp() - cacheData.timestampLastUsed
+        if cacheItemAgeSeconds > MAX_CACHE_AGE_SECONDS:
+            logging.info(f"Deleting cache item {cacheID} as it was last used before: {cacheItemAgeSeconds} seconds")
             del cacheDict[cacheID]
 
 
@@ -945,11 +945,11 @@ class BKBot:
         if cachedImageData is not None:
             # Re-use cached image_id and update cache timestamp
             cachedImageData.updateLastUsedTimestamp()
-            logging.debug("Returning coupon image file_id: " + cachedImageData.imageFileID)
+            logging.debug(f"Returning coupon image file_id: {cachedImageData.imageFileID}")
             return cachedImageData.imageFileID
         elif isValidImageFile(imagePath):
             # Return image file
-            logging.debug("Returning coupon image file in path: " + imagePath)
+            logging.debug(f"Returning coupon image file in path: {imagePath}")
             return open(imagePath, mode='rb')
         else:
             # Return fallback image file -> Should usually not be required!
