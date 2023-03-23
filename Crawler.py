@@ -1,6 +1,5 @@
 import csv
 import logging
-import re
 import traceback
 from typing import List
 
@@ -21,7 +20,7 @@ from UtilsCoupons2 import coupon2GetDatetimeFromString, coupon2FixProductTitle
 from UtilsOffers import offerGetImagePath, offerIsValid
 from UtilsCoupons import couponGetUniqueCouponID, couponGetTitleFull, \
     couponGetExpireDatetime, couponGetStartTimestamp
-from UtilsCouponsDB import Coupon, InfoEntry, CouponFilter, getCouponTitleMapping, User, removeDuplicatedCoupons, sortCoupons, CouponSortModes
+from UtilsCouponsDB import Coupon, InfoEntry, CouponFilter, getCouponTitleMapping, User, removeDuplicatedCoupons, sortCoupons
 from CouponCategory import CouponCategory
 
 HEADERS_OLD = {"User-Agent": "BurgerKing/6.7.0 (de.burgerking.kingfinder; build:432; Android 8.0.0) okhttp/3.12.3"}
@@ -206,14 +205,18 @@ class BKCrawler:
         """ Downloads coupons images and generates QR codes for current productive coupon DB. """
         timestampStart = datetime.now().timestamp()
         couponDB = self.getCouponDB()
-        numberofDownloadedImages = 0
+        # Step 1: Create QR images
+        coupons = []
         for uniqueCouponID in couponDB:
             coupon = Coupon.load(couponDB, uniqueCouponID)
+            coupons.append(coupon)
+            generateQRImageIfNonExistant(uniqueCouponID, coupon.getImagePathQR())
+        # Step 2: Download coupon images
+        numberofDownloadedImages = 0
+        for coupon in coupons:
             if downloadCouponImageIfNonExistant(coupon):
                 numberofDownloadedImages += 1
-            generateQRImageIfNonExistant(uniqueCouponID, coupon.getImagePathQR())
-        logging.info("Number of coupon images downloaded: " + str(numberofDownloadedImages))
-        logging.info("Download image files duration: " + getFormattedPassedTime(timestampStart))
+        logging.info(f"Number of coupon images downloaded: {numberofDownloadedImages} |Duration: {getFormattedPassedTime(timestampStart)}")
 
     def migrateDBs(self):
         """ Migrate DBs from old to new version - leave this function empty if there is nothing to migrate. """
@@ -404,8 +407,13 @@ class BKCrawler:
                 index += 1
 
         logging.info(f'Coupons in app total: {len(appCoupons)}')
-        logging.info(f'Coupons in app not yet active: {len(appCouponsNotYetActive)} | {appCouponsNotYetActive}')
-        logging.info(f'Total coupons1 crawl time: {getFormattedPassedTime(timestampCrawlStart)}')
+        logging.info(f'Coupons in app not yet active: {len(appCouponsNotYetActive)}')
+        if len(appCouponsNotYetActive) > 0:
+            logging.info('**************************')
+            for coupon in appCouponsNotYetActive:
+                logging.info(coupon)
+            logging.info('**************************')
+        logging.info(f'Total coupons crawl time: {getFormattedPassedTime(timestampCrawlStart)}')
 
     def crawlCoupons1OLD_DEPRECATED(self, apiResponse: dict, crawledCouponsDict: dict):
         """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
@@ -813,7 +821,7 @@ class BKCrawler:
                 couponsToAddToDB[coupon.id] = coupon
             else:
                 # Filter out incompatible coupons right away so we will need less DB operations later
-                logging.info(f'Do not add invalid/expired/not-yet-active coupon to DB: {coupon.id} + | {coupon.plu} | {coupon.title} | {coupon.getPrice()}')
+                logging.info(f'Do not add invalid/expired/not-yet-active coupon to DB: {coupon}')
         logging.info(f'Crawled coupons: {len(crawledCouponsDict)} | To be added to DB: {len(couponsToAddToDB)}')
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
