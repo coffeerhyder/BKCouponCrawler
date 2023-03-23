@@ -1253,7 +1253,7 @@ class BKBot:
         if self.getPublicChannelName() is not None:
             await self.cleanupPublicChannel()
         await self.cleanupCaches()
-        logging.info('Batch process done')
+        logging.info('Batch process done.')
 
     def crawl(self):
         try:
