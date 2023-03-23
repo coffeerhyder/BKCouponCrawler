@@ -473,6 +473,7 @@ class Coupon(Document):
             return open(path, mode='rb')
         else:
             # Return fallback --> This should never happen!
+            logging.warning(f'Returning fallback QR image for: {path}')
             return open('media/fallback_image_missing_qr_image.jpeg', mode='rb')
 
     def generateCouponShortText(self, highlightIfNew: bool, includeVeggieSymbol: bool) -> str:

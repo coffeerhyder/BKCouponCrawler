@@ -963,7 +963,7 @@ class BKBot:
         if cachedQRImageData is not None:
             # Return cached image_id and update cache timestamp
             cachedQRImageData.updateLastUsedTimestamp()
-            logging.debug("Returning QR image file_id: " + cachedQRImageData.imageFileID)
+            logging.debug(f"Returning QR image file_id: {cachedQRImageData.imageFileID}")
             return cachedQRImageData.imageFileID
         else:
             # Return image
