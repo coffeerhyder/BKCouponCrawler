@@ -313,8 +313,8 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             msgImage = chatMessages[0]
             msgImageQR = chatMessages[1]
             # Update bot cache
-            bkbot.couponImageCache[coupon.id] = ImageCache(fileID=msgImage.message_id)
-            bkbot.couponImageQRCache[coupon.id] = ImageCache(fileID=msgImageQR.message_id)
+            bkbot.couponImageCache[coupon.id] = ImageCache(fileID=msgImage.photo[0].file_id)
+            bkbot.couponImageQRCache[coupon.id] = ImageCache(fileID=msgImageQR.photo[0].file_id)
             # Update our DB
             channelCoupon.channelMessageID_image = msgImage.message_id
             channelCoupon.channelMessageID_qr = msgImageQR.message_id
