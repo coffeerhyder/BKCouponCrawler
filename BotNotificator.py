@@ -1,13 +1,11 @@
 import asyncio
 import logging
-import time
 import traceback
 from datetime import datetime
 from enum import Enum
-from typing import Union
 
+from couchdb import Database
 from telegram import InputMediaPhoto
-from telegram.error import BadRequest
 from werkzeug.exceptions import Unauthorized
 
 from BotUtils import getBotImpressum, Commands, ImageCache
@@ -313,8 +311,8 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             msgImage = chatMessages[0]
             msgImageQR = chatMessages[1]
             # Update bot cache
-            bkbot.couponImageCache[coupon.id] = ImageCache(fileID=msgImage.message_id)
-            bkbot.couponImageQRCache[coupon.id] = ImageCache(fileID=msgImageQR.message_id)
+            bkbot.couponImageCache[coupon.id] = ImageCache(fileID=msgImage.photo[0].file_id)
+            bkbot.couponImageQRCache[coupon.id] = ImageCache(fileID=msgImageQR.photo[0].file_id)
             # Update our DB
             channelCoupon.channelMessageID_image = msgImage.message_id
             channelCoupon.channelMessageID_qr = msgImageQR.message_id
@@ -389,21 +387,22 @@ async def cleanupChannel(bkbot):
     logging.info("Channel cleanup done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
 
-async def deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc) -> int:
+async def deleteLeftoverMessageIDsToDelete(bkbot, infoDB: Database, infoDoc) -> int:
     """ Deletes all channel messages which were previously flagged for deletion.
      @:returns Number of deleted messages
       """
-    if len(infoDoc.messageIDsToDelete) == 0:
-        return 0
     initialNumberofMsgsToDelete = len(infoDoc.messageIDsToDelete)
-    logging.info("Deleting " + str(initialNumberofMsgsToDelete) + " old messages...")
+    logging.info(f"Deleting {initialNumberofMsgsToDelete} old messages...")
+    if initialNumberofMsgsToDelete == 0:
+        # Do nothing
+        return 0
     index = 0
-    for messageID in infoDoc.messageIDsToDelete[:]:
-        logging.info("Deleting messageID " + str(index + 1) + "/" + str(initialNumberofMsgsToDelete) + " | " + str(messageID))
+    for messageID in infoDoc.messageIDsToDelete:
+        logging.info(f"Deleting messageID {index + 1}/{initialNumberofMsgsToDelete} | {messageID}")
         await asyncio.create_task(bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID))
-        infoDoc.messageIDsToDelete.remove(messageID)
         index += 1
     # Update DB
+    infoDoc.messageIDsToDelete.clear()
     infoDoc.store(infoDB)
     return initialNumberofMsgsToDelete
 

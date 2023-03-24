@@ -872,14 +872,20 @@ class InfoEntry(Document):
     messageIDsToDelete = ListField(IntegerField(), default=[])
     lastMaintenanceModeState = BooleanField()
 
-    def addMessageIDToDelete(self, messageID: int):
+    def addMessageIDToDelete(self, messageID: int) -> bool:
         # Avoid duplicates
         if messageID not in self.messageIDsToDelete:
             self.messageIDsToDelete.append(messageID)
+            return True
+        else:
+            return False
 
-    def addMessageIDsToDelete(self, messageIDs: List):
+    def addMessageIDsToDelete(self, messageIDs: List) -> bool:
+        containsAtLeastOneNewID = False
         for messageID in messageIDs:
-            self.addMessageIDToDelete(messageID)
+            if self.addMessageIDToDelete(messageID):
+                containsAtLeastOneNewID = True
+        return containsAtLeastOneNewID
 
     def addCouponCategoryMessageID(self, couponType: int, messageID: int):
         self.couponTypeOverviewMessageIDs.setdefault(couponType, []).append(messageID)

@@ -1317,10 +1317,14 @@ class BKBot:
             oldCategoryMsgIDs = infoDBDoc.getAllCouponCategoryMessageIDs()
             if len(oldCategoryMsgIDs) > 0:
                 logging.info("Saving coupon category messageIDs for deletion: " + str(oldCategoryMsgIDs))
-                infoDBDoc.addMessageIDsToDelete(oldCategoryMsgIDs)
-                infoDBDoc.deleteAllCouponCategoryMessageIDs()
-                # Update DB
-                infoDBDoc.store(infoDB)
+                addedNewMessageIDsToDelete = infoDBDoc.addMessageIDsToDelete(oldCategoryMsgIDs)
+                deletedOldCouponOverviewMessageIDs = False
+                if infoDBDoc.couponTypeOverviewMessageIDs is not None and len(infoDBDoc.couponTypeOverviewMessageIDs) > 0:
+                    infoDBDoc.deleteAllCouponCategoryMessageIDs()
+                    deletedOldCouponOverviewMessageIDs = True
+                # Update DB if item has changed
+                if addedNewMessageIDsToDelete or deletedOldCouponOverviewMessageIDs:
+                    infoDBDoc.store(infoDB)
         """ Re-send coupon overview(s), spread this information on multiple pages if needed. """
         couponOverviewCounter = 1
         for couponType, coupons in couponsSeparatedByType.items():
@@ -1383,11 +1387,11 @@ class BKBot:
                     if couponIndex == len(coupons) - 1:
                         break
                 # Send new post containing current page
-                msg = await asyncio.create_task(self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
+                couponCategoryOverviewMessage = await asyncio.create_task(self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
                                                                  disable_notification=True))
                 if infoDBDoc is not None:
                     # Update DB
-                    infoDBDoc.addCouponCategoryMessageID(couponType, msg.message_id)
+                    infoDBDoc.addCouponCategoryMessageID(couponType, couponCategoryOverviewMessage.message_id)
                     infoDBDoc.lastMaintenanceModeState = self.maintenanceMode
                     infoDBDoc.store(infoDB)
             couponOverviewCounter += 1
