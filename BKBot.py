@@ -466,7 +466,7 @@ class BKBot:
                 if couponTypeStr is not None and len(couponTypeStr) > 0:
                     couponFilter.allowedCouponTypes = [int(couponTypeStr)]
                 # First we only want to filter coupons. Sort them later according to user preference -> Needs less CPU cycles.
-                if couponFilter.isHidden is None and user.settings.displayHiddenAppCouponsWithinGenericCategories is False:
+                if couponFilter.isHidden is None and user.settings.displayHiddenUpsellingAppCouponsWithinGenericCategories is False:
                     # User does not want to see hidden coupons within generic categories
                     couponFilter.isHidden = False
                 if couponFilter.isPlantBased is None and user.settings.displayPlantBasedCouponsWithinGenericCategories is False:

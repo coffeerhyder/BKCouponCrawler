@@ -630,7 +630,7 @@ class User(Document):
             displayFeedbackCodeGenerator=BooleanField(default=True),
             displayFAQLinkButton=BooleanField(default=True),
             displayPlantBasedCouponsWithinGenericCategories=BooleanField(default=True),
-            displayHiddenAppCouponsWithinGenericCategories=BooleanField(default=False),
+            displayHiddenUpsellingAppCouponsWithinGenericCategories=BooleanField(default=True),
             hideDuplicates=BooleanField(default=False),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
@@ -1067,10 +1067,10 @@ USER_SETTINGS_ON_OFF = {
         "description": "Plant Based Coupons in Kategorien zeigen",
         "default": True
     },
-    "displayHiddenAppCouponsWithinGenericCategories": {
+    "displayHiddenUpsellingAppCouponsWithinGenericCategories": {
         "category": SettingCategories.GLOBAL_FILTERS,
         "description": "Versteckte App Coupons in Kategorien zeigen*¹",
-        "default": False
+        "default": True
     },
     "hideDuplicates": {
         "category": SettingCategories.GLOBAL_FILTERS,
