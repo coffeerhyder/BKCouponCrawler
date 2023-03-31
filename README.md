@@ -163,6 +163,7 @@ optional arguments:
 Siehe BKBot.py -> ``__init__``
 
 # TODOs
+* Benachrichtigung bei neuen Coupons prüfen -> Regression?
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen
 * Die Transparenz bei (mybk) Couponbildern durch gelb ersetzen
 * Handling mit Datumsangaben prüfen/verbessern
