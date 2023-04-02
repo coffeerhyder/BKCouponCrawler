@@ -448,6 +448,12 @@ class BKBot:
         """ Displays all coupons in a pre selected mode """
         # Important! This is required so that we can e.g. jump from "Category 'App coupons' page 2 display single coupon" back into "Category 'App coupons' page 2"
         callbackVar += "&cb=" + urllib.parse.quote(callbackVar)
+        """ 2023-04-02:
+         Log output to find cause of:
+             view = getCouponViewByIndex(index=int(urlinfo["m"]))
+            ValueError: invalid literal for int() with base 10: 'v'
+         """
+        logging.info(f'{callbackVar=}')
         urlquery = furl(callbackVar)
         urlinfo = urlquery.args
         view = getCouponViewByIndex(index=int(urlinfo["m"]))
