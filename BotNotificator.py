@@ -401,8 +401,8 @@ async def deleteLeftoverMessageIDsToDelete(bkbot, infoDB: Database, infoDoc) -> 
         logging.info(f"Deleting messageID {index + 1}/{initialNumberofMsgsToDelete} | {messageID}")
         await asyncio.create_task(bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID))
         index += 1
-    # Update DB
-    infoDoc.messageIDsToDelete.clear()
+    # Update DB so we won't try to delete the same messages again next time
+    infoDoc.messageIDsToDelete = []
     infoDoc.store(infoDB)
     return initialNumberofMsgsToDelete
 

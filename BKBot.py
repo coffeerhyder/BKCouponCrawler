@@ -448,6 +448,12 @@ class BKBot:
         """ Displays all coupons in a pre selected mode """
         # Important! This is required so that we can e.g. jump from "Category 'App coupons' page 2 display single coupon" back into "Category 'App coupons' page 2"
         callbackVar += "&cb=" + urllib.parse.quote(callbackVar)
+        """ 2023-04-02:
+         Log output to find cause of:
+             view = getCouponViewByIndex(index=int(urlinfo["m"]))
+            ValueError: invalid literal for int() with base 10: 'v'
+         """
+        logging.info(f'{callbackVar=}')
         urlquery = furl(callbackVar)
         urlinfo = urlquery.args
         view = getCouponViewByIndex(index=int(urlinfo["m"]))
@@ -466,7 +472,7 @@ class BKBot:
                 if couponTypeStr is not None and len(couponTypeStr) > 0:
                     couponFilter.allowedCouponTypes = [int(couponTypeStr)]
                 # First we only want to filter coupons. Sort them later according to user preference -> Needs less CPU cycles.
-                if couponFilter.isHidden is None and user.settings.displayHiddenAppCouponsWithinGenericCategories is False:
+                if couponFilter.isHidden is None and user.settings.displayHiddenUpsellingAppCouponsWithinGenericCategories is False:
                     # User does not want to see hidden coupons within generic categories
                     couponFilter.isHidden = False
                 if couponFilter.isPlantBased is None and user.settings.displayPlantBasedCouponsWithinGenericCategories is False:
@@ -1506,24 +1512,34 @@ class BKBot:
         return getUserFromDB(self.crawler.getUserDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
 
 
-async def runDaily(hour: int, minute: int, func: Coroutine):
+async def dailyRoutine(hour: int, minute: int, bkbot):
     """ Runs task daily at specific time.
      Does not catch up run if desired time has already passed on the day this is executed first time.
      """
+    ranOnce = False
+    debug = False
     while True:
         now = datetime.now()
         todayAtTargetTime = datetime(now.year, now.month, now.day, hour, minute)
         timediffToday = todayAtTargetTime - now
         if timediffToday.total_seconds() >= 0:
             print(f"Daily batch execution will happen at {hour}:{minute} TODAY in {timediffToday}")
-            await asyncio.sleep(timediffToday.total_seconds())
+            waitSeconds = timediffToday.total_seconds()
         else:
             # Target time was already today -> Wait for same time next day
             tomorrowAtTargetTime = todayAtTargetTime + timedelta(days=1)
             timediffTomorrow = tomorrowAtTargetTime - now
             print(f"Daily batch execution will happen at {hour}:{minute} TOMORROW in {timediffTomorrow}")
-            await asyncio.sleep(timediffTomorrow.total_seconds())
-        await func
+            waitSeconds = timediffTomorrow.total_seconds()
+        if debug:
+            if ranOnce:
+                waitSeconds = 300
+                print(f"Debug: Only waiting a short time seconds: {waitSeconds}")
+            else:
+                waitSeconds = 0
+        await asyncio.sleep(waitSeconds)
+        await bkbot.batchProcess()
+        ranOnce = True
 
 
 def main():
@@ -1549,7 +1565,7 @@ def main():
         bkbot.crawler.migrateDBs()
     if bkbot.args.usernotify:
         loop.create_task(bkbot.notifyUsers())
-    loop.create_task(runDaily(0, 1, bkbot.batchProcess()))
+    loop.create_task(dailyRoutine(0, 1, bkbot))
     bkbot.startBot()
 
 

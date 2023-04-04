@@ -87,6 +87,16 @@
       "expire_date": "2022-03-27",
       "isNewUntilDate": "2022-03-03",
 	  "description": "Danke an: mydealz.de/deals/payback-10fach-15fach-auf-alle-speisen-und-getranke-bei-burger-king-gultig-bis-27032022-1956584"
+    },
+    {
+      "uniqueID": "99128",
+	  "plu": "99128",
+      "paybackMultiplicator": 6,
+      "source": 8,
+      "imageURL": "file://media/extra_coupons_pics/2023_04_23_Payback_99128.jpg",
+      "expire_date": "2023-04-23",
+      "isNewUntilDate": "2023-04-05",
+	  "description": "Danke an: mydealz.de/deals/burger-king-6-fach-payback-punkte-coupon-auf-alle-speisen-getranke-bis-23042023-2153505"
     }
   ]
 }
