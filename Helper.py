@@ -423,7 +423,7 @@ class CouponType:
     SPECIAL = 7
     PAYBACK = 8
 
-
+# TODO: Remove this
 BotAllowedCouponTypes = [CouponType.APP, CouponType.PAPER, CouponType.SPECIAL, CouponType.PAYBACK]
 
 

@@ -101,7 +101,8 @@ class CouponView:
     def getFilter(self) -> CouponFilter:
         return self.couponfilter
 
-    def __init__(self, couponfilter: CouponFilter, includeVeggieSymbol: Union[bool, None] = None, highlightFavorites: Union[bool, None] = None, allowModifyFilter: bool = True, title: str = None):
+    def __init__(self, couponfilter: CouponFilter, includeVeggieSymbol: Union[bool, None] = None, highlightFavorites: Union[bool, None] = None, allowModifyFilter: bool = True,
+                 title: str = None):
         self.title = title
         self.couponfilter = couponfilter
         self.includeVeggieSymbol = includeVeggieSymbol
@@ -127,10 +128,12 @@ class CouponViews:
     CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
     HIDDEN_APP_COUPONS_ONLY = CouponView(
         couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], isHidden=True), title="App Coupons versteckte")
-    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isVeggie=True), includeVeggieSymbol=False, title=f"{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}")
+    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isVeggie=True), includeVeggieSymbol=False,
+                        title=f"{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}")
     MEAT_WITHOUT_PLANT_BASED = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isPlantBased=False), title="Fleisch ohne Plant Based Coupons")
     # Dummy item basically only used for holding default sortCode for users' favorites
-    FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode()), highlightFavorites=False, allowModifyFilter=False, title=f"{SYMBOLS.STAR}Favoriten{SYMBOLS.STAR}")
+    FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode()), highlightFavorites=False, allowModifyFilter=False,
+                           title=f"{SYMBOLS.STAR}Favoriten{SYMBOLS.STAR}")
 
 
 def getAllCouponViews() -> List[CouponView]:
@@ -183,7 +186,7 @@ class Coupon(Document):
     viewID = TextField()
 
     def __str__(self):
-        return f'{self.id} + | {self.plu} | {self.title} | {self.getPrice()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}'
+        return f'{self.id} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}'
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -207,19 +210,33 @@ class Coupon(Document):
 
     def getTitle(self):
         if self.paybackMultiplicator is not None:
-            return f'{self.paybackMultiplicator}Fach auf jede Bestellung'
+            return f'{self.paybackMultiplicator}Fach auf alle Speisen & Getränke!'
         else:
             return self.title
 
     def getTitleShortened(self, includeVeggieSymbol: bool):
-        shortenedTitle = shortenProductNames(self.title)
+        shortenedTitle = shortenProductNames(self.getTitle())
         includeNutritionTypeSymbol = False
         includeMeatSymbol = False
-        if (includeNutritionTypeSymbol or includeMeatSymbol) and self.containsMeat():
-            shortenedTitle = '🥩' + shortenedTitle
-        elif (includeNutritionTypeSymbol or includeVeggieSymbol) and self.isVeggie():
-            shortenedTitle = SYMBOLS.BROCCOLI + shortenedTitle
+        nutritionSymbol = None
+        if includeNutritionTypeSymbol or includeMeatSymbol:
+            nutritionSymbol = self.getNutritionSymbols()
+        elif includeNutritionTypeSymbol or includeVeggieSymbol:
+            nutritionSymbol = self.getNutritionSymbols()
+        if nutritionSymbol is not None:
+            shortenedTitle = nutritionSymbol + shortenedTitle
         return shortenedTitle
+
+    def getNutritionSymbols(self):
+        if not self.isEatable():
+            return None
+        enableMeatSymbol = False
+        if enableMeatSymbol and self.containsMeat():
+            return '🥩'
+        elif self.isVeggie():
+            return SYMBOLS.BROCCOLI
+        else:
+            return None
 
     def isExpiredForLongerTime(self):
         """ Using this check, coupons that e.g. expire on midnight and get elongated will not be marked as new because really they aren't. """
@@ -264,7 +281,7 @@ class Coupon(Document):
             return True
 
     def isContainsFriesAndDrink(self) -> bool:
-        return couponTitleContainsFriesAndDrink(self.title)
+        return couponTitleContainsFriesAndDrink(self.getTitle())
 
     def isPlantBased(self) -> bool:
         if self.tags is not None:
@@ -272,7 +289,7 @@ class Coupon(Document):
                 tag = tag.lower()
                 if tag == 'plantbased':
                     return True
-        if couponTitleContainsPlantBasedFood(self.title):
+        if couponTitleContainsPlantBasedFood(self.getTitle()):
             return True
         else:
             return False
@@ -288,7 +305,7 @@ class Coupon(Document):
             return False
         elif self.isPlantBased():
             return True
-        elif couponTitleContainsVeggieFood(self.title):
+        elif couponTitleContainsVeggieFood(self.getTitle()):
             # No result? Fallback to other, more unsafe methods.
             return True
         else:
@@ -315,7 +332,7 @@ class Coupon(Document):
                 if tag == 'beef' or tag == 'chicken':
                     return True
 
-        titleLower = self.title.lower()
+        titleLower = self.getTitle().lower()
         if 'chicken' in titleLower:
             return True
         else:
@@ -331,6 +348,7 @@ class Coupon(Document):
         return self.price
 
     def getPriceCompare(self) -> Union[float, None]:
+        """ Returns original price of this product (or all product it contains) without discount. """
         return self.priceCompare
 
     def isEatable(self) -> bool:
@@ -349,7 +367,10 @@ class Coupon(Document):
     def isNewCoupon(self) -> bool:
         """ Determines whether or not this coupon is considered 'new'. """
         currentTimestamp = getCurrentDate().timestamp()
+        timePassedSinceCouponWasAddedToDB = currentTimestamp - self.timestampAddedToDB
         timePassedSinceLastNewTimestamp = currentTimestamp - self.timestampIsNew
+        if timePassedSinceCouponWasAddedToDB < COUPON_IS_NEW_FOR_SECONDS:
+            return True
         if timePassedSinceLastNewTimestamp < COUPON_IS_NEW_FOR_SECONDS:
             # Coupon has been added just recently and thus can still be considered 'new'
             # couponNewSecondsRemaining = COUPON_IS_NEW_FOR_SECONDS - timePassedSinceLastNewTimestamp
@@ -399,7 +420,7 @@ class Coupon(Document):
         else:
             return fallback
 
-    def getPriceFormatted(self, fallback=None) -> Union[str, None]:
+    def getPriceFormatted(self, fallback: Union[str, None] = None) -> Union[str, None]:
         if self.price is not None:
             return formatPrice(self.price)
         else:
@@ -989,6 +1010,7 @@ def getCouponTitleMapping(coupons: Union[dict, list]) -> dict:
     for coupon in coupons:
         couponTitleMappingTmp.setdefault(coupon.getNormalizedTitle(), []).append(coupon)
     return couponTitleMappingTmp
+
 
 class SettingCategory:
 

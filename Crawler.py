@@ -341,11 +341,14 @@ class BKCrawler:
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP)
                 coupon.viewID = couponBK.get('_id')
-                tagsStringArray = []
-                offerTags = couponBK['offerTags']
-                for offerTag in offerTags:
-                    tagsStringArray.append(offerTag['value'])
-                coupon.tags = tagsStringArray
+                offerTags = couponBK.get('offerTags')
+                if offerTags is not None and len(offerTags) > 0:
+                    tagsStringArray = []
+                    for offerTag in offerTags:
+                        tagsStringArray.append(offerTag['value'])
+                    coupon.tags = tagsStringArray
+                else:
+                    logging.info(f'Detected coupon without tags: {coupon.viewID}')
                 if index > 0:
                     # First item = Real coupon, all others = upsell/"hidden" coupon(s)
                     coupon.isHidden = True
@@ -409,11 +412,12 @@ class BKCrawler:
         logging.info(f'Coupons in app total: {len(appCoupons)}')
         logging.info(f'Coupons in app not yet active: {len(appCouponsNotYetActive)}')
         if len(appCouponsNotYetActive) > 0:
-            logging.info('**************************')
+            logging.info(getLogSeparatorString())
             for coupon in appCouponsNotYetActive:
                 logging.info(coupon)
-            logging.info('**************************')
+            logging.info(getLogSeparatorString())
         logging.info(f'Total coupons crawl time: {getFormattedPassedTime(timestampCrawlStart)}')
+
 
     def crawlCoupons1OLD_DEPRECATED(self, apiResponse: dict, crawledCouponsDict: dict):
         """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
@@ -666,7 +670,6 @@ class BKCrawler:
         for extraCouponJson in extraCouponsJson:
             coupon = Coupon.wrap(extraCouponJson)
             coupon.id = coupon.uniqueID  # Set custom uniqueID otherwise couchDB will create one later -> This is not what we want to happen!!
-            coupon.title = sanitizeCouponTitle(coupon.title)
             expiredateStr = extraCouponJson["expire_date"] + " 23:59:59"
             expiredate = datetime.strptime(expiredateStr, '%Y-%m-%d %H:%M:%S').astimezone(getTimezone())
             coupon.timestampExpire = expiredate.timestamp()
@@ -816,11 +819,16 @@ class BKCrawler:
         # Collect items we want to add to DB
         couponsToAddToDB = {}
         # Get rid of invalid coupons so we won't even bother adding them to our DB.
+        invalidCoupons = []
         for coupon in crawledCouponsDict.values():
             if coupon.isValid():
                 couponsToAddToDB[coupon.id] = coupon
             else:
-                # Filter out incompatible coupons right away so we will need less DB operations later
+                # Collect invalid coupons for logging purposes.
+                invalidCoupons.append(coupon)
+        if len(invalidCoupons) > 0:
+            logging.info(getLogSeparatorString())
+            for coupon in invalidCoupons:
                 logging.info(f'Do not add invalid/expired/not-yet-active coupon to DB: {coupon}')
         logging.info(f'Crawled coupons: {len(crawledCouponsDict)} | To be added to DB: {len(couponsToAddToDB)}')
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
@@ -1379,6 +1387,10 @@ def getCouponMappingForCrawler() -> dict:
                 paperCouponMapping[uniquePaperCouponID] = Coupon(id=uniquePaperCouponID, type=CouponType.PAPER, plu=plu, timestampExpire=expireTimestamp,
                                                                  dateFormattedExpire=formatDateGerman(expireTimestamp))
     return paperCouponMapping
+
+
+def getLogSeparatorString() -> str:
+    return '**************************'
 
 
 if __name__ == '__main__':
