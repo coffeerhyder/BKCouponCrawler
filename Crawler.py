@@ -1175,7 +1175,7 @@ class BKCrawler:
                     crawledCoupon.timestampIsNew = getCurrentDate().timestamp()
                 dbUpdates.append(crawledCoupon)
                 newCouponIDs.append(crawledCoupon.id)
-        logging.info('Pushing ' + str(len(dbUpdates)) + ' coupon DB updates')
+        logging.info(f'Pushing {len(dbUpdates)} coupon DB updates')
         couponDB.update(dbUpdates)
         self.updateCachedMissingPaperCouponsInfo(couponDB)
         logging.info("Coupons new IDs: " + str(numberofCouponsNew))

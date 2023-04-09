@@ -368,15 +368,20 @@ class Coupon(Document):
         """ Determines whether or not this coupon is considered 'new'. """
         currentTimestamp = getCurrentDate().timestamp()
         timePassedSinceCouponWasAddedToDB = currentTimestamp - self.timestampAddedToDB
-        timePassedSinceLastNewTimestamp = currentTimestamp - self.timestampIsNew
         if timePassedSinceCouponWasAddedToDB < COUPON_IS_NEW_FOR_SECONDS:
             return True
+        timePassedSinceLastNewTimestamp = currentTimestamp - self.timestampIsNew
         if timePassedSinceLastNewTimestamp < COUPON_IS_NEW_FOR_SECONDS:
             # Coupon has been added just recently and thus can still be considered 'new'
             # couponNewSecondsRemaining = COUPON_IS_NEW_FOR_SECONDS - timePassedSinceLastNewTimestamp
             # print(f'Coupon is considered as new for {formatSeconds(seconds=couponNewSecondsRemaining)} time')
             return True
-        elif self.isNewUntilDate is not None:
+        timePassedSinceCouponValidityStarted = -1
+        if self.timestampStart is not None and self.timestampStart > 0:
+            timePassedSinceCouponValidityStarted = currentTimestamp - self.timestampStart
+        if 0 < timePassedSinceCouponValidityStarted < COUPON_IS_NEW_FOR_SECONDS:
+            return True
+        if self.isNewUntilDate is not None:
             # Check if maybe coupon should be considered as new for X
             try:
                 enforceIsNewOverrideUntilDate = datetime.strptime(self.isNewUntilDate + ' 23:59:59',

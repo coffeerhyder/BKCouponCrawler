@@ -1,12 +1,10 @@
 import asyncio
 import logging
-import traceback
 from datetime import datetime
 from enum import Enum
 
 from couchdb import Database
 from telegram import InputMediaPhoto
-from werkzeug.exceptions import Unauthorized
 
 from BotUtils import getBotImpressum, Commands, ImageCache
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes, formatSeconds
@@ -46,6 +44,7 @@ async def notifyUsersAboutNewCoupons(bkbot) -> None:
     usersNotify = {}
     numberofFavoriteNotifications = 0
     numberofNewCouponsNotifications = 0
+    logging.info('Computing new coupons\' notification messages...')
     for userIDStr in userDB:
         user = User.load(userDB, userIDStr)
         usertext = ""
@@ -126,29 +125,11 @@ async def notifyUsersAboutNewCoupons(bkbot) -> None:
         userDB.update(list(dbUserFavoritesUpdates))
     logging.info(f"Notifying {len(usersNotify)} users about favorites/new coupons")
     position = 0
-    dbUserUpdates = []
     for userIDStr, postText in usersNotify.items():
         position += 1
         logging.info("Sending user notification " + str(position) + "/" + str(len(usersNotify)) + " to user: " + userIDStr)
         user = User.load(userDB, userIDStr)
-        try:
-            await bkbot.sendMessage(chat_id=userIDStr, text=postText, parse_mode='HTML', disable_web_page_preview=True)
-            if user.botBlockedCounter > 0:
-                """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
-                This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
-                """
-                user.updateActivityTimestamp(force=True)
-                dbUserUpdates.append(user)
-        except Unauthorized as botBlocked:
-            # Almost certainly it will be "Forbidden: bot was blocked by the user"
-            traceback.print_exc()
-            logging.info("User blocked bot: " + userIDStr)
-            user.botBlockedCounter += 1
-            user.timestampLastTimeBlockedBot = getCurrentDate().timestamp()
-            dbUserUpdates.append(user)
-    if len(dbUserUpdates) > 0:
-        logging.info("Pushing DB updates for users who have blocked/unblocked bot: " + str(len(dbUserUpdates)))
-        userDB.update(dbUserUpdates)
+        await bkbot.sendMessageWithUserBlockedHandling(user=user, userDB=userDB, text=postText, parse_mode='HTML', disable_web_page_preview=True)
     logging.info("New coupons notifications done | Duration: " + getFormattedPassedTime(timestampStart))
 
 
@@ -179,19 +160,7 @@ async def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
                 text += f'\nDies ist Warnung {user.timesInformedAboutUpcomingAutoAccountDeletion}/{MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION}.'
             text += '\nÖffne das Hauptmenü einmalig mit /start, um dem Bot zu zeigen, dass du noch lebst.'
             text += f'\nWahlweise kannst du deinen Account mit /{Commands.DELETE_ACCOUNT} selbst löschen.'
-            try:
-                await bkbot.sendMessage(chat_id=user.id, text=text, parse_mode='HTML', disable_web_page_preview=True)
-                if user.botBlockedCounter > 0:
-                    # Rare/edge case
-                    """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
-                    This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
-                    """
-                    user.updateActivityTimestamp(force=True)
-            except Unauthorized as botBlocked:
-                # Almost certainly it will be "Forbidden: bot was blocked by the user"
-                logging.info(botBlocked.message + " | User blocked bot | chat_id: " + user.id)
-                user.botBlockedCounter += 1
-                user.timestampLastTimeBlockedBot = getCurrentDate().timestamp()
+            await bkbot.sendMessageWithUserBlockedHandling(user=user, userDB=userDB, text=text, parse_mode='HTML', disable_web_page_preview=True)
             user.store(db=userDB)
             numberOfMessagesSent += 1
     logging.info('Number of users informed about account deletion: ' + str(numberOfMessagesSent))
