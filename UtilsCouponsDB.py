@@ -379,7 +379,7 @@ class Coupon(Document):
         timePassedSinceCouponValidityStarted = -1
         if self.timestampStart is not None and self.timestampStart > 0:
             timePassedSinceCouponValidityStarted = currentTimestamp - self.timestampStart
-        if timePassedSinceCouponValidityStarted < COUPON_IS_NEW_FOR_SECONDS:
+        if 0 < timePassedSinceCouponValidityStarted < COUPON_IS_NEW_FOR_SECONDS:
             return True
         if self.isNewUntilDate is not None:
             # Check if maybe coupon should be considered as new for X
