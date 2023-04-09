@@ -10,7 +10,7 @@ from furl import furl, urllib
 from telegram import Update, InlineKeyboardButton, InputMediaPhoto, Message
 from telegram._utils.defaultvalue import DEFAULT_NONE
 from telegram._utils.types import ReplyMarkup, ODVInput
-from telegram.error import RetryAfter, BadRequest
+from telegram.error import RetryAfter, BadRequest, Forbidden
 from telegram.ext import CommandHandler, CallbackContext, ConversationHandler, CallbackQueryHandler, MessageHandler, Application, filters
 
 from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion
@@ -1441,6 +1441,30 @@ class BKBot:
         return await self.processMessage(chat_id=chat_id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
                                          disable_web_page_preview=disable_web_page_preview,
                                          reply_markup=reply_markup)
+
+    async def sendMessageWithUserBlockedHandling(self, user: User, userDB: Database, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
+                          disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
+                          reply_markup: ReplyMarkup = None
+                          ) -> Union[Message, None]:
+        try:
+            msg = await self.processMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
+                                             disable_web_page_preview=disable_web_page_preview,
+                                             reply_markup=reply_markup)
+            if user.botBlockedCounter > 0:
+                """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
+                This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
+                """
+                user.updateActivityTimestamp(force=True)
+                user.store(db=userDB)
+            elif user.updateActivityTimestamp():
+                user.store(db=userDB)
+            return msg
+        except Forbidden:
+            logging.info(f"User blocked bot: {user.id}")
+            user.botBlockedCounter += 1
+            user.timestampLastTimeBlockedBot = getCurrentDate().timestamp()
+            user.store(db=userDB)
+            return None
 
     async def sendPhoto(self, chat_id: Union[int, str], photo, caption: Union[None, str] = None,
                         parse_mode: Union[None, str] = None, disable_notification: ODVInput[bool] = DEFAULT_NONE,

@@ -163,7 +163,6 @@ optional arguments:
 Siehe BKBot.py -> ``__init__``
 
 # TODOs
-* Benachrichtigung bei neuen Coupons prüfen -> Regression?
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen
 * Die Transparenz bei (mybk) Couponbildern durch gelb ersetzen
 * Handling mit Datumsangaben prüfen/verbessern
@@ -171,10 +170,6 @@ Siehe BKBot.py -> ``__init__``
 * Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei Netzwerkfehlern o.ä.
-* App DB per Proxy in der originalen BK App modifizieren?
-
-# Feature Ideen
-* Einstellung, um abgelaufene Favoriten automatisch löschen zu lassen sonst werden es über die Zeit immer mehr
 
 # Daten für den BotFather (Telegram Bot Konfiguration)
 

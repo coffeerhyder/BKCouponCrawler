@@ -46,31 +46,31 @@
     },
     {
       "uniqueID": "99140",
-	  "plu": "99140",
+	  "plu": null,
       "paybackMultiplicator": 10,
-      "title": "10Fach auf jede Bestellung",
+      "title": null,
       "source": 8,
-      "imageURL": "file://media/extra_coupons_pics/2022_08_28_Payback_99140.jpg",
-      "expire_date": "2022-08-28",
-      "isNewUntilDate": "2022-08-05",
-	  "description": "Danke an: mydealz.de/deals/payback-10fach-punkte-bei-burger-king-auf-alle-speisen-getranke-ab-2eur-gultig-bis-28082022-2024599"
+      "imageURL": "file://media/extra_coupons_pics/2023_04_23_Payback_99140.webp",
+      "expire_date": "2023-04-23",
+      "isNewUntilDate": "2023-04-10",
+	  "description": "Danke an: mydealz.de/deals/payback-2x-10fach-punkte-auf-alle-speisen-getranke-gultig-bis-zum-230423-2157423"
     },
     {
       "uniqueID": "99141",
 	  "plu": null,
       "paybackMultiplicator": 10,
-      "title": "10Fach auf jede Bestellung",
+      "title": null,
       "source": 8,
-      "imageURL": "file://media/extra_coupons_pics/2022_07_31_Payback_99141.jpg",
-      "expire_date": "2022-07-31",
-      "isNewUntilDate": "2022-07-21",
-      "description":  "Danke an: mydealz.de/deals/payback-10fach-punkte-bei-burger-king-auf-alle-speisen-getranke-ab-2eur-gultig-bis-31072022-2010607"
+      "imageURL": "file://media/extra_coupons_pics/2023_04_23_Payback_99141.jpg",
+      "expire_date": "2023-04-23",
+      "isNewUntilDate": "2023-04-10",
+	  "description": "Danke an: mydealz.de/deals/payback-2x-10fach-punkte-auf-alle-speisen-getranke-gultig-bis-zum-230423-2157423"
     },
     {
       "uniqueID": "99144",
 	  "plu": "99144",
       "paybackMultiplicator": 10,
-      "title": "10Fach auf jede Bestellung",
+      "title": null,
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2022_08_28_Payback_99144.jpg",
       "expire_date": "2022-08-28",
@@ -89,8 +89,18 @@
 	  "description": "Danke an: mydealz.de/deals/payback-10fach-15fach-auf-alle-speisen-und-getranke-bei-burger-king-gultig-bis-27032022-1956584"
     },
     {
+      "uniqueID": "99122",
+	  "plu": null,
+      "paybackMultiplicator": 8,
+      "source": 8,
+      "imageURL": "file://media/extra_coupons_pics/2023_04_30_Payback_99122.png",
+      "expire_date": "2023-04-30",
+      "isNewUntilDate": "2023-04-10",
+	  "description": "Danke an Dreistein von mydealz: mydealz.de/deals/burger-king-8fach-payback-punkte-ab-2eur-mew-bis-3004-2157393"
+    },
+    {
       "uniqueID": "99128",
-	  "plu": "99128",
+	  "plu": null,
       "paybackMultiplicator": 6,
       "source": 8,
       "imageURL": "file://media/extra_coupons_pics/2023_04_23_Payback_99128.jpg",
