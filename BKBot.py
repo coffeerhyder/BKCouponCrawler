@@ -428,15 +428,16 @@ class BKBot:
         text += '\nAnzahl User, die den Bot wahrscheinlich geblockt haben: ' + str(userStats.numberofUsersWhoProbablyBlockedBot)
         text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoRecentlyUsedBot)
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
-        text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
+        text += '\nAnzahl gültige Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
-        text += f'\nStatistiken generiert am: {formatDateGerman(self.statsCachedTimestamp)}'
+        text += f'\nStatistiken generiert am: {formatDateGermanHuman(self.statsCachedTimestamp)}'
         text += '\n---'
         text += '\nDein BetterKing Account:'
         text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
         text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
-        text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt von vom Bot zugestelltem Coupon-Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(
-            user.timestampLastTimeAccountUsed)
+        text += f'\nBot  zuletzt verwendet am: {formatDateGermanHuman(user.timestampLastTimeBotUsed)}'
+        text += f'\nLetzte Benachrichtigung vom Bot erhalten am: {formatDateGermanHuman(user.timestampLastTimeNotificationSentSuccessfully)}'
+        text += f'\n(Alle Datumsangaben zur Bot Verwendung / Benachrichtigungszeitpunkte sind auf {MAX_HOURS_ACTIVITY_TRACKING}h genau)'
         text += '</pre>'
         if loadingMessage is not None:
             await self.editMessage(chat_id=loadingMessage.chat_id, message_id=loadingMessage.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
@@ -1450,13 +1451,7 @@ class BKBot:
             msg = await self.processMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
                                              disable_web_page_preview=disable_web_page_preview,
                                              reply_markup=reply_markup)
-            if user.botBlockedCounter > 0:
-                """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
-                This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
-                """
-                user.updateActivityTimestamp(force=True)
-                user.store(db=userDB)
-            elif user.updateActivityTimestamp():
+            if user.updateNotificationReceivedActivityTimestamp() or user.botBlockedCounter > 0:
                 user.store(db=userDB)
             return msg
         except Forbidden:

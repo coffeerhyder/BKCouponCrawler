@@ -139,12 +139,12 @@ async def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
     for userID in userDB:
         user = User.load(db=userDB, id=userID)
         currentTimestampSeconds = getCurrentDate().timestamp()
-        secondsPassedSinceLastUsage = currentTimestampSeconds - user.timestampLastTimeAccountUsed
-        secondsPassedSinceLastAccountDeletionWarning = currentTimestampSeconds - user.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion
-        if secondsPassedSinceLastUsage >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and secondsPassedSinceLastAccountDeletionWarning > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+        secondsPassedSinceLastAccountActivity = user.getSecondsPassedSinceLastAccountActivity()
+        secondsPassedSinceLastAccountDeletionWarning = getCurrentDate().timestamp() - user.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion
+        if secondsPassedSinceLastAccountActivity >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and secondsPassedSinceLastAccountDeletionWarning > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
             secondsUntilAccountDeletion = user.getSecondsUntilAccountDeletion()
             text = f'{SYMBOLS.WARNING}<b>Achtung!</b>'
-            text += f'\nDu hast diesen Bot seit ca. {formatSeconds(seconds=secondsPassedSinceLastUsage)} nicht mehr verwendet.'
+            text += f'\nDu hast diesen Bot seit ca. {formatSeconds(seconds=secondsPassedSinceLastAccountActivity)} nicht mehr verwendet und keine Benachrichtigungen von ihm erhalten.'
             text += f'\nInaktive Accounts werden nach {formatSeconds(seconds=MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION)} automatisch gelöscht.'
             forceLastWarningText = False
             if secondsUntilAccountDeletion == 0:

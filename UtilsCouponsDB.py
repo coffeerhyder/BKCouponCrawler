@@ -165,7 +165,7 @@ class Coupon(Document):
     title = TextField()
     timestampAddedToDB = FloatField(default=getCurrentDate().timestamp())
     timestampLastModifiedDB = FloatField(default=0)
-    timestampStart = FloatField()
+    timestampStart = FloatField(default=0)
     timestampExpireInternal = FloatField()  # Internal expire-date
     timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
     timestampCouponNotInAPIAnymore = FloatField()
@@ -377,7 +377,7 @@ class Coupon(Document):
             # print(f'Coupon is considered as new for {formatSeconds(seconds=couponNewSecondsRemaining)} time')
             return True
         timePassedSinceCouponValidityStarted = -1
-        if self.timestampStart is not None and self.timestampStart > 0:
+        if self.timestampStart > 0:
             timePassedSinceCouponValidityStarted = currentTimestamp - self.timestampStart
         if 0 < timePassedSinceCouponValidityStarted < COUPON_IS_NEW_FOR_SECONDS:
             return True
@@ -398,7 +398,7 @@ class Coupon(Document):
             return False
 
     def getStartDatetime(self) -> Union[datetime, None]:
-        if self.timestampStart is not None:
+        if self.timestampStart is not None and self.timestampStart > 0:
             return datetime.fromtimestamp(self.timestampStart, getTimezone())
         else:
             # Start date must not always be given
@@ -678,7 +678,8 @@ class User(Document):
         ))
     couponViewSortModes = DictField(default={})
     # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
-    timestampLastTimeAccountUsed = FloatField(default=getCurrentDate().timestamp())
+    timestampLastTimeBotUsed = FloatField(default=getCurrentDate().timestamp())
+    timestampLastTimeNotificationSentSuccessfully = FloatField(default=0)
     timesInformedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
     timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
     timestampLastTimeBlockedBot = IntegerField(default=0)
@@ -845,18 +846,41 @@ class User(Document):
         self.couponViewSortModes[str(couponView.getViewCode())] = sortMode.getSortCode()
 
     def hasRecentlyUsedBot(self) -> bool:
-        if self.timestampLastTimeAccountUsed == 0:
+        if self.timestampLastTimeBotUsed == 0:
+            # User has never used bot - this is nearly impossible unless user has been manually added to DB.
             return False
         else:
             currentTimestamp = getCurrentDate().timestamp()
-            if currentTimestamp - self.timestampLastTimeAccountUsed < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
+            if currentTimestamp - self.timestampLastTimeBotUsed < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
                 return True
             else:
                 return False
 
     def updateActivityTimestamp(self, force: bool = False) -> bool:
         if force or not self.hasRecentlyUsedBot():
-            self.timestampLastTimeAccountUsed = getCurrentDate().timestamp()
+            self.timestampLastTimeBotUsed = getCurrentDate().timestamp()
+            # Reset this as user is active and is not about to be auto deleted
+            self.timesInformedAboutUpcomingAutoAccountDeletion = 0
+            # Reset this because user is using bot so it's obviously not blocked (anymore)
+            self.botBlockedCounter = 0
+            return True
+        else:
+            return False
+
+    def hasRecentlyReceivedBotNotification(self) -> bool:
+        if self.timestampLastTimeNotificationSentSuccessfully == 0:
+            # User has never received notification from bot.
+            return False
+        else:
+            currentTimestamp = getCurrentDate().timestamp()
+            if currentTimestamp - self.timestampLastTimeNotificationSentSuccessfully < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
+                return True
+            else:
+                return False
+
+    def updateNotificationReceivedActivityTimestamp(self, force: bool = False) -> bool:
+        if force or not self.hasRecentlyReceivedBotNotification():
+            self.timestampLastTimeNotificationSentSuccessfully = getCurrentDate().timestamp()
             # Reset this as user is active and is not about to be auto deleted
             self.timesInformedAboutUpcomingAutoAccountDeletion = 0
             # Reset this because user is using bot so it's obviously not blocked (anymore)
@@ -866,20 +890,32 @@ class User(Document):
             return False
 
     def getSecondsUntilAccountDeletion(self) -> float:
-        secondsPassedSinceLastUsage = self.getSecondsPassedSinceLastTimeUsed()
-        if secondsPassedSinceLastUsage > MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
+        secondsPassedSinceLastAccountActivity = self.getSecondsPassedSinceLastAccountActivity()
+        if secondsPassedSinceLastAccountActivity > MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
             # Account can be deleted now
             return 0
         else:
             # Account can be deleted in X seconds
-            return MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - secondsPassedSinceLastUsage
+            return MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - secondsPassedSinceLastAccountActivity
+
+    def getSecondsPassedSinceLastAccountActivity(self) -> float:
+        """ Returns smaller of these two values:
+         - Seconds passed since user used bot last time
+         - Seconds passed since bot sent user notification successfully last time
+         """
+        secondsPassedSinceLastUsage = self.getSecondsPassedSinceLastTimeUsed()
+        secondsPassedSinceLastNotificationSentSuccessfully = self.getSecondsPassedSinceLastTimeNotificationSentSuccessfully()
+        return min(secondsPassedSinceLastUsage, secondsPassedSinceLastNotificationSentSuccessfully)
 
     def getSecondsPassedSinceLastTimeUsed(self) -> float:
-        return getCurrentDate().timestamp() - self.timestampLastTimeAccountUsed
+        return getCurrentDate().timestamp() - self.timestampLastTimeBotUsed
+
+    def getSecondsPassedSinceLastTimeNotificationSentSuccessfully(self) -> float:
+        return getCurrentDate().timestamp() - self.timestampLastTimeNotificationSentSuccessfully
 
     def allowWarningAboutUpcomingAutoAccountDeletion(self) -> bool:
         currentTimestampSeconds = getCurrentDate().timestamp()
-        if currentTimestampSeconds + MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - self.timestampLastTimeAccountUsed <= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and self.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+        if currentTimestampSeconds + MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - self.timestampLastTimeBotUsed <= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and self.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
             return True
         else:
             return False

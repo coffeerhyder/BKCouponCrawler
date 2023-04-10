@@ -163,6 +163,7 @@ optional arguments:
 Siehe BKBot.py -> ``__init__``
 
 # TODOs
+* Zeitberechnungen refactoring: timedelta überall verwenden wo möglich
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen
 * Die Transparenz bei (mybk) Couponbildern durch gelb ersetzen
 * Handling mit Datumsangaben prüfen/verbessern

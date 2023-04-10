@@ -244,7 +244,7 @@ class BKCrawler:
         dummyActivityTimestampSeconds = getCurrentDate().timestamp() - 3 * 24 * 60 * 60
         for userID in userDB:
             user = User.load(userDB, userID)
-            user.timestampLastTimeAccountUsed = dummyActivityTimestampSeconds
+            user.timestampLastTimeBotUsed = dummyActivityTimestampSeconds
             user.store(userDB)
         return
 
@@ -405,7 +405,7 @@ class BKCrawler:
                     coupon.timestampExpire = expiredate2
                 crawledCouponsDict[uniqueCouponID] = coupon
                 appCoupons.append(coupon)
-                if coupon.timestampStart is not None and coupon.timestampStart > datetime.now().timestamp():
+                if coupon.timestampStart > datetime.now().timestamp():
                     appCouponsNotYetActive.append(coupon)
                 index += 1
 
