@@ -362,6 +362,10 @@ class BKBot:
             menuText += '\n<b>Du bist Admin!</b>'
             menuText += '\nAdmin Commands:'
             menuText += '\n/' + Commands.MAINTENANCE + ' - Wartungsmodus toggeln'
+            infoDB = self.crawler.getInfoDB()
+            infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
+            menuText += f'\nLetzter erfolgreicher Crawlvorgang: {formatDateGermanHuman(infoDoc.dateLastSuccessfulCrawlRun)}'
+            menuText += f'\nLetztes erfolgreiches Channelupdate: {formatDateGermanHuman(infoDoc.dateLastSuccessfulChannelUpdate)}'
         query = update.callback_query
         if query is not None:
             await query.answer()
@@ -713,9 +717,9 @@ class BKBot:
             text += "\n" + generateFeedbackCode()
         text += "\nSchreibe einen Code deiner Wahl auf die Rückseite eines BK Kassenbons, um den gratis Artikel zu erhalten."
         text += "\nFalls weder Kassenbon noch Schamgefühl vorhanden sind, hier ein Trick:"
-        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ und lasse dir den Kassenbon geben."
+        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,40€ und lasse dir den Kassenbon geben."
         text += "\nDie Konditionen der Feedback Codes variieren."
-        text += "\nDerzeit gibt es: Gratis Eiswaffel oder Kaffee(klein) [Stand: 14.04.2021]"
+        text += "\nDerzeit gibt es gratis Pommes (klein) oder Kaffee (klein)."
         text += "\nDanke an <a href=\"https://edik.ch/posts/hack-the-burger-king.html\">Edik</a>!"
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
         await self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
@@ -1382,7 +1386,7 @@ class BKBot:
                             else:
                                 couponText = coupon.generateCouponShortTextFormatted(highlightIfNew=True)
                     else:
-                        # This should never happen but we'll allow it to
+                        # This should never happen but we'll allow it to#
                         logging.warning("Can't hyperlink coupon because it is not in channelDB: " + coupon.id)
                         if useLongCouponTitles:
                             couponText = coupon.generateCouponLongTextFormatted()

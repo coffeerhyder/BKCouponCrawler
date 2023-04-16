@@ -159,9 +159,9 @@ COUPON_IS_NEW_FOR_SECONDS = 24 * 60 * 60
 class Coupon(Document):
     plu = TextField()
     uniqueID = TextField()
-    price = FloatField()
-    priceCompare = FloatField()
-    staticReducedPercent = FloatField()
+    price = IntegerField()
+    priceCompare = IntegerField()
+    staticReducedPercent = IntegerField()
     title = TextField()
     timestampAddedToDB = FloatField(default=getCurrentDate().timestamp())
     timestampLastModifiedDB = FloatField(default=0)
@@ -169,12 +169,12 @@ class Coupon(Document):
     timestampExpireInternal = FloatField()  # Internal expire-date
     timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
     timestampCouponNotInAPIAnymore = FloatField()
+    timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
     dateFormattedExpire = TextField()
     imageURL = TextField()
     paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
     type = IntegerField(name='source')  # Legacy. This is called "type" now!
-    timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
     isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new. Use this as an override of default handling.
     isHidden = BooleanField(default=False)  # Typically only available for App coupons
     isUnsafeExpiredate = BooleanField(
@@ -183,10 +183,11 @@ class Coupon(Document):
     # TODO: Make use of this once it is possible for users to add coupons to DB via API
     addedVia = IntegerField()
     tags = ListField(TextField())
-    viewID = TextField()
+    webviewID = TextField()
+    webviewURL = TextField()
 
     def __str__(self):
-        return f'{self.id} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}'
+        return f'{self.id} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}  | WEBVIEW: {self.getWebviewURL()}'
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -502,6 +503,16 @@ class Coupon(Document):
             logging.warning(f'Returning fallback QR image for: {path}')
             return open('media/fallback_image_missing_qr_image.jpeg', mode='rb')
 
+    def getWebviewURL(self) -> Union[str, None]:
+        if self.webviewID is not None:
+            # Default for DB coupons
+            return f'https://www.burgerking.de/rewards/offers/{self.webviewID}'
+        elif self.webviewURL is not None:
+            # Static webview URL e.g. useful for Payback coupons -> Links to mydealz deals
+            return self.webviewURL
+        else:
+            return None
+
     def generateCouponShortText(self, highlightIfNew: bool, includeVeggieSymbol: bool) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
         couponText = ''
@@ -572,8 +583,9 @@ class Coupon(Document):
             couponText += '\nGültig bis ' + expireDateFormatted
         if self.description is not None:
             couponText += "\n" + self.description
-        if self.viewID is not None:
-            couponText += f"\n<a href=\"https://www.burgerking.de/rewards/offers/{self.viewID}\">Webansicht</a>"
+        webviewURL = self.getWebviewURL()
+        if webviewURL is not None:
+            couponText += f"\n{SYMBOLS.ARROW_RIGHT}<a href=\"{webviewURL}\">Webansicht</a>"
         return couponText
 
     def getPLUInformationFormatted(self) -> str:
@@ -927,8 +939,8 @@ class User(Document):
 
 
 class InfoEntry(Document):
-    timestampLastCrawl = FloatField(default=-1)
-    timestampLastChannelUpdate = FloatField(default=-1)
+    dateLastSuccessfulChannelUpdate = DateTimeField()
+    dateLastSuccessfulCrawlRun = DateTimeField()
     informationMessageID = TextField()
     couponTypeOverviewMessageIDs = DictField(default={})
     messageIDsToDelete = ListField(IntegerField(), default=[])

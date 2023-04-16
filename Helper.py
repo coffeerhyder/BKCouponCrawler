@@ -196,7 +196,7 @@ def formatDateGerman(date: Union[datetime, float]) -> str:
 
 def formatDateGermanHuman(date: Union[datetime, float, int]) -> str:
     """ Returns human readable string representation of given datetime or timestamp. """
-    if isinstance(date, (int, float, complex)) and date <= 0:
+    if date is None or isinstance(date, (int, float, complex)) and date <= 0:
         return 'Nie'
     else:
         return formatDateGerman(date)

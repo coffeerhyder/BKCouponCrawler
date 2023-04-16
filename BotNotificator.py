@@ -182,18 +182,13 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     timestampStart = datetime.now().timestamp()
     logging.info("ChannelUpdateMode = " + updateMode.name)
     # Get last channel info from DB
-    channelInfoDB = bkbot.couchdb[DATABASES.INFO_DB]
-    channelInfoDoc = InfoEntry.load(channelInfoDB, DATABASES.INFO_DB)
-    if channelInfoDoc.timestampLastChannelUpdate > -1:
-        passedSeconds = getCurrentDate().timestamp() - channelInfoDoc.timestampLastChannelUpdate
+    infoDB = bkbot.crawler.getInfoDB()
+    infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
+    if infoDBDoc.dateLastSuccessfulChannelUpdate is not None:
+        passedSeconds = (getCurrentDate() - infoDBDoc.dateLastSuccessfulChannelUpdate).total_seconds()
         logging.info("Passed seconds since last channel update: " + str(passedSeconds))
-    # Update channel info and DB
-    channelInfoDoc.timestampLastChannelUpdate = getCurrentDate().timestamp()
-    channelInfoDoc.store(channelInfoDB)
     activeCoupons = bkbot.crawler.getFilteredCouponsAsDict(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
-    infoDB = bkbot.couchdb[DATABASES.INFO_DB]
-    infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
     # All coupons we want to send out this run
     couponsToSendOut = {}
     # All new coupons
@@ -343,6 +338,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     newMsg = await asyncio.create_task(bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True))
     # Store new messageID
     infoDBDoc.informationMessageID = newMsg.message_id
+    infoDBDoc.dateLastSuccessfulChannelUpdate = getCurrentDate().now()
     infoDBDoc.store(infoDB)
     logging.info("Channel update done | Total time needed: " + getFormattedPassedTime(timestampStart))
 
