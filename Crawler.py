@@ -1169,15 +1169,13 @@ class BKCrawler:
                     # Important: We need the "_rev" value to be able to update/overwrite existing documents!
                     crawledCoupon["_rev"] = existingCoupon.rev
                     crawledCoupon.timestampLastModifiedDB = getCurrentDate().timestamp()
-                    """ 
-                     Important! Crawled coupon will have current timestamp which would result in upper system treating this coupon as a new coupon!
-                     """
                     crawledCoupon.timestampAddedToDB = existingCoupon.timestampAddedToDB
                     dbUpdates.append(crawledCoupon)
                     updatedCouponIDs.append(crawledCoupon.id)
                     numberofCouponsUpdated += 1
             else:
                 # Add new coupon to DB
+                crawledCoupon.timestampAddedToDB = datetime.now().timestamp()
                 numberofCouponsNew += 1
                 if flagNewCouponsAsNew:
                     numberofCouponsFlaggedAsNew += 1

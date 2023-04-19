@@ -163,7 +163,7 @@ class Coupon(Document):
     priceCompare = IntegerField()
     staticReducedPercent = IntegerField()
     title = TextField()
-    timestampAddedToDB = FloatField(default=getCurrentDate().timestamp())
+    timestampAddedToDB = FloatField(default=0)
     timestampLastModifiedDB = FloatField(default=0)
     timestampStart = FloatField(default=0)
     timestampExpireInternal = FloatField()  # Internal expire-date
@@ -217,12 +217,8 @@ class Coupon(Document):
 
     def getTitleShortened(self, includeVeggieSymbol: bool):
         shortenedTitle = shortenProductNames(self.getTitle())
-        includeNutritionTypeSymbol = False
-        includeMeatSymbol = False
         nutritionSymbol = None
-        if includeNutritionTypeSymbol or includeMeatSymbol:
-            nutritionSymbol = self.getNutritionSymbols()
-        elif includeNutritionTypeSymbol or includeVeggieSymbol:
+        if includeVeggieSymbol:
             nutritionSymbol = self.getNutritionSymbols()
         if nutritionSymbol is not None:
             shortenedTitle = nutritionSymbol + shortenedTitle
@@ -525,7 +521,7 @@ class Coupon(Document):
     def generateCouponShortTextFormatted(self, highlightIfNew: bool) -> str:
         """ Returns e.g. "<b>Y15</b> | 2Whopper+M🍟+0,4Cola | 8,99€" """
         couponText = ''
-        if self.isNewCoupon() and highlightIfNew:
+        if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.getTitleShortened(includeVeggieSymbol=True)
         couponText = self.appendPriceInfoText(couponText)
@@ -536,7 +532,7 @@ class Coupon(Document):
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         couponText = "<b>" + self.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
             messageID) + "\">"
-        if self.isNewCoupon() and highlightIfNew:
+        if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.getTitleShortened(includeVeggieSymbol=includeVeggieSymbol) + "</a>"
         couponText = self.appendPriceInfoText(couponText)
@@ -572,7 +568,7 @@ class Coupon(Document):
         :return: E.g. "<b>B3</b> | 1234 | 13.99€ | -50%\nGültig bis:19.06.2021\nCoupon.description"
         """
         couponText = ''
-        if self.isNewCoupon() and highlightIfNew:
+        if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.getTitle() + '\n'
         couponText += self.getPLUInformationFormatted()
@@ -986,7 +982,7 @@ class ChannelCoupon(Document):
      Only contains minimum of required information as information about coupons itself is stored in another DB. """
     uniqueIdentifier = TextField()
     messageIDs = ListField(IntegerField())
-    timestampMessagesPosted = FloatField(default=-1)
+    dateMessagesPosted = DateTimeField()
     channelMessageID_image = IntegerField()
     channelMessageID_qr = IntegerField()
     channelMessageID_text = IntegerField()
