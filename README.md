@@ -244,10 +244,12 @@ Sofern es welche gibt, hier:
 mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
 Dieser Ordner dient außerdem als Archiv.
 
-Warum fehlen (manchmal) Papiercoupons im Bot/Channel?
-Seit dem 03.12.2021 waren Papiercoupons nach einem längeren Ausfall wieder verfügbar. Aus technischen Gründen fehlten manchmal welche.
+Warum fehlen Papiercoupons im Bot/Channel?
 Seit dem 30.07.2022 gibt es keine Papiercoupons mehr direkt im Bot/Channel, da man diese manuell eintragen müsste und ich _noch_ keine Zeit hatte, ein System dafür zu bauen.
 Die aktuellen Papiercoupons finden sich immer auf MyDealz und in der oben verlinkten MEGA Cloud.
+
+Warum sind Payback Coupons nur manchmal direkt im Bot/Channel verfügbar?
+Weil sie derzeit von Hand eingetragen werden müssen und ich faul bin.
 
 Welche Daten speichert der Bot?
 Deine Benutzer-ID, deine Einstellungen und alle 48 Stunden einen Zeitstempel der letzten Bot verwendung.
