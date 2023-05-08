@@ -8,7 +8,7 @@ from telegram import InlineKeyboardMarkup
 
 from Helper import SYMBOLS
 
-VERSION = '2.0.3'
+VERSION = '2.0.4'
 
 """ Place static stuff into this class. """
 
@@ -99,11 +99,11 @@ def loadConfig() -> Config:
 class ImageCache:
     def __init__(self, fileID: str):
         self.imageFileID = fileID
-        self.timestampCreated = datetime.now().timestamp()
-        self.timestampLastUsed = datetime.now().timestamp()
+        self.dateCreated = datetime.now()
+        self.dateLastUsed = datetime.now()
         # self.timesUsed = 0
 
-    def updateLastUsedTimestamp(self):
+    def updateLastUsedDate(self):
         """ Updates last used timestamp to current timestamp. """
-        self.timestampLastUsed = datetime.now().timestamp()
+        self.dateLastUsed = datetime.now()
         # self.timesUsed += 1

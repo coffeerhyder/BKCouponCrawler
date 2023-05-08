@@ -61,7 +61,7 @@ MAX_CACHE_AGE_SECONDS = 7 * 24 * 60 * 60
 async def cleanupCache(cacheDict: dict):
     cacheDictCopy = cacheDict.copy()
     for cacheID, cacheData in cacheDictCopy.items():
-        cacheItemAgeSeconds = datetime.now().timestamp() - cacheData.timestampLastUsed
+        cacheItemAgeSeconds = (datetime.now() - cacheData.dateLastUsed).total_seconds()
         if cacheItemAgeSeconds > MAX_CACHE_AGE_SECONDS:
             logging.info(f"Deleting cache item {cacheID} as it was last used before: {cacheItemAgeSeconds} seconds")
             del cacheDict[cacheID]
@@ -362,6 +362,10 @@ class BKBot:
             menuText += '\n<b>Du bist Admin!</b>'
             menuText += '\nAdmin Commands:'
             menuText += '\n/' + Commands.MAINTENANCE + ' - Wartungsmodus toggeln'
+            infoDB = self.crawler.getInfoDB()
+            infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
+            menuText += f'\nLetzter erfolgreicher Crawlvorgang: {formatDateGermanHuman(infoDoc.dateLastSuccessfulCrawlRun)}'
+            menuText += f'\nLetztes erfolgreiches Channelupdate: {formatDateGermanHuman(infoDoc.dateLastSuccessfulChannelUpdate)}'
         query = update.callback_query
         if query is not None:
             await query.answer()
@@ -428,15 +432,16 @@ class BKBot:
         text += '\nAnzahl User, die den Bot wahrscheinlich geblockt haben: ' + str(userStats.numberofUsersWhoProbablyBlockedBot)
         text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoRecentlyUsedBot)
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
-        text += '\nAnzahl gültige Bot Coupons: ' + str(len(couponDB))
+        text += '\nAnzahl gültige Coupons: ' + str(len(couponDB))
         text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
-        text += f'\nStatistiken generiert am: {formatDateGerman(self.statsCachedTimestamp)}'
+        text += f'\nStatistiken generiert am: {formatDateGermanHuman(self.statsCachedTimestamp)}'
         text += '\n---'
         text += '\nDein BetterKing Account:'
         text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
         text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
-        text += f'\nBot  zuletzt verwendet (auf {MAX_HOURS_ACTIVITY_TRACKING}h genau, Zeitpunkt von vom Bot zugestelltem Coupon-Benachrichtigungen zählen auch als Aktivität): ' + formatDateGerman(
-            user.timestampLastTimeAccountUsed)
+        text += f'\nBot  zuletzt verwendet am: {formatDateGermanHuman(user.timestampLastTimeBotUsed)}'
+        text += f'\nLetzte Benachrichtigung vom Bot erhalten am: {formatDateGermanHuman(user.timestampLastTimeNotificationSentSuccessfully)}'
+        text += f'\n(Alle Datumsangaben zur Bot Verwendung / Benachrichtigungszeitpunkte sind auf {MAX_HOURS_ACTIVITY_TRACKING}h genau)'
         text += '</pre>'
         if loadingMessage is not None:
             await self.editMessage(chat_id=loadingMessage.chat_id, message_id=loadingMessage.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
@@ -712,9 +717,9 @@ class BKBot:
             text += "\n" + generateFeedbackCode()
         text += "\nSchreibe einen Code deiner Wahl auf die Rückseite eines BK Kassenbons, um den gratis Artikel zu erhalten."
         text += "\nFalls weder Kassenbon noch Schamgefühl vorhanden sind, hier ein Trick:"
-        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,20€ und lasse dir den Kassenbon geben."
+        text += "\nBestelle ein einzelnes Päckchen Mayo oder Ketchup für ~0,40€ und lasse dir den Kassenbon geben."
         text += "\nDie Konditionen der Feedback Codes variieren."
-        text += "\nDerzeit gibt es: Gratis Eiswaffel oder Kaffee(klein) [Stand: 14.04.2021]"
+        text += "\nDerzeit gibt es gratis Pommes (klein) oder Kaffee (klein)."
         text += "\nDanke an <a href=\"https://edik.ch/posts/hack-the-burger-king.html\">Edik</a>!"
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
         await self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
@@ -950,7 +955,7 @@ class BKBot:
         imagePath = coupon.getImagePath()
         if cachedImageData is not None:
             # Re-use cached image_id and update cache timestamp
-            cachedImageData.updateLastUsedTimestamp()
+            cachedImageData.updateLastUsedDate()
             logging.debug(f"Returning coupon image file_id: {cachedImageData.imageFileID}")
             return cachedImageData.imageFileID
         elif isValidImageFile(imagePath):
@@ -968,7 +973,7 @@ class BKBot:
         # Re-use Telegram file-ID if possible: https://core.telegram.org/bots/api#message
         if cachedQRImageData is not None:
             # Return cached image_id and update cache timestamp
-            cachedQRImageData.updateLastUsedTimestamp()
+            cachedQRImageData.updateLastUsedDate()
             logging.debug(f"Returning QR image file_id: {cachedQRImageData.imageFileID}")
             return cachedQRImageData.imageFileID
         else:
@@ -982,7 +987,7 @@ class BKBot:
         cachedImageData = self.offerImageCache.get(image_url)
         if cachedImageData is not None:
             # Re-use cached image_id and update cache timestamp
-            cachedImageData.updateLastUsedTimestamp()
+            cachedImageData.updateLastUsedDate()
             return cachedImageData.imageFileID
         if os.path.exists(offerGetImagePath(offer)):
             # Return image file
@@ -1450,19 +1455,13 @@ class BKBot:
             msg = await self.processMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
                                              disable_web_page_preview=disable_web_page_preview,
                                              reply_markup=reply_markup)
-            if user.botBlockedCounter > 0:
-                """ User had blocked but at some point of time but unblocked it --> Force last used timestamp update which will also reset the bot blocked counter so upper handling will not delete user at some point of time.
-                This ensures that users who e.g. only use the bot to be informed about their once set favorites or only use it to be informed about new coupons will not be auto deleted at some point of time.
-                """
-                user.updateActivityTimestamp(force=True)
-                user.store(db=userDB)
-            elif user.updateActivityTimestamp():
+            if user.updateNotificationReceivedActivityTimestamp() or user.botBlockedCounter > 0:
                 user.store(db=userDB)
             return msg
         except Forbidden:
             logging.info(f"User blocked bot: {user.id}")
             user.botBlockedCounter += 1
-            user.timestampLastTimeBlockedBot = getCurrentDate().timestamp()
+            user.timestampLastTimeBlockedBot = datetime.now()
             user.store(db=userDB)
             return None
 

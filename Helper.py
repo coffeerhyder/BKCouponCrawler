@@ -1,3 +1,4 @@
+import numbers
 import os
 import random
 import re
@@ -187,10 +188,18 @@ def convertCouponAndOfferDateToGermanFormat(date: str) -> str:
 def formatDateGerman(date: Union[datetime, float]) -> str:
     """ Accepts timestamp as float or datetime instance.
     Returns date in format: 13.10.2020 21:36 Uhr """
-    if isinstance(date, float):
+    if isinstance(date, float) or isinstance(date, int):
         # We want datetime
         date = datetime.fromtimestamp(date, getTimezone())
     return date.strftime('%d.%m.%Y %H:%M Uhr')
+
+
+def formatDateGermanHuman(date: Union[datetime, float, int]) -> str:
+    """ Returns human readable string representation of given datetime or timestamp. """
+    if date is None or isinstance(date, (int, float, complex)) and date <= 0:
+        return 'Nie'
+    else:
+        return formatDateGerman(date)
 
 
 def getDatetimeFromString(dateStr: str) -> datetime:
@@ -290,7 +299,9 @@ def couponTitleContainsVeggieFood(title: str) -> bool:
         # All plant based articles
         return True
     titleLower = title.lower()
-    if 'fusion' in titleLower:
+    if 'veggie' in titleLower:
+        return True
+    elif 'fusion' in titleLower:
         # Ice cream
         return True
     elif couponTitleIsFries(titleLower):

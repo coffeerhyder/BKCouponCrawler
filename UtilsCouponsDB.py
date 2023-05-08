@@ -159,22 +159,22 @@ COUPON_IS_NEW_FOR_SECONDS = 24 * 60 * 60
 class Coupon(Document):
     plu = TextField()
     uniqueID = TextField()
-    price = FloatField()
-    priceCompare = FloatField()
-    staticReducedPercent = FloatField()
+    price = IntegerField()
+    priceCompare = IntegerField()
+    staticReducedPercent = IntegerField()
     title = TextField()
-    timestampAddedToDB = FloatField(default=getCurrentDate().timestamp())
+    timestampAddedToDB = FloatField(default=0)
     timestampLastModifiedDB = FloatField(default=0)
-    timestampStart = FloatField()
+    timestampStart = FloatField(default=0)
     timestampExpireInternal = FloatField()  # Internal expire-date
     timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
-    timestampCouponNotInAPIAnymore = FloatField()
+    timestampCouponNotInAPIAnymore = FloatField() # 2023-05-09: Not used at this moment
+    timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
     dateFormattedExpire = TextField()
     imageURL = TextField()
     paybackMultiplicator = IntegerField()
     productIDs = ListField(IntegerField())
     type = IntegerField(name='source')  # Legacy. This is called "type" now!
-    timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
     isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new. Use this as an override of default handling.
     isHidden = BooleanField(default=False)  # Typically only available for App coupons
     isUnsafeExpiredate = BooleanField(
@@ -183,10 +183,11 @@ class Coupon(Document):
     # TODO: Make use of this once it is possible for users to add coupons to DB via API
     addedVia = IntegerField()
     tags = ListField(TextField())
-    viewID = TextField()
+    webviewID = TextField()
+    webviewURL = TextField()
 
     def __str__(self):
-        return f'{self.id} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}'
+        return f'{self.id} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}  | WEBVIEW: {self.getWebviewURL()}'
 
     def getPLUOrUniqueID(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
@@ -216,12 +217,8 @@ class Coupon(Document):
 
     def getTitleShortened(self, includeVeggieSymbol: bool):
         shortenedTitle = shortenProductNames(self.getTitle())
-        includeNutritionTypeSymbol = False
-        includeMeatSymbol = False
         nutritionSymbol = None
-        if includeNutritionTypeSymbol or includeMeatSymbol:
-            nutritionSymbol = self.getNutritionSymbols()
-        elif includeNutritionTypeSymbol or includeVeggieSymbol:
+        if includeVeggieSymbol:
             nutritionSymbol = self.getNutritionSymbols()
         if nutritionSymbol is not None:
             shortenedTitle = nutritionSymbol + shortenedTitle
@@ -377,7 +374,7 @@ class Coupon(Document):
             # print(f'Coupon is considered as new for {formatSeconds(seconds=couponNewSecondsRemaining)} time')
             return True
         timePassedSinceCouponValidityStarted = -1
-        if self.timestampStart is not None and self.timestampStart > 0:
+        if self.timestampStart > 0:
             timePassedSinceCouponValidityStarted = currentTimestamp - self.timestampStart
         if 0 < timePassedSinceCouponValidityStarted < COUPON_IS_NEW_FOR_SECONDS:
             return True
@@ -398,7 +395,7 @@ class Coupon(Document):
             return False
 
     def getStartDatetime(self) -> Union[datetime, None]:
-        if self.timestampStart is not None:
+        if self.timestampStart is not None and self.timestampStart > 0:
             return datetime.fromtimestamp(self.timestampStart, getTimezone())
         else:
             # Start date must not always be given
@@ -502,6 +499,16 @@ class Coupon(Document):
             logging.warning(f'Returning fallback QR image for: {path}')
             return open('media/fallback_image_missing_qr_image.jpeg', mode='rb')
 
+    def getWebviewURL(self) -> Union[str, None]:
+        if self.webviewID is not None:
+            # Default for DB coupons
+            return f'https://www.burgerking.de/rewards/offers/{self.webviewID}'
+        elif self.webviewURL is not None:
+            # Static webview URL e.g. useful for Payback coupons -> Links to mydealz deals
+            return self.webviewURL
+        else:
+            return None
+
     def generateCouponShortText(self, highlightIfNew: bool, includeVeggieSymbol: bool) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola | 8,99€" """
         couponText = ''
@@ -514,7 +521,7 @@ class Coupon(Document):
     def generateCouponShortTextFormatted(self, highlightIfNew: bool) -> str:
         """ Returns e.g. "<b>Y15</b> | 2Whopper+M🍟+0,4Cola | 8,99€" """
         couponText = ''
-        if self.isNewCoupon() and highlightIfNew:
+        if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.getTitleShortened(includeVeggieSymbol=True)
         couponText = self.appendPriceInfoText(couponText)
@@ -525,7 +532,7 @@ class Coupon(Document):
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
         couponText = "<b>" + self.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
             messageID) + "\">"
-        if self.isNewCoupon() and highlightIfNew:
+        if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.getTitleShortened(includeVeggieSymbol=includeVeggieSymbol) + "</a>"
         couponText = self.appendPriceInfoText(couponText)
@@ -561,7 +568,7 @@ class Coupon(Document):
         :return: E.g. "<b>B3</b> | 1234 | 13.99€ | -50%\nGültig bis:19.06.2021\nCoupon.description"
         """
         couponText = ''
-        if self.isNewCoupon() and highlightIfNew:
+        if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.getTitle() + '\n'
         couponText += self.getPLUInformationFormatted()
@@ -572,8 +579,9 @@ class Coupon(Document):
             couponText += '\nGültig bis ' + expireDateFormatted
         if self.description is not None:
             couponText += "\n" + self.description
-        if self.viewID is not None:
-            couponText += f"\n<a href=\"https://www.burgerking.de/rewards/offers/{self.viewID}\">Webansicht</a>"
+        webviewURL = self.getWebviewURL()
+        if webviewURL is not None:
+            couponText += f"\n{SYMBOLS.ARROW_RIGHT}<a href=\"{webviewURL}\">Webansicht</a>"
         return couponText
 
     def getPLUInformationFormatted(self) -> str:
@@ -678,7 +686,8 @@ class User(Document):
         ))
     couponViewSortModes = DictField(default={})
     # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
-    timestampLastTimeAccountUsed = FloatField(default=getCurrentDate().timestamp())
+    timestampLastTimeBotUsed = FloatField(default=getCurrentDate().timestamp())
+    timestampLastTimeNotificationSentSuccessfully = FloatField(default=0)
     timesInformedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
     timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
     timestampLastTimeBlockedBot = IntegerField(default=0)
@@ -845,18 +854,41 @@ class User(Document):
         self.couponViewSortModes[str(couponView.getViewCode())] = sortMode.getSortCode()
 
     def hasRecentlyUsedBot(self) -> bool:
-        if self.timestampLastTimeAccountUsed == 0:
+        if self.timestampLastTimeBotUsed == 0:
+            # User has never used bot - this is nearly impossible unless user has been manually added to DB.
             return False
         else:
             currentTimestamp = getCurrentDate().timestamp()
-            if currentTimestamp - self.timestampLastTimeAccountUsed < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
+            if currentTimestamp - self.timestampLastTimeBotUsed < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
                 return True
             else:
                 return False
 
     def updateActivityTimestamp(self, force: bool = False) -> bool:
         if force or not self.hasRecentlyUsedBot():
-            self.timestampLastTimeAccountUsed = getCurrentDate().timestamp()
+            self.timestampLastTimeBotUsed = getCurrentDate().timestamp()
+            # Reset this as user is active and is not about to be auto deleted
+            self.timesInformedAboutUpcomingAutoAccountDeletion = 0
+            # Reset this because user is using bot so it's obviously not blocked (anymore)
+            self.botBlockedCounter = 0
+            return True
+        else:
+            return False
+
+    def hasRecentlyReceivedBotNotification(self) -> bool:
+        if self.timestampLastTimeNotificationSentSuccessfully == 0:
+            # User has never received notification from bot.
+            return False
+        else:
+            currentTimestamp = getCurrentDate().timestamp()
+            if currentTimestamp - self.timestampLastTimeNotificationSentSuccessfully < MAX_HOURS_ACTIVITY_TRACKING * 60 * 60:
+                return True
+            else:
+                return False
+
+    def updateNotificationReceivedActivityTimestamp(self, force: bool = False) -> bool:
+        if force or not self.hasRecentlyReceivedBotNotification():
+            self.timestampLastTimeNotificationSentSuccessfully = getCurrentDate().timestamp()
             # Reset this as user is active and is not about to be auto deleted
             self.timesInformedAboutUpcomingAutoAccountDeletion = 0
             # Reset this because user is using bot so it's obviously not blocked (anymore)
@@ -866,20 +898,32 @@ class User(Document):
             return False
 
     def getSecondsUntilAccountDeletion(self) -> float:
-        secondsPassedSinceLastUsage = self.getSecondsPassedSinceLastTimeUsed()
-        if secondsPassedSinceLastUsage > MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
+        secondsPassedSinceLastAccountActivity = self.getSecondsPassedSinceLastAccountActivity()
+        if secondsPassedSinceLastAccountActivity > MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION:
             # Account can be deleted now
             return 0
         else:
             # Account can be deleted in X seconds
-            return MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - secondsPassedSinceLastUsage
+            return MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - secondsPassedSinceLastAccountActivity
+
+    def getSecondsPassedSinceLastAccountActivity(self) -> float:
+        """ Returns smaller of these two values:
+         - Seconds passed since user used bot last time
+         - Seconds passed since bot sent user notification successfully last time
+         """
+        secondsPassedSinceLastUsage = self.getSecondsPassedSinceLastTimeUsed()
+        secondsPassedSinceLastNotificationSentSuccessfully = self.getSecondsPassedSinceLastTimeNotificationSentSuccessfully()
+        return min(secondsPassedSinceLastUsage, secondsPassedSinceLastNotificationSentSuccessfully)
 
     def getSecondsPassedSinceLastTimeUsed(self) -> float:
-        return getCurrentDate().timestamp() - self.timestampLastTimeAccountUsed
+        return getCurrentDate().timestamp() - self.timestampLastTimeBotUsed
+
+    def getSecondsPassedSinceLastTimeNotificationSentSuccessfully(self) -> float:
+        return getCurrentDate().timestamp() - self.timestampLastTimeNotificationSentSuccessfully
 
     def allowWarningAboutUpcomingAutoAccountDeletion(self) -> bool:
         currentTimestampSeconds = getCurrentDate().timestamp()
-        if currentTimestampSeconds + MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - self.timestampLastTimeAccountUsed <= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and self.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
+        if currentTimestampSeconds + MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - self.timestampLastTimeBotUsed <= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and currentTimestampSeconds - self.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and self.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
             return True
         else:
             return False
@@ -891,8 +935,8 @@ class User(Document):
 
 
 class InfoEntry(Document):
-    timestampLastCrawl = FloatField(default=-1)
-    timestampLastChannelUpdate = FloatField(default=-1)
+    dateLastSuccessfulChannelUpdate = DateTimeField()
+    dateLastSuccessfulCrawlRun = DateTimeField()
     informationMessageID = TextField()
     couponTypeOverviewMessageIDs = DictField(default={})
     messageIDsToDelete = ListField(IntegerField(), default=[])
@@ -938,7 +982,7 @@ class ChannelCoupon(Document):
      Only contains minimum of required information as information about coupons itself is stored in another DB. """
     uniqueIdentifier = TextField()
     messageIDs = ListField(IntegerField())
-    timestampMessagesPosted = FloatField(default=-1)
+    dateMessagesPosted = DateTimeField()
     channelMessageID_image = IntegerField()
     channelMessageID_qr = IntegerField()
     channelMessageID_text = IntegerField()
