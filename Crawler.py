@@ -334,7 +334,7 @@ class BKCrawler:
                             titleFull = title + ' ' + subtitle
                             # Log seemingly strange values
                             if not subtitle.startswith('+'):
-                                logging.info('Possible subtitle which should not be included in coupon title: ' + subtitle)
+                                logging.info(f'Coupon {uniqueCouponID}: Possible subtitle which should not be included in coupon title: {subtitle} | {titleFull=}')
 
                 titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']
@@ -348,7 +348,7 @@ class BKCrawler:
                         tagsStringArray.append(offerTag['value'])
                     coupon.tags = tagsStringArray
                 else:
-                    logging.info(f'Detected coupon without tags: {coupon.webviewID}')
+                    logging.info(f'Detected coupon without tags: {coupon.id}')
                 if index > 0:
                     # First item = Real coupon, all others = upsell/"hidden" coupon(s)
                     coupon.isHidden = True
@@ -1185,7 +1185,7 @@ class BKCrawler:
         logging.info(f'Pushing {len(dbUpdates)} coupon DB updates')
         couponDB.update(dbUpdates)
         self.updateCachedMissingPaperCouponsInfo(couponDB)
-        logging.info("Coupons new IDs: " + str(numberofCouponsNew))
+        logging.info("Coupons new: " + str(numberofCouponsNew))
         if len(newCouponIDs) > 0:
             logging.info("New IDs: " + str(newCouponIDs))
         logging.info("Coupons updated: " + str(numberofCouponsUpdated))

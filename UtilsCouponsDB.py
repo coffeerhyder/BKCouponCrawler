@@ -168,7 +168,7 @@ class Coupon(Document):
     timestampStart = FloatField(default=0)
     timestampExpireInternal = FloatField()  # Internal expire-date
     timestampExpire = FloatField()  # Expire date used by BK in their apps -> "Real" expire date.
-    timestampCouponNotInAPIAnymore = FloatField()
+    timestampCouponNotInAPIAnymore = FloatField() # 2023-05-09: Not used at this moment
     timestampIsNew = FloatField(default=0)  # Last timestamp from which on this coupon was new
     dateFormattedExpire = TextField()
     imageURL = TextField()

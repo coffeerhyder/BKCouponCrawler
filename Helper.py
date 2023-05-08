@@ -299,7 +299,9 @@ def couponTitleContainsVeggieFood(title: str) -> bool:
         # All plant based articles
         return True
     titleLower = title.lower()
-    if 'fusion' in titleLower:
+    if 'veggie' in titleLower:
+        return True
+    elif 'fusion' in titleLower:
         # Ice cream
         return True
     elif couponTitleIsFries(titleLower):
