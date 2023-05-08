@@ -458,7 +458,7 @@ class BKBot:
              view = getCouponViewByIndex(index=int(urlinfo["m"]))
             ValueError: invalid literal for int() with base 10: 'v'
          """
-        logging.info(f'{callbackVar=}')
+        logging.debug(f'{callbackVar=}')
         urlquery = furl(callbackVar)
         urlinfo = urlquery.args
         view = getCouponViewByIndex(index=int(urlinfo["m"]))
