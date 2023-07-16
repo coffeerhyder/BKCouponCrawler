@@ -241,11 +241,6 @@ class BKCrawler:
         #     user.store(userDB)
 
         # timestamp migration/introduction 2022-07-20
-        dummyActivityTimestampSeconds = getCurrentDate().timestamp() - 3 * 24 * 60 * 60
-        for userID in userDB:
-            user = User.load(userDB, userID)
-            user.timestampLastTimeBotUsed = dummyActivityTimestampSeconds
-            user.store(userDB)
         return
 
     def crawlAndProcessData(self):

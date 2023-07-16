@@ -663,6 +663,7 @@ class User(Document):
             displayBKWebsiteURLs=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
             displayFAQLinkButton=BooleanField(default=True),
+            displayAdminButtons=BooleanField(default=True),
             displayPlantBasedCouponsWithinGenericCategories=BooleanField(default=True),
             displayHiddenUpsellingAppCouponsWithinGenericCategories=BooleanField(default=True),
             hideDuplicates=BooleanField(default=False),
@@ -673,7 +674,7 @@ class User(Document):
             highlightVeggieCouponsInCouponButtonTexts=BooleanField(default=True),
             displayQR=BooleanField(default=True),
             autoDeleteExpiredFavorites=BooleanField(default=False),
-            enableBetaFeatures=BooleanField(default=False)
+            enableBetaFeatures=BooleanField(default=False),
         )
     )
     botBlockedCounter = IntegerField(default=0)
@@ -686,7 +687,7 @@ class User(Document):
         ))
     couponViewSortModes = DictField(default={})
     # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
-    timestampLastTimeBotUsed = FloatField(default=getCurrentDate().timestamp())
+    timestampLastTimeBotUsed = FloatField(default=0)
     timestampLastTimeNotificationSentSuccessfully = FloatField(default=0)
     timesInformedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
     timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
@@ -1131,6 +1132,11 @@ USER_SETTINGS_ON_OFF = {
     "displayFAQLinkButton": {
         "category": SettingCategories.MAIN_MENU,
         "description": "FAQ Button zeigen",
+        "default": True
+    },
+    "displayAdminButtons": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": "Admin Buttons anzeigen",
         "default": True
     },
     "displayPlantBasedCouponsWithinGenericCategories": {

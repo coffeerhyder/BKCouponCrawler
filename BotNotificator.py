@@ -421,8 +421,7 @@ async def nukeChannel(bkbot):
         # Update DB if changes were made
         infoDoc.store(infoDB)
     await deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc)
-
-    logging.info("Cleanup channel DONE! --> Total time needed: " + getFormattedPassedTime(timestampStart))
+    logging.info("Nuke channel DONE! --> Total time needed: " + getFormattedPassedTime(timestampStart))
 
 
 # def editMessageAndWait(bkbot, messageID: Union[int, str, None], messageText) -> bool:

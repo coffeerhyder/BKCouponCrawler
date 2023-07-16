@@ -42,6 +42,8 @@ class CallbackVars:
     MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS = 'menu_settings_delete_unavailable_favorite_coupons'
     MENU_SETTINGS_USER_DELETE_ACCOUNT = 'menu_settings_user_delete_account'
     EASTER_EGG = 'easter_egg'
+    ADMIN_RESEND_COUPONS = 'admin_resend_coupons'
+    ADMIN_NUKE_CHANNEL = 'admin_nuke_channel'
 
 
 class Commands:
