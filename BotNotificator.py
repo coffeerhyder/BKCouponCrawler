@@ -144,6 +144,11 @@ async def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
     numberOfMessagesSent = 0
     for userID in userDB:
         user = User.load(db=userDB, id=userID)
+        if not user.hasEverUsedBot():
+            """ 
+            Avoid sending such notifications to users whose datasets are not up2date.
+            """
+            continue
         currentTimestampSeconds = getCurrentDate().timestamp()
         secondsPassedSinceLastAccountActivity = user.getSecondsPassedSinceLastAccountActivity()
         secondsPassedSinceLastAccountDeletionWarning = getCurrentDate().timestamp() - user.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion
@@ -214,7 +219,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             updatedCoupons[coupon.id] = coupon
     if len(infoDBDoc.messageIDsToDelete) > 0:
         # This can happen but should only be a rare occurance!
-        logging.warning("Found " + str(len(infoDBDoc.messageIDsToDelete)) + " leftover messageIDs to delete")
+        logging.warning(f"Found {len(infoDBDoc.messageIDsToDelete)} leftover messageIDs to delete")
     # Collect deleted coupons from channel
     deletedChannelCoupons = []
     for uniqueCouponID in channelDB:
@@ -233,11 +238,14 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         couponsToSendOut = activeCoupons
     elif updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE:
         # Collect all coupons that haven't been sent into the channel at all or were sent into the channel more than X seconds ago (= "old" entries)
+        allFromNowOn = False
         for coupon in activeCoupons.values():
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
-            if channelCoupon is None or (datetime.now() - channelCoupon.dateMessagesPosted).total_seconds() > 16 * 60 * 60:
+            if allFromNowOn or channelCoupon is None or channelCoupon.channelMessageID_image_and_qr_date_posted is None or (datetime.now() - channelCoupon.channelMessageID_image_and_qr_date_posted).total_seconds() > 16 * 60 * 60 or channelCoupon.channelMessageID_text_date_posted is None or (datetime.now() - channelCoupon.channelMessageID_text_date_posted).total_seconds() > 16 * 60 * 60:
                 # Coupon has not been posted into channel yet or has been posted in there too long ago -> Add to list of coupons to re-send later
                 couponsToSendOut[coupon.id] = coupon
+                # One coupon was missing/incomplete? Re-send all after this one.
+                allFromNowOn = True
     else:
         # This should never happen!
         logging.warning("Unsupported ChannelUpdateMode! Developer mistake?!")
@@ -247,7 +255,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         logging.warning("Developer mistake or DB has been updated without sending channel update in between for at least 2 days: Number of 'new' coupons to send into channel is: " + str(numberOfCouponsNewToThisChannel) + " but should be: " + str(len(newCoupons)))
     if len(couponsToSendOut) > 0:
         # Send relevant coupons into chat
-        logging.info("Sending out " + str(len(couponsToSendOut)) + " coupons...")
+        logging.info(f"Sending out {len(couponsToSendOut)}/{len(activeCoupons)} coupons...")
         # Collect all old messageIDs which need to be deleted by checking which of the ones we want to send out are already in our channel at this moment
         channelCouponDBUpdates = []
         for coupon in couponsToSendOut.values():
@@ -267,10 +275,6 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
                 break
             index += 1
             logging.info("Working on coupon " + str(index + 1) + "/" + str(len(couponsToSendOut)) + " | " + coupon.id)
-            if coupon.id not in channelDB:
-                channelDB[coupon.id] = {}
-            channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
-            channelCoupon.uniqueIdentifier = coupon.getUniqueIdentifier()
             couponText = coupon.generateCouponLongTextFormattedWithDescription(highlightIfNew=True)
             photoAlbum = [InputMediaPhoto(media=bkbot.getCouponImage(coupon), caption=couponText, parse_mode='HTML'),
                           InputMediaPhoto(media=bkbot.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
@@ -284,8 +288,13 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             bkbot.couponImageCache[coupon.id] = ImageCache(fileID=msgImage.photo[0].file_id)
             bkbot.couponImageQRCache[coupon.id] = ImageCache(fileID=msgImageQR.photo[0].file_id)
             # Update our DB
+            if coupon.id not in channelDB:
+                channelDB[coupon.id] = {}
+            channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
+            channelCoupon.uniqueIdentifier = coupon.getUniqueIdentifier()
             channelCoupon.channelMessageID_image = msgImage.message_id
             channelCoupon.channelMessageID_qr = msgImageQR.message_id
+            channelCoupon.channelMessageID_image_and_qr_date_posted = datetime.now()
             # Update DB
             channelCoupon.store(channelDB)
             # Send coupon information as text (= last message for this coupon)
@@ -293,8 +302,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             couponTextMsg = await asyncio.create_task(bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=couponText, parse_mode='HTML', disable_notification=True,
                                               disable_web_page_preview=True))
             channelCoupon.channelMessageID_text = couponTextMsg.message_id
-            # Save timestamp so we roughly know when these messages have been posted
-            channelCoupon.dateMessagesPosted = datetime.now()
+            channelCoupon.channelMessageID_text_date_posted = datetime.now()
             # Update DB
             channelCoupon.store(channelDB)
 
@@ -337,10 +345,9 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     Did we only delete coupons and/or update existing ones while there were no new coupons coming in AND we were not forced to delete- and re-send all items?
     Edit our last message if existant so the user won't receive a new notification!
     """
-    oldInfoMsgID = infoDBDoc.informationMessageID
-    # Post new message and store old for later deletion
-    if oldInfoMsgID is not None:
-        infoDBDoc.messageIDsToDelete.append(oldInfoMsgID)
+    # Store old informationMessageID for later deletion
+    if infoDBDoc.informationMessageID is not None:
+        infoDBDoc.addMessageIDToDelete(infoDBDoc.informationMessageID)
     newMsg = await asyncio.create_task(bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True))
     # Store new messageID
     infoDBDoc.informationMessageID = newMsg.message_id

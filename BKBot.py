@@ -365,7 +365,7 @@ class BKBot:
             menuText += '\n<b>'
             menuText += SYMBOLS.WARNING + 'Derzeit im Bot fehlende Papiercoupons: ' + missingPaperCouponsText
             if self.publicChannelName is not None:
-                menuText += f"\nVollständige Papiercouponbögen sind im FAQ  <a href=\"{self.getPublicChannelFAQLink()}\">FAQ</a> verlinkt."
+                menuText += f"\nVollständige Papiercouponbögen sind im <a href=\"{self.getPublicChannelFAQLink()}\">FAQ</a> verlinkt."
             menuText += '</b>'
         if self.isAdmin(user):
             infoDB = self.crawler.getInfoDB()
@@ -1160,7 +1160,7 @@ class BKBot:
         query = update.callback_query
         if query is not None:
             await query.answer()
-        await self.sendMessage(chat_id=update.effective_user.id, text='Ich nix verstehen.')
+        await self.sendMessage(chat_id=update.effective_user.id, text='Ich nix verstehen!')
 
     async def botAdminToggleMaintenanceMode(self, update: Update, context: CallbackContext):
         user = getUserFromDB(userDB=self.crawler.getUserDB(), userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
@@ -1202,15 +1202,23 @@ class BKBot:
         users = []
         for userIDStr in userDB:
             user = User.load(userDB, userIDStr)
-            if user.settings.autoDeleteExpiredFavorites:
-                users.append(user)
+            users.append(user)
         await self.deleteUsersUnavailableFavorites(userDB, users)
 
-    async def deleteUsersUnavailableFavorites(self, userDB: Database, users: list):
+    async def deleteUsersUnavailableFavorites(self, userDB: Database, users: list, force: bool = False):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
+        if len(users) == 0:
+            return
+        usersToDeleteExpiredFavorites = []
+        for user in users:
+            if (force or user.settings.autoDeleteExpiredFavorites) and len(user.favoriteCoupons) > 0:
+                usersToDeleteExpiredFavorites.append(user)
+        if len(usersToDeleteExpiredFavorites) == 0:
+            logging.info("Failed to find any users eligable for favorite deletion")
+            return
         coupons = self.getFilteredCouponsAsDict(couponFilter=CouponFilter())
         dbUpdates = []
-        for user in users:
+        for user in usersToDeleteExpiredFavorites:
             userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=False)
             if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0:
                 for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
@@ -1278,7 +1286,6 @@ class BKBot:
                 except:
                     traceback.print_exc()
                     logging.info(f'Error while notifying user {userID} about auto account deletion.')
-                    pass
         if len(usersToDelete) > 0:
             logging.info(f'Deleting {len(usersToDelete)} inactive users from DB')
             userDB.purge(docs=usersToDelete)
@@ -1288,7 +1295,24 @@ class BKBot:
         """ Runs all processes which should only run once per day. """
         logging.info('Running batch process...')
         self.crawl()
-        await self.renewPublicChannel()
+        # infoDB = self.crawler.getInfoDB()
+        # infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
+        # lastSuccessfulChannelupdate = infoDBDoc.dateLastSuccessfulChannelUpdate
+        if not await self.renewPublicChannel():
+            attempts = 0
+            attemptsMax = 24
+            retryseconds = 300
+            while True:
+                attempts += 1
+                logging.info(f"Retrying channelupdate in {retryseconds} seconds | Attempt: {attempts}/{attemptsMax}")
+                await asyncio.sleep(retryseconds)
+                if await self.resumePublicChannelUpdate():
+                    break
+                elif attempts >= attemptsMax:
+                    logging.warning("Channelupdate failed and can't be saved :(")
+                    break
+                else:
+                    continue
         self.deleteInactiveAccounts()
         await self.batchProcessAutoDeleteUsersUnavailableFavorites()
         await self.notifyUsers()
@@ -1296,24 +1320,16 @@ class BKBot:
         await self.cleanupCaches()
         logging.info('Batch process done.')
 
-    def crawl(self):
+    def crawl(self) -> bool:
         try:
             self.crawler.crawlAndProcessData()
+            return True
         except:
             traceback.print_exc()
             logging.warning("Crawler failed")
+            return False
 
-    async def notifyUsers(self):
-        """ Notify users about expired favorite coupons that are back or new coupons depending on their settings. """
-        try:
-            await notifyUsersAboutNewCoupons(self)
-            await notifyUsersAboutUpcomingAccountDeletion(self)
-        except Exception:
-            # This should never happen
-            traceback.print_exc()
-            logging.warning("Exception happened during user notify")
-
-    async def renewPublicChannel(self) -> Union[None ,bool]:
+    async def renewPublicChannel(self) -> Union[None, bool]:
         """ Deletes all channel messages and re-sends them / updates channel with current content. """
         if self.getPublicChannelName() is None:
             # Not possible without a given public channel
@@ -1337,6 +1353,18 @@ class BKBot:
         except Exception:
             traceback.print_exc()
             logging.warning("Resume of public channel update failed")
+            return False
+
+    async def notifyUsers(self) -> Union[None, bool]:
+        """ Notify users about expired favorite coupons that are back or new coupons depending on their settings. """
+        try:
+            await notifyUsersAboutNewCoupons(self)
+            await notifyUsersAboutUpcomingAccountDeletion(self)
+            return True
+        except Exception:
+            # This should never happen
+            traceback.print_exc()
+            logging.warning("Exception happened during user notify")
             return False
 
     async def cleanupPublicChannel(self) -> Union[None, bool]:

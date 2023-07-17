@@ -865,6 +865,21 @@ class User(Document):
             else:
                 return False
 
+    def hasEverUsedBot(self) -> bool:
+        """ Every user in DB should have used the bot at least once so this is kind of an ugly helper function which will return False
+         if DB values do not match current DB activity values e.g. due to DB changes.
+          Can especially be used to avoid sending account deletion notifications to users who are not eligable for auto account deletion. """
+        if self.timestampLastTimeBotUsed > 0:
+            return True
+        elif self.timestampLastTimeNotificationSentSuccessfully > 0:
+            return True
+        elif len(self.favoriteCoupons) > 0:
+            return True
+        elif self.getPaybackCardNumber() is not None:
+            return True
+        else:
+            return False
+
     def updateActivityTimestamp(self, force: bool = False) -> bool:
         if force or not self.hasRecentlyUsedBot():
             self.timestampLastTimeBotUsed = getCurrentDate().timestamp()
@@ -982,11 +997,11 @@ class ChannelCoupon(Document):
     """ Represents a coupon posted in a Telegram channel.
      Only contains minimum of required information as information about coupons itself is stored in another DB. """
     uniqueIdentifier = TextField()
-    messageIDs = ListField(IntegerField())
-    dateMessagesPosted = DateTimeField()
+    channelMessageID_image_and_qr_date_posted = DateTimeField()
     channelMessageID_image = IntegerField()
     channelMessageID_qr = IntegerField()
     channelMessageID_text = IntegerField()
+    channelMessageID_text_date_posted = DateTimeField()
 
     def getMessageIDs(self) -> List[int]:
         messageIDs = []
