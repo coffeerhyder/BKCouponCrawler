@@ -14,7 +14,8 @@ from telegram._utils.types import ReplyMarkup, ODVInput
 from telegram.error import RetryAfter, BadRequest, Forbidden
 from telegram.ext import CommandHandler, CallbackContext, ConversationHandler, CallbackQueryHandler, MessageHandler, Application, filters
 
-from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion
+from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion, \
+    notifyAdminsAboutProblems
 from BotUtils import *
 from BaseUtils import *
 from BotUtils import loadConfig, ImageCache
@@ -1360,6 +1361,7 @@ class BKBot:
         try:
             await notifyUsersAboutNewCoupons(self)
             await notifyUsersAboutUpcomingAccountDeletion(self)
+            await notifyAdminsAboutProblems(self)
             return True
         except Exception:
             # This should never happen

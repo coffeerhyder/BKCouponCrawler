@@ -7,7 +7,7 @@ from couchdb import Database
 from telegram import InputMediaPhoto
 
 from BotUtils import getBotImpressum, Commands, ImageCache
-from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes, formatSeconds
+from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes, formatSeconds, formatDateGermanHuman
 
 from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortModes, \
     MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER, MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING, MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION, \
@@ -139,6 +139,37 @@ async def notifyUsersAboutNewCoupons(bkbot) -> None:
     logging.info(f"New coupons notifications done | Duration: {(datetime.now() - timeStart)}")
 
 
+async def notifyAdminsAboutProblems(bkbot) -> None:
+    adminIDs = bkbot.cfg.admin_ids
+    if adminIDs is None or len(adminIDs) == 0:
+        # There are no admins
+        return
+    infoDatabase = bkbot.crawler.getInfoDB()
+    infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
+    timedeltaLastSuccessfulRun = datetime.now() - infoDBDoc.dateLastSuccessfulCrawlRun if infoDBDoc.dateLastSuccessfulCrawlRun is not None else None
+    timedeltaLastSuccessfulChannelupdate = datetime.now() - infoDBDoc.dateLastSuccessfulChannelUpdate if infoDBDoc.dateLastSuccessfulChannelUpdate is not None else None
+    text = ''
+    if timedeltaLastSuccessfulRun is not None and timedeltaLastSuccessfulRun.seconds > 48 * 60 * 60:
+        text += f'{SYMBOLS.WARNING} Letzter erfolgreicher Crawlvorgang war am {formatDateGermanHuman(infoDBDoc.dateLastSuccessfulCrawlRun)}'
+    if timedeltaLastSuccessfulChannelupdate is not None and timedeltaLastSuccessfulChannelupdate.seconds > 48 * 60 * 60:
+        text += f'\n{SYMBOLS.WARNING} Letztes erfolgreiches Channelupdate war am {formatDateGermanHuman(infoDBDoc.dateLastSuccessfulChannelUpdate)}'
+    if len(text) == 0:
+        # No notifications to send out
+        return
+    userDB = bkbot.crawler.getUserDB()
+    adminUsersToNotify = []
+    for adminID in adminIDs:
+        adminUser = User.load(userDB, adminID)
+        if adminUser is not None and adminUser.settings.notifyMeAsAdminIfThereAreProblems:
+            adminUsersToNotify.append(adminUser)
+    if len(adminUsersToNotify) == 0:
+        logging.info("There are no admins that want to be notified")
+        return
+    for adminUser in adminUsersToNotify:
+        await bkbot.sendMessageWithUserBlockedHandling(user=adminUser, userDB=userDB, text=text, parse_mode='HTML', disable_web_page_preview=True)
+
+
+
 async def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
     userDB = bkbot.crawler.getUserDB()
     numberOfMessagesSent = 0
@@ -149,7 +180,7 @@ async def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
             Avoid sending such notifications to users whose datasets are not up2date.
             """
             continue
-        currentTimestampSeconds = getCurrentDate().timestamp()
+        # currentTimestampSeconds = getCurrentDate().timestamp()
         secondsPassedSinceLastAccountActivity = user.getSecondsPassedSinceLastAccountActivity()
         secondsPassedSinceLastAccountDeletionWarning = getCurrentDate().timestamp() - user.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion
         if secondsPassedSinceLastAccountActivity >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and secondsPassedSinceLastAccountDeletionWarning > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:

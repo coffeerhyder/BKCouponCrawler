@@ -669,6 +669,7 @@ class User(Document):
             hideDuplicates=BooleanField(default=False),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
+            notifyMeAsAdminIfThereAreProblems=BooleanField(default=True),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
             highlightNewCouponsInCouponButtonTexts=BooleanField(default=True),
             highlightVeggieCouponsInCouponButtonTexts=BooleanField(default=True),
@@ -1203,6 +1204,11 @@ USER_SETTINGS_ON_OFF = {
         "category": SettingCategories.NOTIFICATIONS,
         "description": "Benachrichtigung bei neuen Coupons",
         "default": False
+    },
+    "notifyMeAsAdminIfThereAreProblems": {
+        "category": SettingCategories.NOTIFICATIONS,
+        "description": "Admin Benachrichtigung bei Problemen",
+        "default": True
     },
     "autoDeleteExpiredFavorites": {
         "category": SettingCategories.MISC,
