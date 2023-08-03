@@ -303,6 +303,7 @@ class BKCrawler:
                 # 2022-11-02: Prefer normal titles again because internal ones are sometimes incomplete
                 useInternalNameAsTitle = False
                 internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|CRM_MYBK_|MYBK_|\d{3,}_)?(.+)').search(internalName)
+                subtitle = couponBK['description']['de'][0]['children'][0]['text']
                 if internalNameRegex is not None and useInternalNameAsTitle:
                     titleFull = internalNameRegex.group(1)
                     titleFull = titleFull.replace('_', ' ')
@@ -310,7 +311,6 @@ class BKCrawler:
                 else:
                     title = couponBK['name']['de'][0]['children'][0]['text']
                     title = sanitizeCouponTitle(title)
-                    subtitle = couponBK['description']['de'][0]['children'][0]['text']
                     if subtitle is None:
                         titleFull = title
                     else:
@@ -333,7 +333,7 @@ class BKCrawler:
 
                 titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']
-                coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, titleShortened=shortenProductNames(titleFull),
+                coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, subtitle=subtitle, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP)
                 coupon.webviewID = couponBK.get('_id')
                 offerTags = couponBK.get('offerTags')
