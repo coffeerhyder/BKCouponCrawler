@@ -91,9 +91,9 @@ def shortenProductNames(couponTitle: str) -> str:
     couponTitle = sanitizeCouponTitle(couponTitle)
     pommesReplacement = SYMBOLS.FRIES
     # pommesReplacement = 'Pomm'
-    couponTitle = replaceRegex(re.compile(r'(?i)kleine\s*KING\s*Pommes'), 'S ' + pommesReplacement, couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)mittlere\s*KING\s*Pommes'), 'M ' + pommesReplacement, couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)große\s*KING\s*Pommes'), 'L ' + pommesReplacement, couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)kleine(\s*KING)?\s*Pommes'), 'S ' + pommesReplacement, couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)mittlere(\s*KING)?\s*Pommes'), 'M ' + pommesReplacement, couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)große(\s*KING)?\s*Pommes'), 'L ' + pommesReplacement, couponTitle)
     """ Just in case we missed one case... """
     couponTitle = replaceRegex(re.compile(r'(?i)KING\s*Pommes'), pommesReplacement, couponTitle)
     """ E.g. "Big KING" --> "Big K" """
@@ -162,10 +162,10 @@ def shortenProductNames(couponTitle: str) -> str:
 def sanitizeCouponTitle(couponTitle: str) -> str:
     """ Generic method which sanitizes strings and removes unneeded symbols such as trademark symbols. """
     couponTitle = couponTitle.replace('®', '')
-    removeOR = re.compile(r'( oder ?)').search(couponTitle)
+    removeOR = re.compile(r'(\s*oder\s*)').search(couponTitle)
     if removeOR:
         couponTitle = couponTitle.replace(removeOR.group(0), ', ')
-    couponTitle = replaceRegex(re.compile(r' ?zum\s*Preis\s*von\s*1!?'), '', couponTitle)  # 2021-01-19
+    couponTitle = replaceRegex(re.compile(r'\s*zum\s*Preis\s*von\s*(1!?|einem|einer)'), '', couponTitle)
     couponTitle = couponTitle.strip()
     return couponTitle
 

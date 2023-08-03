@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import logging
 import math
 import traceback
 from copy import deepcopy
@@ -13,7 +14,8 @@ from telegram._utils.types import ReplyMarkup, ODVInput
 from telegram.error import RetryAfter, BadRequest, Forbidden
 from telegram.ext import CommandHandler, CallbackContext, ConversationHandler, CallbackQueryHandler, MessageHandler, Application, filters
 
-from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion
+from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion, \
+    notifyAdminsAboutProblems
 from BotUtils import *
 from BaseUtils import *
 from BotUtils import loadConfig, ImageCache
@@ -152,6 +154,8 @@ class BKBot:
                     CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
                     CallbackQueryHandler(self.botDisplayPaybackCard, pattern='^' + CallbackVars.MENU_DISPLAY_PAYBACK_CARD + '$'),
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$'),
+                    CallbackQueryHandler(self.botAdminResendChannelCoupons, pattern='^' + CallbackVars.ADMIN_RESEND_COUPONS + '$'),
+                    CallbackQueryHandler(self.botAdminNukeChannel, pattern='^' + CallbackVars.ADMIN_NUKE_CHANNEL + '$'),
                 ],
                 CallbackVars.MENU_OFFERS: [
                     CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
@@ -348,22 +352,29 @@ class BKBot:
         if self.publicChannelName is not None and user.settings.displayFAQLinkButton:
             allButtons.append([InlineKeyboardButton('FAQ', url=self.getPublicChannelFAQLink())])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
+        if self.isAdmin(user) and user.settings.displayAdminButtons:
+            allButtons.append(
+                [InlineKeyboardButton(SYMBOLS.WARNING + 'ChannelCoupons erneut senden', callback_data=CallbackVars.ADMIN_RESEND_COUPONS)])
+            allButtons.append(
+                [InlineKeyboardButton(SYMBOLS.WARNING + 'Nuke Channel', callback_data=CallbackVars.ADMIN_NUKE_CHANNEL)])
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = 'Hallo ' + update.effective_user.first_name + ', <b>Bock auf Fastfood?</b>'
         menuText += '\n' + getBotImpressum()
         missingPaperCouponsText = self.crawler.getMissingPaperCouponsText()
         if missingPaperCouponsText is not None:
+            # Legacy code
             menuText += '\n<b>'
             menuText += SYMBOLS.WARNING + 'Derzeit im Bot fehlende Papiercoupons: ' + missingPaperCouponsText
             if self.publicChannelName is not None:
-                menuText += f"\nVollständige Papiercouponbögen sind im FAQ  <a href=\"{self.getPublicChannelFAQLink()}\">FAQ</a> verlinkt."
+                menuText += f"\nVollständige Papiercouponbögen sind im <a href=\"{self.getPublicChannelFAQLink()}\">FAQ</a> verlinkt."
             menuText += '</b>'
         if self.isAdmin(user):
-            menuText += '\n<b>Du bist Admin!</b>'
-            menuText += '\nAdmin Commands:'
-            menuText += '\n/' + Commands.MAINTENANCE + ' - Wartungsmodus toggeln'
             infoDB = self.crawler.getInfoDB()
             infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
+            menuText += '\n<b>Admin Panel:</b>'
+            menuText += '\nAdmin Commands:'
+            menuText += '\n/' + Commands.MAINTENANCE + ' - Wartungsmodus toggeln'
+            menuText += '\nAdmin Information:'
             menuText += f'\nLetzter erfolgreicher Crawlvorgang: {formatDateGermanHuman(infoDoc.dateLastSuccessfulCrawlRun)}'
             menuText += f'\nLetztes erfolgreiches Channelupdate: {formatDateGermanHuman(infoDoc.dateLastSuccessfulChannelUpdate)}'
         query = update.callback_query
@@ -458,7 +469,7 @@ class BKBot:
              view = getCouponViewByIndex(index=int(urlinfo["m"]))
             ValueError: invalid literal for int() with base 10: 'v'
          """
-        logging.info(f'{callbackVar=}')
+        logging.debug(f'{callbackVar=}')
         urlquery = furl(callbackVar)
         urlinfo = urlquery.args
         view = getCouponViewByIndex(index=int(urlinfo["m"]))
@@ -729,6 +740,28 @@ class BKBot:
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         await self.displaySettings(update, context, user)
         return CallbackVars.MENU_SETTINGS
+
+    async def botAdminResendChannelCoupons(self, update: Update, context: CallbackContext):
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        self.adminOrException(user)
+        await self.editOrSendMessage(update, text="Aktualisiere Channel...", parse_mode='HTML')
+        channelUpdateResult = await self.renewPublicChannel()
+        if channelUpdateResult is True:
+            await self.editOrSendMessage(update, text=SYMBOLS.CONFIRM + "Channelupdate erfolgreich", parse_mode='HTML')
+        else:
+            await self.editOrSendMessage(update, text=SYMBOLS.WARNING + "Channelupdate fehlgeschlagen", parse_mode='HTML')
+        return CallbackVars.MENU_MAIN
+
+    async def botAdminNukeChannel(self, update: Update, context: CallbackContext):
+        """
+        Deletes all channel coupons.
+        """
+        user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        self.adminOrException(user)
+        await self.editOrSendMessage(update, text="Starte Channel Nuke...", parse_mode='HTML')
+        await nukeChannel(self)
+        await self.editOrSendMessage(update, text=SYMBOLS.CONFIRM + "Channel Nuke erledigt", parse_mode='HTML')
+        return CallbackVars.MENU_MAIN
 
     async def displaySettings(self, update: Update, context: CallbackContext, user: User):
         keyboard = []
@@ -1128,7 +1161,7 @@ class BKBot:
         query = update.callback_query
         if query is not None:
             await query.answer()
-        await self.sendMessage(chat_id=update.effective_user.id, text='Ich nix verstehen.')
+        await self.sendMessage(chat_id=update.effective_user.id, text='Ich nix verstehen!')
 
     async def botAdminToggleMaintenanceMode(self, update: Update, context: CallbackContext):
         user = getUserFromDB(userDB=self.crawler.getUserDB(), userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
@@ -1170,15 +1203,23 @@ class BKBot:
         users = []
         for userIDStr in userDB:
             user = User.load(userDB, userIDStr)
-            if user.settings.autoDeleteExpiredFavorites:
-                users.append(user)
+            users.append(user)
         await self.deleteUsersUnavailableFavorites(userDB, users)
 
-    async def deleteUsersUnavailableFavorites(self, userDB: Database, users: list):
+    async def deleteUsersUnavailableFavorites(self, userDB: Database, users: list, force: bool = False):
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
+        if len(users) == 0:
+            return
+        usersToDeleteExpiredFavorites = []
+        for user in users:
+            if (force or user.settings.autoDeleteExpiredFavorites) and len(user.favoriteCoupons) > 0:
+                usersToDeleteExpiredFavorites.append(user)
+        if len(usersToDeleteExpiredFavorites) == 0:
+            logging.info("Failed to find any users eligable for favorite deletion")
+            return
         coupons = self.getFilteredCouponsAsDict(couponFilter=CouponFilter())
         dbUpdates = []
-        for user in users:
+        for user in usersToDeleteExpiredFavorites:
             userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=False)
             if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0:
                 for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
@@ -1246,7 +1287,6 @@ class BKBot:
                 except:
                     traceback.print_exc()
                     logging.info(f'Error while notifying user {userID} about auto account deletion.')
-                    pass
         if len(usersToDelete) > 0:
             logging.info(f'Deleting {len(usersToDelete)} inactive users from DB')
             userDB.purge(docs=usersToDelete)
@@ -1256,55 +1296,90 @@ class BKBot:
         """ Runs all processes which should only run once per day. """
         logging.info('Running batch process...')
         self.crawl()
-        if self.getPublicChannelName() is not None:
-            await self.renewPublicChannel()
+        # infoDB = self.crawler.getInfoDB()
+        # infoDBDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
+        # lastSuccessfulChannelupdate = infoDBDoc.dateLastSuccessfulChannelUpdate
+        if not await self.renewPublicChannel():
+            attempts = 0
+            attemptsMax = 24
+            retryseconds = 300
+            while True:
+                attempts += 1
+                logging.info(f"Retrying channelupdate in {retryseconds} seconds | Attempt: {attempts}/{attemptsMax}")
+                await asyncio.sleep(retryseconds)
+                if await self.resumePublicChannelUpdate():
+                    break
+                elif attempts >= attemptsMax:
+                    logging.warning("Channelupdate failed and can't be saved :(")
+                    break
+                else:
+                    continue
         self.deleteInactiveAccounts()
         await self.batchProcessAutoDeleteUsersUnavailableFavorites()
         await self.notifyUsers()
-        if self.getPublicChannelName() is not None:
-            await self.cleanupPublicChannel()
+        await self.cleanupPublicChannel()
         await self.cleanupCaches()
         logging.info('Batch process done.')
 
-    def crawl(self):
+    def crawl(self) -> bool:
         try:
             self.crawler.crawlAndProcessData()
+            return True
         except:
             traceback.print_exc()
             logging.warning("Crawler failed")
+            return False
 
-    async def notifyUsers(self):
+    async def renewPublicChannel(self) -> Union[None, bool]:
+        """ Deletes all channel messages and re-sends them / updates channel with current content. """
+        if self.getPublicChannelName() is None:
+            # Not possible without a given public channel
+            return None
+        try:
+            await updatePublicChannel(self, updateMode=ChannelUpdateMode.RESEND_ALL)
+            return True
+        except Exception:
+            traceback.print_exc()
+            logging.warning("Renew of public channel failed")
+            return False
+
+    async def resumePublicChannelUpdate(self) -> Union[None, bool]:
+        """ Resumes channel update. """
+        if self.getPublicChannelName() is None:
+            # Not possible without a given public channel
+            return None
+        try:
+            await updatePublicChannel(self, updateMode=ChannelUpdateMode.RESUME_CHANNEL_UPDATE)
+            return True
+        except Exception:
+            traceback.print_exc()
+            logging.warning("Resume of public channel update failed")
+            return False
+
+    async def notifyUsers(self) -> Union[None, bool]:
         """ Notify users about expired favorite coupons that are back or new coupons depending on their settings. """
         try:
             await notifyUsersAboutNewCoupons(self)
             await notifyUsersAboutUpcomingAccountDeletion(self)
+            await notifyAdminsAboutProblems(self)
+            return True
         except Exception:
             # This should never happen
             traceback.print_exc()
             logging.warning("Exception happened during user notify")
+            return False
 
-    async def renewPublicChannel(self):
-        """ Deletes all channel messages and re-sends them / updates channel with current content. """
-        try:
-            await updatePublicChannel(self, updateMode=ChannelUpdateMode.RESEND_ALL)
-        except Exception:
-            traceback.print_exc()
-            logging.warning("Renew of public channel failed")
-
-    async def resumePublicChannelUpdate(self):
-        """ Resumes channel update. """
-        try:
-            await updatePublicChannel(self, updateMode=ChannelUpdateMode.RESUME_CHANNEL_UPDATE)
-        except Exception:
-            traceback.print_exc()
-            logging.warning("Resume of public channel update failed")
-
-    async def cleanupPublicChannel(self):
+    async def cleanupPublicChannel(self) -> Union[None, bool]:
+        if self.getPublicChannelName() is None:
+            # Can't execute this without public channelname
+            return None
         try:
             await cleanupChannel(self)
+            return True
         except:
             traceback.print_exc()
             logging.warning("Cleanup channel failed")
+            return False
 
     def startBot(self):
         self.application.run_polling()

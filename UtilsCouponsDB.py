@@ -163,6 +163,7 @@ class Coupon(Document):
     priceCompare = IntegerField()
     staticReducedPercent = IntegerField()
     title = TextField()
+    subtitle = TextField()
     timestampAddedToDB = FloatField(default=0)
     timestampLastModifiedDB = FloatField(default=0)
     timestampStart = FloatField(default=0)
@@ -206,16 +207,19 @@ class Coupon(Document):
             return None
         return pluRegEx.group(1).upper()
 
-    def getNormalizedTitle(self):
+    def getNormalizedTitle(self) -> Union[str, None]:
         return normalizeString(self.getTitle())
 
-    def getTitle(self):
+    def getTitle(self) -> Union[str, None]:
         if self.paybackMultiplicator is not None:
             return f'{self.paybackMultiplicator}Fach auf alle Speisen & Getränke!'
         else:
             return self.title
 
-    def getTitleShortened(self, includeVeggieSymbol: bool):
+    def getSubtitle(self) -> Union[str, None]:
+        return self.subtitle
+
+    def getTitleShortened(self, includeVeggieSymbol: bool) -> Union[str, None]:
         shortenedTitle = shortenProductNames(self.getTitle())
         nutritionSymbol = None
         if includeVeggieSymbol:
@@ -224,7 +228,7 @@ class Coupon(Document):
             shortenedTitle = nutritionSymbol + shortenedTitle
         return shortenedTitle
 
-    def getNutritionSymbols(self):
+    def getNutritionSymbols(self) -> Union[str, None]:
         if not self.isEatable():
             return None
         enableMeatSymbol = False
@@ -235,7 +239,7 @@ class Coupon(Document):
         else:
             return None
 
-    def isExpiredForLongerTime(self):
+    def isExpiredForLongerTime(self) -> bool:
         """ Using this check, coupons that e.g. expire on midnight and get elongated will not be marked as new because really they aren't. """
         expireDatetime = self.getExpireDatetime()
         if expireDatetime is None:
@@ -259,7 +263,7 @@ class Coupon(Document):
     #     else:
     #         return False
 
-    def isValid(self):
+    def isValid(self) -> bool:
         expireDatetime = self.getExpireDatetime()
         currentDatetime = getCurrentDate()
         if expireDatetime is None:
@@ -663,17 +667,19 @@ class User(Document):
             displayBKWebsiteURLs=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
             displayFAQLinkButton=BooleanField(default=True),
+            displayAdminButtons=BooleanField(default=True),
             displayPlantBasedCouponsWithinGenericCategories=BooleanField(default=True),
             displayHiddenUpsellingAppCouponsWithinGenericCategories=BooleanField(default=True),
             hideDuplicates=BooleanField(default=False),
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
+            notifyMeAsAdminIfThereAreProblems=BooleanField(default=True),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
             highlightNewCouponsInCouponButtonTexts=BooleanField(default=True),
             highlightVeggieCouponsInCouponButtonTexts=BooleanField(default=True),
             displayQR=BooleanField(default=True),
             autoDeleteExpiredFavorites=BooleanField(default=False),
-            enableBetaFeatures=BooleanField(default=False)
+            enableBetaFeatures=BooleanField(default=False),
         )
     )
     botBlockedCounter = IntegerField(default=0)
@@ -686,7 +692,7 @@ class User(Document):
         ))
     couponViewSortModes = DictField(default={})
     # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
-    timestampLastTimeBotUsed = FloatField(default=getCurrentDate().timestamp())
+    timestampLastTimeBotUsed = FloatField(default=0)
     timestampLastTimeNotificationSentSuccessfully = FloatField(default=0)
     timesInformedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
     timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion = IntegerField(default=0)
@@ -864,6 +870,21 @@ class User(Document):
             else:
                 return False
 
+    def hasEverUsedBot(self) -> bool:
+        """ Every user in DB should have used the bot at least once so this is kind of an ugly helper function which will return False
+         if DB values do not match current DB activity values e.g. due to DB changes.
+          Can especially be used to avoid sending account deletion notifications to users who are not eligable for auto account deletion. """
+        if self.timestampLastTimeBotUsed > 0:
+            return True
+        elif self.timestampLastTimeNotificationSentSuccessfully > 0:
+            return True
+        elif len(self.favoriteCoupons) > 0:
+            return True
+        elif self.getPaybackCardNumber() is not None:
+            return True
+        else:
+            return False
+
     def updateActivityTimestamp(self, force: bool = False) -> bool:
         if force or not self.hasRecentlyUsedBot():
             self.timestampLastTimeBotUsed = getCurrentDate().timestamp()
@@ -981,11 +1002,11 @@ class ChannelCoupon(Document):
     """ Represents a coupon posted in a Telegram channel.
      Only contains minimum of required information as information about coupons itself is stored in another DB. """
     uniqueIdentifier = TextField()
-    messageIDs = ListField(IntegerField())
-    dateMessagesPosted = DateTimeField()
+    channelMessageID_image_and_qr_date_posted = DateTimeField()
     channelMessageID_image = IntegerField()
     channelMessageID_qr = IntegerField()
     channelMessageID_text = IntegerField()
+    channelMessageID_text_date_posted = DateTimeField()
 
     def getMessageIDs(self) -> List[int]:
         messageIDs = []
@@ -1133,6 +1154,11 @@ USER_SETTINGS_ON_OFF = {
         "description": "FAQ Button zeigen",
         "default": True
     },
+    "displayAdminButtons": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": "Admin Buttons anzeigen",
+        "default": True
+    },
     "displayPlantBasedCouponsWithinGenericCategories": {
         "category": SettingCategories.GLOBAL_FILTERS,
         "description": "Plant Based Coupons in Kategorien zeigen",
@@ -1182,6 +1208,11 @@ USER_SETTINGS_ON_OFF = {
         "category": SettingCategories.NOTIFICATIONS,
         "description": "Benachrichtigung bei neuen Coupons",
         "default": False
+    },
+    "notifyMeAsAdminIfThereAreProblems": {
+        "category": SettingCategories.NOTIFICATIONS,
+        "description": "Admin Benachrichtigung bei Problemen",
+        "default": True
     },
     "autoDeleteExpiredFavorites": {
         "category": SettingCategories.MISC,

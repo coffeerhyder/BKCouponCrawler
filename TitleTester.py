@@ -11,7 +11,8 @@ oldProductTitles = [
     "Big King",
     "Fish King",
     "KING FRIES Medium +1 DIP",
-    "KING NUGGETS 6 STK. + 1 DIP"
+    "KING NUGGETS 6 STK. + 1 DIP",
+    "2 Crispy Chicken 2 Crispy Chicken zum Preis von einem"
 ]
 
 for oldTitle in oldProductTitles:
