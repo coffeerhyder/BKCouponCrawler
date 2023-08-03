@@ -34,7 +34,7 @@ def coupon2FixProductTitle(productTitle: str) -> str:
         newDipQuantifier = ' + ' + dipQuantifier.group(2) + ' ' + dipQuantifier.group(3)
         newProductTitle = newProductTitle.replace(dipQuantifier.group(0), newDipQuantifier)
     # Remove things we don't need!
-    forPriceOfOne = re.compile(r"(?i)\s*?ZUM\s*PREIS\s*VON\s*EINER(\s*\d+ER\s*PORTION)?").search(newProductTitle)
+    forPriceOfOne = re.compile(r"(?i)\s*?ZUM\s*PREIS\s*VON\s*(EINEM|EINER\s* PORTION)").search(newProductTitle)
     if forPriceOfOne:
         newProductTitle = newProductTitle.replace(forPriceOfOne.group(0), '')
     buyOneGetOneFree = re.compile(r"(?i)[\s-]*?Buy\s*1\s*get\s*1\s*free").search(newProductTitle)

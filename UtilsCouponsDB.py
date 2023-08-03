@@ -163,6 +163,7 @@ class Coupon(Document):
     priceCompare = IntegerField()
     staticReducedPercent = IntegerField()
     title = TextField()
+    subtitle = TextField()
     timestampAddedToDB = FloatField(default=0)
     timestampLastModifiedDB = FloatField(default=0)
     timestampStart = FloatField(default=0)
@@ -206,16 +207,19 @@ class Coupon(Document):
             return None
         return pluRegEx.group(1).upper()
 
-    def getNormalizedTitle(self):
+    def getNormalizedTitle(self) -> Union[str, None]:
         return normalizeString(self.getTitle())
 
-    def getTitle(self):
+    def getTitle(self) -> Union[str, None]:
         if self.paybackMultiplicator is not None:
             return f'{self.paybackMultiplicator}Fach auf alle Speisen & Getränke!'
         else:
             return self.title
 
-    def getTitleShortened(self, includeVeggieSymbol: bool):
+    def getSubtitle(self) -> Union[str, None]:
+        return self.subtitle
+
+    def getTitleShortened(self, includeVeggieSymbol: bool) -> Union[str, None]:
         shortenedTitle = shortenProductNames(self.getTitle())
         nutritionSymbol = None
         if includeVeggieSymbol:
@@ -224,7 +228,7 @@ class Coupon(Document):
             shortenedTitle = nutritionSymbol + shortenedTitle
         return shortenedTitle
 
-    def getNutritionSymbols(self):
+    def getNutritionSymbols(self) -> Union[str, None]:
         if not self.isEatable():
             return None
         enableMeatSymbol = False
@@ -235,7 +239,7 @@ class Coupon(Document):
         else:
             return None
 
-    def isExpiredForLongerTime(self):
+    def isExpiredForLongerTime(self) -> bool:
         """ Using this check, coupons that e.g. expire on midnight and get elongated will not be marked as new because really they aren't. """
         expireDatetime = self.getExpireDatetime()
         if expireDatetime is None:
@@ -259,7 +263,7 @@ class Coupon(Document):
     #     else:
     #         return False
 
-    def isValid(self):
+    def isValid(self) -> bool:
         expireDatetime = self.getExpireDatetime()
         currentDatetime = getCurrentDate()
         if expireDatetime is None:
