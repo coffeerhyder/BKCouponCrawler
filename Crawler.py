@@ -1129,6 +1129,9 @@ class BKCrawler:
     def addCouponsToDB(self, couponDB: Database, couponsToAddToDB: Union[dict, List[Coupon]]) -> bool:
         if isinstance(couponsToAddToDB, dict):
             couponsToAddToDB = list(couponsToAddToDB.values())
+        if len(couponsToAddToDB) == 0:
+            # Nothing to do
+            return False
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         numberofCouponsNew = 0
