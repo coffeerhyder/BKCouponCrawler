@@ -1536,7 +1536,7 @@ class BKBot:
         except Forbidden:
             logging.info(f"User blocked bot: {user.id}")
             user.botBlockedCounter += 1
-            user.timestampLastTimeBlockedBot = datetime.now()
+            user.timestampLastTimeBlockedBot = datetime.now().timestamp()
             user.store(db=userDB)
             return None
 

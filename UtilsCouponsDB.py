@@ -212,7 +212,7 @@ class Coupon(Document):
 
     def getTitle(self) -> Union[str, None]:
         if self.paybackMultiplicator is not None:
-            return f'{self.paybackMultiplicator}Fach auf alle Speisen & Getränke!'
+            return f'{self.paybackMultiplicator}Fach auf alle Speisen & Getränke'
         else:
             return self.title
 
@@ -254,31 +254,28 @@ class Coupon(Document):
             """ Coupon is not expired or not "long enough". """
             return False
 
-    # def isExpired(self):
-    #     expireDatetime = self.getExpireDatetime()
-    #     currentDatetime = getCurrentDate()
-    #     if expireDatetime is None or currentDatetime > expireDatetime:
-    #         # Coupon is expired
-    #         return True
-    #     else:
-    #         return False
+    def isExpired(self) -> bool:
+        expireDatetime = self.getExpireDatetime()
+        if expireDatetime is None or expireDatetime < getCurrentDate():
+            # Coupon is expired
+            return True
+        else:
+            return False
+
+    def isNotYetActive(self) -> bool:
+        startDatetime = self.getStartDatetime()
+        if startDatetime is not None and startDatetime > getCurrentDate():
+            # Start time hasn't been reached yet -> Coupon is not valid yet
+            return True
+        else:
+            return False
 
     def isValid(self) -> bool:
-        expireDatetime = self.getExpireDatetime()
-        currentDatetime = getCurrentDate()
-        if expireDatetime is None:
-            # Coupon without expire-date = invalid --> Should never happen
-            return False
-        if currentDatetime > expireDatetime:
-            # Coupon is expired
-            return False
-        # Looks valid -> Check if coupon is available already according to start-timestamp
-        startDatetime = self.getStartDatetime()
-        if startDatetime is not None and startDatetime > currentDatetime:
-            # Start time hasn't been reached yet -> Coupon is not valid yet
+        """ If this returns true, we can present the coupon to the user.
+         If this returns false, this usually means that the coupon is expired or not yet available. """
+        if self.isExpired() or self.isNotYetActive():
             return False
         else:
-            # Coupon is valid
             return True
 
     def isContainsFriesAndDrink(self) -> bool:

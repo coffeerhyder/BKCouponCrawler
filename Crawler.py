@@ -694,17 +694,27 @@ class BKCrawler:
         # Collect items we want to add to DB
         couponsToAddToDB = {}
         # Get rid of invalid coupons so we won't even bother adding them to our DB.
-        invalidCoupons = []
+        notYetActiveCoupons = []
+        expiredCoupons = []
         for coupon in crawledCouponsDict.values():
-            if coupon.isValid():
-                couponsToAddToDB[coupon.id] = coupon
+            if coupon.isExpired():
+                expiredCoupons.append(coupon)
             else:
-                # Collect invalid coupons for logging purposes.
-                invalidCoupons.append(coupon)
-        if len(invalidCoupons) > 0:
+                if coupon.isNotYetActive():
+                    notYetActiveCoupons.append(coupon)
+                couponsToAddToDB[coupon.id] = coupon
+        if len(notYetActiveCoupons) > 0 or len(expiredCoupons) > 0:
             logging.info(getLogSeparatorString())
-            for coupon in invalidCoupons:
-                logging.info(f'Do not add invalid/expired/not-yet-active coupon to DB: {coupon}')
+            logging.info("Coupons which will not go into DB:")
+            logging.info(getLogSeparatorString())
+            logging.info(f"Expired coupons: {len(expiredCoupons)}")
+            for coupon in expiredCoupons:
+                logging.info(f'{coupon}')
+            logging.info(getLogSeparatorString())
+            logging.info(f"Not yet active coupons: {len(notYetActiveCoupons)}")
+            for coupon in notYetActiveCoupons:
+                logging.info(f'{coupon}')
+            logging.info(getLogSeparatorString())
         logging.info(f'Crawled coupons: {len(crawledCouponsDict)} | To be added to DB: {len(couponsToAddToDB)}')
         infoDatabase = self.getInfoDB()
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
@@ -733,7 +743,7 @@ class BKCrawler:
                 #         # Coupon hasn't been in API for at least 3 days -> Delete it
                 #         deleteCouponDocs[uniqueCouponID] = dbCoupon
                 deleteCouponDocs[uniqueCouponID] = dbCoupon
-            elif not crawledCoupon.isValid():
+            elif crawledCoupon.isExpired():
                 # Coupon is in DB and in crawled coupons but is expired -> Delete from DB
                 deleteCouponDocs[uniqueCouponID] = dbCoupon
         if len(deleteCouponDocs) > 0:
