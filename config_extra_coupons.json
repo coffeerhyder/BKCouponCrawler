@@ -113,6 +113,18 @@
       "isNewUntilDate": "2023-04-05",
 	  "description": "Danke an: mydealz.de/deals/burger-king-6-fach-payback-punkte-coupon-auf-alle-speisen-getranke-bis-23042023-2153505",
       "webviewURL": "https://www.mydealz.de/deals/burger-king-6-fach-payback-punkte-coupon-auf-alle-speisen-getranke-bis-23042023-2153505"
+    },
+    {
+      "uniqueID": "99222",
+	  "plu": "99222",
+      "paybackMultiplicator": 10,
+      "title": null,
+      "source": 8,
+      "imageURL": "file://media/extra_coupons_pics/2023_08_27_Payback_99222.png",
+      "expire_date": "2023-08-27",
+      "isNewUntilDate": "2022-08-08",
+	  "description": "Danke an: mydealz.de/deals/payback-10fach-punkte-auf-speisen-getranke-bei-burger-king-gultig-bis-zum-27082023-2211499",
+      "webviewURL": "https://www.mydealz.de/deals/payback-10fach-punkte-auf-speisen-getranke-bei-burger-king-gultig-bis-zum-27082023-2211499"
     }
   ]
 }

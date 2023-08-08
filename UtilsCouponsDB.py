@@ -212,7 +212,7 @@ class Coupon(Document):
 
     def getTitle(self) -> Union[str, None]:
         if self.paybackMultiplicator is not None:
-            return f'{self.paybackMultiplicator}Fach auf alle Speisen & Getränke!'
+            return f'{self.paybackMultiplicator}Fach auf alle Speisen & Getränke'
         else:
             return self.title
 
