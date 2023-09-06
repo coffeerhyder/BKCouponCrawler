@@ -452,7 +452,8 @@ class BKBot:
         text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
         text += f'\nBot  zuletzt verwendet am: {formatDateGermanHuman(user.timestampLastTimeBotUsed)}'
         text += f'\nLetzte Benachrichtigung vom Bot erhalten am: {formatDateGermanHuman(user.timestampLastTimeNotificationSentSuccessfully)}'
-        text += f'\n(Alle Datumsangaben zur Bot Verwendung / Benachrichtigungszeitpunkte sind auf {MAX_HOURS_ACTIVITY_TRACKING}h genau)'
+        text += '\n---'
+        text += f'\nAlle Datumsangaben zur Bot Verwendung / Benachrichtigungszeitpunkte sind auf {MAX_HOURS_ACTIVITY_TRACKING}h genau.'
         text += '</pre>'
         if loadingMessage is not None:
             await self.editMessage(chat_id=loadingMessage.chat_id, message_id=loadingMessage.message_id, text=text, parse_mode='html', disable_web_page_preview=True)
