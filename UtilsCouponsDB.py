@@ -29,6 +29,7 @@ class CouponFilter(BaseModel):
     isHidden: Optional[Union[bool, None]] = None
     isVeggie: Optional[Union[bool, None]] = None
     isPlantBased: Optional[Union[bool, None]] = None
+    isEatable: Optional[Union[bool, None]] = None
     sortCode: Optional[Union[None, int]]
 
 
@@ -122,15 +123,16 @@ class CouponView:
 
 
 class CouponViews:
-    ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode()), title="Alle Coupons")
-    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=False), title="Alle Coupons ohne Menü")
+    ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), isEatable=True), title="Alle Coupons")
+    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=False, isEatable=True), title="Alle Coupons ohne Menü")
+    ALL_WITH_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=True, isEatable=True), title="Alle Coupons mit Menü")
     CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode()))
     CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False))
     HIDDEN_APP_COUPONS_ONLY = CouponView(
         couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), allowedCouponTypes=[CouponType.APP], isHidden=True), title="App Coupons versteckte")
-    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isVeggie=True), includeVeggieSymbol=False,
+    VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isVeggie=True, isEatable=True), includeVeggieSymbol=False,
                         title=f"{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}")
-    MEAT_WITHOUT_PLANT_BASED = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isPlantBased=False), title="Fleisch ohne Plant Based Coupons")
+    MEAT_WITHOUT_PLANT_BASED = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isPlantBased=False, isEatable=True), title="Fleisch ohne Plant Based Coupons")
     # Dummy item basically only used for holding default sortCode for users' favorites
     FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode()), highlightFavorites=False, allowModifyFilter=False,
                            title=f"{SYMBOLS.STAR}Favoriten{SYMBOLS.STAR}")

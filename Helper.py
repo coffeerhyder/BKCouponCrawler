@@ -306,6 +306,9 @@ def couponTitleContainsVeggieFood(title: str) -> bool:
         return True
     elif couponTitleIsFries(titleLower):
         return True
+    elif '+' not in titleLower and 'cheese nacho' in titleLower:
+        # Cheese Nachos
+        return True
     elif '+' not in titleLower and 'chili cheese nuggets' in titleLower:
         return True
     elif '+' not in titleLower and 'onion rings' in titleLower:

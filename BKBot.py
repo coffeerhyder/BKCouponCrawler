@@ -33,6 +33,7 @@ from UtilsOffers import offerGetImagePath
 class CouponCallbackVars:
     ALL_COUPONS = f"?a=dcs&m={CouponViews.ALL.getViewCode()}&cs="
     ALL_COUPONS_WITHOUT_MENU = f"?a=dcs&m={CouponViews.ALL_WITHOUT_MENU.getViewCode()}&cs="
+    ALL_COUPONS_WITH_MENU = f"?a=dcs&m={CouponViews.ALL_WITH_MENU.getViewCode()}&cs="
     MEAT_WITHOUT_PLANT_BASED = f"?a=dcs&m={CouponViews.MEAT_WITHOUT_PLANT_BASED.getViewCode()}&cs="
     VEGGIE = f"?a=dcs&m={CouponViews.VEGGIE.getViewCode()}&cs="
     # MEAT_WITHOUT_PLANT_BASED = f"?a=dcs&m={CouponDisplayMode.MEAT_WITHOUT_PLANT_BASED}&cs="
@@ -313,6 +314,7 @@ class BKBot:
                 allButtons.append([InlineKeyboardButton('Alle Coupons Liste lange Titel + Pics', callback_data=CallbackVars.MENU_DISPLAY_ALL_COUPONS_LIST_WITH_FULL_TITLES)])
         allButtons.append([InlineKeyboardButton('Alle Coupons', callback_data=CouponCallbackVars.ALL_COUPONS)])
         allButtons.append([InlineKeyboardButton('Coupons ohne Menü', callback_data=CouponCallbackVars.ALL_COUPONS_WITHOUT_MENU)])
+        allButtons.append([InlineKeyboardButton(f'Coupons mit Menü ({SYMBOLS.FRIES}+Drink)', callback_data=CouponCallbackVars.ALL_COUPONS_WITH_MENU)])
         for couponSrc in BotAllowedCouponTypes:
             # Only add buttons for coupon categories for which at least one coupon is available
             couponCategory = self.crawler.getCachedCouponCategory(couponSrc)

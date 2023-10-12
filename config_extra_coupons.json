@@ -125,6 +125,30 @@
       "isNewUntilDate": "2022-08-08",
 	  "description": "Danke an: mydealz.de/deals/payback-10fach-punkte-auf-speisen-getranke-bei-burger-king-gultig-bis-zum-27082023-2211499",
       "webviewURL": "https://www.mydealz.de/deals/payback-10fach-punkte-auf-speisen-getranke-bei-burger-king-gultig-bis-zum-27082023-2211499"
+    },
+    {
+      "uniqueID": "99232",
+	  "plu": "99232",
+      "paybackMultiplicator": 10,
+      "title": null,
+      "source": 8,
+      "imageURL": "file://media/extra_coupons_pics/2023_10_12_Payback_99232.png",
+      "expire_date": "2023-10-22",
+      "isNewUntilDate": "2022-10-12",
+	  "description": "Danke an: mydealz.de/deals/payback-2x-10fach-punkte-bei-burger-king-auf-getranke-und-speisen-ab-2eur-gultig-bis-22102023-2236406",
+      "webviewURL": "https://www.mydealz.de/deals/payback-2x-10fach-punkte-bei-burger-king-auf-getranke-und-speisen-ab-2eur-gultig-bis-22102023-2236406"
+    },
+    {
+      "uniqueID": "99224",
+	  "plu": "99224",
+      "paybackMultiplicator": 10,
+      "title": null,
+      "source": 8,
+      "imageURL": "file://media/extra_coupons_pics/2023_10_12_Payback_99224.png",
+      "expire_date": "2023-10-22",
+      "isNewUntilDate": "2022-10-12",
+	  "description": "Danke an: mydealz.de/deals/payback-2x-10fach-punkte-bei-burger-king-auf-getranke-und-speisen-ab-2eur-gultig-bis-22102023-2236406",
+      "webviewURL": "https://www.mydealz.de/deals/payback-2x-10fach-punkte-bei-burger-king-auf-getranke-und-speisen-ab-2eur-gultig-bis-22102023-2236406"
     }
   ]
 }
