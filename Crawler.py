@@ -264,28 +264,20 @@ class BKCrawler:
         timestampCrawlStart = datetime.now().timestamp()
         # Docs: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default
         # Official live instance: https://www.burgerking.de/rewards/offers
-        date = datetime.now(getTimezone())
-        utcOffset = date.strftime('%z')
-        utcOffsetFormatted = utcOffset[:3] + ':' + utcOffset[3:]
-        dateformatted = date.strftime('%Y-%m-%dT%H:%M:%S.%f') + utcOffsetFormatted
-        post_json = {"operationName": "evaluateAllUserOffers",
-                     "variables": {"locale": "de", "platform": "web", "serviceMode": "TAKEOUT", "redeemedOn": dateformatted, "storeId": None},
-                     "query": "query evaluateAllUserOffers($locale: Locale, $platform: Platform, $redeemedOn: String!, $serviceMode: ServiceMode, $storeId: String) {\n  evaluateAllUserOffers(locale: $locale, platform: $platform, redeemedOn: $redeemedOn, serviceMode: $serviceMode, storeId: $storeId) {\n    offersFeedback {\n      ...OfferFeedbackEntryFragment\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment OfferFeedbackEntryFragment on CouponUserOffersFeedbackEntry {\n  cartEntry {\n    cartId: lineId\n    __typename\n  }\n  _id: couponId\n  tokenId\n  couponId\n  offerDetails\n  offerState\n  offerVariables {\n    key\n    type\n    value\n    __typename\n  }\n  rank\n  redemptionEligibility {\n    isRedeemable\n    isValid\n    evaluationFeedback {\n      code\n      condition\n      message\n      redeemableForSeconds\n      redeemableInSeconds\n      ruleSetType\n      sanityId\n      __typename\n    }\n    validationErrors {\n      code\n      message\n      ruleSetType\n      __typename\n    }\n    __typename\n  }\n  __typename\n}\n"}
-        req = httpx.post('https://euc1-prod-bk.rbictg.com/graphql', json=post_json, headers=HEADERS)
+        # Old one: https://euc1-prod-bk.rbictg.com/graphql
+        req = httpx.get(url='https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default?operationName=featureSortedLoyaltyOffers&variables=%7B%22id%22%3A%22feature-loyalty-offers-ui-singleton%22%7D&query=query+featureSortedLoyaltyOffers%28%24id%3AID%21%29%7BLoyaltyOffersUI%28id%3A%24id%29%7B_id+sortedSystemwideOffers%7B...SystemwideOffersFragment+__typename%7D__typename%7D%7Dfragment+SystemwideOffersFragment+on+SystemwideOffer%7B_id+_type+loyaltyEngineId+name%7BlocaleRaw%3AdeRaw+__typename%7Ddescription%7BlocaleRaw%3AdeRaw+__typename%7DmoreInfo%7BlocaleRaw%3AdeRaw+__typename%7DhowToRedeem%7BenRaw+__typename%7DbackgroundImage%7B...MenuImageFragment+__typename%7DshortCode+mobileOrderOnly+redemptionMethod+daypart+redemptionType+upsellOptions%7B_id+loyaltyEngineId+description%7BlocaleRaw%3AdeRaw+__typename%7DlocalizedImage%7Blocale%3Ade%7B...MenuImagesFragment+__typename%7D__typename%7Dname%7BlocaleRaw%3AdeRaw+__typename%7D__typename%7DofferPrice+marketPrice%7B...on+Item%7B_id+_type+vendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D...on+Combo%7B_id+_type+vendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D__typename%7DlocalizedImage%7Blocale%3Ade%7B...MenuImagesFragment+__typename%7D__typename%7DuiPattern+lockedOffersPanel%7BcompletedChallengeHeader%7BlocaleRaw%3AdeRaw+__typename%7DcompletedChallengeDescription%7BlocaleRaw%3AdeRaw+__typename%7D__typename%7DpromoCodePanel%7BpromoCodeDescription%7BlocaleRaw%3AdeRaw+__typename%7DpromoCodeLabel%7BlocaleRaw%3AdeRaw+__typename%7DpromoCodeLink+__typename%7Dincentives%7B__typename+...on+Combo%7B_id+_type+mainItem%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7DisOfferBenefit+__typename%7D...on+Item%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D...on+Picker%7B_id+_type+options%7Boption%7B__typename+...on+Combo%7B_id+_type+mainItem%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D...on+Item%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D%7D__typename%7DisOfferBenefit+__typename%7D...on+OfferDiscount%7B_id+_type+discountValue+discountType+__typename%7D...on+OfferActivation%7B_id+_type+__typename%7D...on+SwapMapping%7B_type+__typename%7D%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7Drules%7B...on+RequiresAuthentication%7BrequiresAuthentication+__typename%7D...on+LoyaltyBetweenDates%7BstartDate+endDate+__typename%7D__typename%7D__typename%7Dfragment+MenuImageFragment+on+Image%7Bhotspot%7Bx+y+height+width+__typename%7Dcrop%7Btop+bottom+left+right+__typename%7Dasset%7Bmetadata%7Blqip+palette%7Bdominant%7Bbackground+foreground+__typename%7D__typename%7D__typename%7D_id+__typename%7D__typename%7Dfragment+MenuImagesFragment+on+Images%7Bapp%7B...MenuImageFragment+__typename%7Dkiosk%7B...MenuImageFragment+__typename%7DimageDescription+__typename%7Dfragment+VendorConfigsFragment+on+VendorConfigs%7Bcarrols%7B...VendorConfigFragment+__typename%7DcarrolsDelivery%7B...VendorConfigFragment+__typename%7Dncr%7B...VendorConfigFragment+__typename%7DncrDelivery%7B...VendorConfigFragment+__typename%7Doheics%7B...VendorConfigFragment+__typename%7DoheicsDelivery%7B...VendorConfigFragment+__typename%7Dpartner%7B...VendorConfigFragment+__typename%7DpartnerDelivery%7B...VendorConfigFragment+__typename%7DproductNumber%7B...VendorConfigFragment+__typename%7DproductNumberDelivery%7B...VendorConfigFragment+__typename%7Dsicom%7B...VendorConfigFragment+__typename%7DsicomDelivery%7B...VendorConfigFragment+__typename%7Dqdi%7B...VendorConfigFragment+__typename%7DqdiDelivery%7B...VendorConfigFragment+__typename%7Dqst%7B...VendorConfigFragment+__typename%7DqstDelivery%7B...VendorConfigFragment+__typename%7Drpos%7B...VendorConfigFragment+__typename%7DrposDelivery%7B...VendorConfigFragment+__typename%7DsimplyDelivery%7B...VendorConfigFragment+__typename%7DsimplyDeliveryDelivery%7B...VendorConfigFragment+__typename%7Dtablet%7B...VendorConfigFragment+__typename%7DtabletDelivery%7B...VendorConfigFragment+__typename%7D__typename%7Dfragment+VendorConfigFragment+on+VendorConfig%7BpluType+parentSanityId+pullUpLevels+constantPlu+discountPlu+quantityBasedPlu%7Bquantity+plu+qualifier+__typename%7DmultiConstantPlus%7Bquantity+plu+qualifier+__typename%7DparentChildPlu%7Bplu+childPlu+__typename%7DsizeBasedPlu%7BcomboPlu+comboSize+__typename%7D__typename%7D', headers=HEADERS, timeout=120)
+        print(req.text)
         apiResponse = req.json()
         if self.storeCouponAPIDataAsJson:
             # Save API response so we can easily use this data for local testing later on.
             saveJson('crawler/coupons1.json', apiResponse)
-        offersFeedback = apiResponse['data']['evaluateAllUserOffers']['offersFeedback']
+        couponArrayBK = apiResponse['data']['LoyaltyOffersUI']['sortedSystemwideOffers']
         appCoupons = []
         appCouponsNotYetActive = []
-        for offerFeedback in offersFeedback:
-            # json in json
-            couponJson = offerFeedback['offerDetails']
-            couponBK = loads(couponJson)
-            bkCoupons = [couponBK]
+        for couponBKTmp in couponArrayBK:
+            bkCoupons = [couponBKTmp]
             # Collect hidden coupons
-            upsellOptions = couponBK.get('upsellOptions')
+            upsellOptions = couponBKTmp.get('upsellOptions')
             if upsellOptions is not None:
                 for upsellOption in upsellOptions:
                     upsellType = upsellOption.get('_type')
@@ -298,18 +290,24 @@ class BKCrawler:
             index = 0
             for couponBK in bkCoupons:
                 uniqueCouponID = couponBK['vendorConfigs']['rpos']['constantPlu']
-                internalName = couponBK['internalName']
+                legacyInternalName = couponBK.get('internalName')
                 # Find coupon-title. Prefer to get it from 'internalName' as the other title may contain crap we don't want.
                 # 2022-11-02: Prefer normal titles again because internal ones are sometimes incomplete
                 useInternalNameAsTitle = False
-                internalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|CRM_MYBK_|MYBK_|\d{3,}_)?(.+)').search(internalName)
-                subtitle = couponBK['description']['de'][0]['children'][0]['text']
-                if internalNameRegex is not None and useInternalNameAsTitle:
-                    titleFull = internalNameRegex.group(1)
+                legacyInternalNameRegex = None
+                if legacyInternalName is not None:
+                    legacyInternalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|CRM_MYBK_|MYBK_|\d{3,}_)?(.+)').search(legacyInternalName)
+                subtitle = None
+                try:
+                    subtitle = couponBK['description']['localeRaw'][0]['children'][0]['text']
+                except:
+                    pass
+                if legacyInternalNameRegex is not None and useInternalNameAsTitle:
+                    titleFull = legacyInternalNameRegex.group(1)
                     titleFull = titleFull.replace('_', ' ')
                     titleFull = sanitizeCouponTitle(titleFull)
                 else:
-                    title = couponBK['name']['de'][0]['children'][0]['text']
+                    title = couponBK['name']['localeRaw'][0]['children'][0]['text']
                     title = sanitizeCouponTitle(title)
                     if subtitle is None:
                         titleFull = title
@@ -333,9 +331,11 @@ class BKCrawler:
 
                 titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']
-                coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=couponBK['shortCode'], title=titleFull, subtitle=subtitle, titleShortened=shortenProductNames(titleFull),
+                plu = couponBK['shortCode']
+                coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=plu, title=titleFull, subtitle=subtitle, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP)
                 coupon.webviewID = couponBK.get('_id')
+                # TODO: Check where those tags are located in new API
                 offerTags = couponBK.get('offerTags')
                 if offerTags is not None and len(offerTags) > 0:
                     tagsStringArray = []
@@ -357,50 +357,54 @@ class BKCrawler:
                         coupon.price = 0
                 else:
                     coupon.price = price
-                coupon.imageURL = couponBK['localizedImage']['de']['app']['asset']['url']
-                """ Find and set expire-date:
-                 BKs API can provide different start- and expire-dates depending on the coupon-type e.g. "King Deal" coupons may have an offset of 1 hour
-                 while all others have an offset of two hours. In order to get around this offset problem we prefer to extract the expire-date
-                 from the footnote of the coupons and simply add the time (end of the day).
+                # Build URL to coupon product image
+                imageurl = couponBK['localizedImage']['locale']['app']['asset']['_id']
+                imageurl = "https://cdn.sanity.io/images/czqk28jt/prod_bk_de/" + imageurl.replace('image-', '')
+                imageurl = imageurl.replace('-png', '.png')
+                coupon.imageURL = imageurl
+                """ Find and set start- and expire-date.
                  """
-                expiredate1 = None
-                expiredate2 = None
+                datetimeExpire1 = None
+                datetimeExpire2 = None
+                datetimeStart = None
                 try:
-                    footnote = couponBK['moreInfo']['de'][0]['children'][0]['text']
+                    footnote = couponBK['moreInfo']['localeRaw'][0]['children'][0]['text']
                     expiredateRegex = re.compile(r'(?i)Abgabe bis (\d{1,2}\.\d{1,2}\.\d{4})').search(footnote)
                     if expiredateRegex is not None:
                         expiredateStr = expiredateRegex.group(1) + ' 23:59:59'
-                        expiredate1 = datetime.strptime(expiredateStr, '%d.%m.%Y %H:%M:%S').timestamp()
+                        datetimeExpire1 = datetime.strptime(expiredateStr, '%d.%m.%Y %H:%M:%S')
                 except:
                     # Dontcare
-                    logging.warning('Failed to find BetterExpiredate for coupon ' + coupon.id)
-                ruleSets = couponBK['ruleSet']
-                realRuleSets = []
-                for ruleSet in ruleSets:
-                    ruleSetsChilds = ruleSet.get('ruleSet')
+                    logging.warning('Failed to find BetterExpiredate for coupon: ' + coupon.id)
+                rulesHere = couponBK['rules']
+                rulesAll = []
+                for ruleSet in rulesHere:
+                    ruleSetsChilds = ruleSet.get('rules')
                     if ruleSetsChilds is not None:
                         for ruleSetsChild in ruleSetsChilds:
-                            realRuleSets.append(ruleSetsChild)
+                            rulesAll.append(ruleSetsChild)
                     else:
-                        realRuleSets.append(ruleSet)
-                dateformat = '%Y-%m-%dT%H:%M:%S.%fZ'
-                serversideTimeOffset = 2 * 60 * 60
-                for realRuleSet in realRuleSets:
-                    if realRuleSet['_type'] == 'between-dates':
-                        coupon.timestampStart = datetime.strptime(realRuleSet['startDate'], dateformat).timestamp() + serversideTimeOffset
-                        expiredate2 = datetime.strptime(realRuleSet['endDate'], dateformat).timestamp() + serversideTimeOffset
+                        rulesAll.append(ruleSet)
+                dateformatStart = '%Y-%m-%d'
+                dateformatEnd = '%Y-%m-%d %H:%M:%S'
+                for rule in rulesAll:
+                    if rule['__typename'] == 'LoyaltyBetweenDates':
+                        datetimeStart = datetime.strptime(rule['startDate'], dateformatStart)
+                        datetimeExpire2 = datetime.strptime(rule['endDate'] + ' 23:59:59', dateformatEnd)
                         break
-                if expiredate1 is None and expiredate2 is None:
+                if datetimeExpire1 is None and datetimeExpire2 is None:
                     # This should never happen
                     logging.warning(f'WTF failed to find any expiredate for coupon: {uniqueCouponID}')
-                elif expiredate1 is not None:
+                elif datetimeExpire1 is not None:
                     # Prefer this expiredate
-                    coupon.timestampExpire = expiredate1
+                    coupon.timestampExpire = datetimeExpire1.timestamp()
                 else:
-                    coupon.timestampExpire = expiredate2
+                    coupon.timestampExpire = datetimeExpire2.timestamp()
+                if datetimeStart is not None:
+                    coupon.timestampStart = datetimeStart.timestamp()
                 crawledCouponsDict[uniqueCouponID] = coupon
                 appCoupons.append(coupon)
-                if coupon.timestampStart > datetime.now().timestamp():
+                if datetimeStart is not None and datetimeStart > datetime.now():
                     appCouponsNotYetActive.append(coupon)
                 index += 1
 
@@ -1129,6 +1133,9 @@ class BKCrawler:
     def addCouponsToDB(self, couponDB: Database, couponsToAddToDB: Union[dict, List[Coupon]]) -> bool:
         if isinstance(couponsToAddToDB, dict):
             couponsToAddToDB = list(couponsToAddToDB.values())
+        if len(couponsToAddToDB) == 0:
+            # Nothing to do
+            return False
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         numberofCouponsNew = 0
@@ -1285,6 +1292,8 @@ class BKCrawler:
             elif filter.isVeggie is not None and coupon.isVeggie() != filter.isVeggie:
                 continue
             elif filter.isPlantBased is not None and coupon.isPlantBased() != filter.isPlantBased:
+                continue
+            elif filter.isEatable is not None and coupon.isEatable() != filter.isEatable:
                 continue
             else:
                 desiredCoupons[uniqueCouponID] = coupon
