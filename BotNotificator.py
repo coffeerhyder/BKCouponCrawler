@@ -15,7 +15,7 @@ from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCou
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
-DEBUGNOTIFICATOR = True
+DEBUGNOTIFICATOR = False
 
 
 async def collectNewCouponsNotifications(bkbot) -> None:
