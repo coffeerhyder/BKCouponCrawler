@@ -15,12 +15,12 @@ from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCou
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
-DEBUGNOTIFICATOR = False
+DEBUGNOTIFICATOR = True
 
 
-async def notifyUsersAboutNewCoupons(bkbot) -> None:
+async def collectNewCouponsNotifications(bkbot) -> None:
     """
-    Notifies user about new coupons and users' expired favorite coupons that are back (well = also new coupons).
+    Collects user notifications regarding new coupons and adds them to user document so they can be sent out later.
     """
     logging.info("Checking for pending new coupons notifications")
     timeStart = datetime.now()
@@ -29,7 +29,6 @@ async def notifyUsersAboutNewCoupons(bkbot) -> None:
         logging.info("No new coupons available to notify users about")
         return
     userDB = bkbot.crawler.getUserDB()
-
     """ 
      Build a mapping of normalized coupon titles to coupons.
      This way we can easily find alternatives to users' expired coupons (e.g. when BK decides to raise prices for the same product again).
@@ -47,18 +46,17 @@ async def notifyUsersAboutNewCoupons(bkbot) -> None:
     """ 
      Now compute all messages for all users to when sending out the messages we can have a nice progress log output.
      """
-    dbUserFavoritesUpdates = set()
-    usersNotify = {}
+    # List of user documents that were changed and need to be pushed to DB
+    dbUserUpdateList = set()
+
     numberofFavoriteNotifications = 0
-    numberofNewCouponsNotifications = 0
     logging.info('Computing new coupons\' notification messages...')
     for userIDStr in userDB:
         user = User.load(userDB, userIDStr)
-        usertext = ""
-        # Obey Telegram entity limits...
-        remainingEntities = 50
+        notificationtext = ""
         userNewFavoriteCoupons = {}
         # Check if user wants to be notified about favorites that are back
+        updateUserDoc = False
         if user.isAllowSendFavoritesNotification():
             # Collect users favorite coupons that are currently new --> Those ones are 'Favorites that are back'
             userFavoritesInfo = user.getUserFavoritesInfo(newCoupons, sortCoupons=True)
@@ -81,15 +79,11 @@ async def notifyUsersAboutNewCoupons(bkbot) -> None:
                     foundAtLeastOneAlternativeCoupon = True
             if foundAtLeastOneAlternativeCoupon:
                 # DB update required
-                dbUserFavoritesUpdates.add(user)
+                updateUserDoc = True
             if len(userNewFavoriteCoupons) > 0:
-
-                usertext += "<b>" + SYMBOLS.STAR + str(
+                notificationtext += "<b>" + SYMBOLS.STAR + str(
                     len(userNewFavoriteCoupons)) + " deiner Favoriten sind wieder verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(userNewFavoriteCoupons, 49)
                 numberofFavoriteNotifications += 1
-                # The '<b>' entity is also one entity so let's substract this so we know how many are remaining
-                remainingEntities -= 1
-                remainingEntities -= len(userNewFavoriteCoupons)
         # Check if user has enabled notifications for new coupons
         if user.settings.notifyWhenNewCouponsAreAvailable:
             newCouponsListForThisUsersNotification = {}
@@ -103,40 +97,31 @@ async def notifyUsersAboutNewCoupons(bkbot) -> None:
             else:
                 newCouponsListForThisUsersNotification = newCoupons
             if len(newCouponsListForThisUsersNotification) > 0:
-                if len(usertext) == 0:
-                    # '<b>' entity only counts as one even if there are multiple of those used in one post
-                    remainingEntities -= 1
-                else:
-                    usertext += "\n---\n"
-                usertext += "<b>" + SYMBOLS.NEW + str(len(newCouponsListForThisUsersNotification)) + " neue Coupons verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(newCouponsListForThisUsersNotification, 49)
-                numberofNewCouponsNotifications += 1
-                remainingEntities -= len(newCouponsListForThisUsersNotification)
-        if len(usertext) > 0:
+                if len(notificationtext) > 0:
+                    notificationtext += "\n---\n"
+                notificationtext += "<b>" + SYMBOLS.NEW + str(
+                    len(newCouponsListForThisUsersNotification)) + " neue Coupons verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(
+                    newCouponsListForThisUsersNotification, 49)
+        if len(notificationtext) > 0:
             # Complete user text and save it to send it later
             if bkbot.getPublicChannelName() is None:
                 # Different text in case someone sets up this bot without a public channel (kinda makes no sense).
-                usertext += "\nMit /start gelangst du ins Hauptmenü des Bots."
+                notificationtext += "\nMit /start gelangst du ins Hauptmenü des Bots."
             else:
-                usertext += f"\nPer Klick gelangst du zu den jeweiligen Coupons im {bkbot.getPublicChannelHyperlinkWithCustomizedText('Channel')} und mit /start ins Hauptmenü des Bots."
-            if remainingEntities < 0:
-                usertext += f"\n{SYMBOLS.WARNING}Wegen Telegram Limits konnten evtl. nicht alle Coupons verlinkt werden."
-                usertext += "\nDas ist nicht weiter tragisch. Du findest alle Coupons im Bot/Channel."
-            # Store text and send it later
-            usersNotify[userIDStr] = usertext
-    if len(usersNotify) == 0:
-        logging.info("No users available who want to be notified on new coupons")
+                notificationtext += f"\nPer Klick gelangst du zu den jeweiligen Coupons im {bkbot.getPublicChannelHyperlinkWithCustomizedText('Channel')} und mit /start ins Hauptmenü des Bots."
+            if notificationtext not in user.pendingNotifications:
+                # Add notification text if it is not already contained in list of pending notifications
+                joinedlist = user.pendingNotifications + [notificationtext]
+                user.pendingNotifications = joinedlist
+                updateUserDoc = True
+        if updateUserDoc:
+            dbUserUpdateList.add(user)
+    if len(dbUserUpdateList) == 0:
+        logging.info("Did not collect any new notifications to send out")
         return
-    if len(dbUserFavoritesUpdates) > 0:
-        logging.info(f"Auto updated favorites of {len(dbUserFavoritesUpdates)} users")
-        userDB.update(list(dbUserFavoritesUpdates))
-    logging.info(f"Notifying {len(usersNotify)} users about favorites/new coupons")
-    position = 0
-    for userIDStr, postText in usersNotify.items():
-        position += 1
-        logging.info("Sending user notification " + str(position) + "/" + str(len(usersNotify)) + " to user: " + userIDStr)
-        user = User.load(userDB, userIDStr)
-        await bkbot.sendMessageWithUserBlockedHandling(user=user, userDB=userDB, text=postText, parse_mode='HTML', disable_web_page_preview=True)
-    logging.info(f"New coupons notifications done | Duration: {(datetime.now() - timeStart)}")
+    logging.info(f"Pushing DB update of {len(dbUserUpdateList)} user documents")
+    userDB.update(list(dbUserUpdateList))
+    logging.info(f"New coupons notifications collector done | Duration: {(datetime.now() - timeStart)}")
 
 
 async def notifyAdminsAboutProblems(bkbot) -> None:
@@ -169,10 +154,9 @@ async def notifyAdminsAboutProblems(bkbot) -> None:
         await bkbot.sendMessageWithUserBlockedHandling(user=adminUser, userDB=userDB, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
 
-
-async def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
+async def collectUserDeleteNotifications(bkbot) -> None:
     userDB = bkbot.crawler.getUserDB()
-    numberOfMessagesSent = 0
+    numberOfCollectedNotifications = 0
     for userID in userDB:
         user = User.load(db=userDB, id=userID)
         if not user.hasEverUsedBot():
@@ -180,7 +164,6 @@ async def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
             Avoid sending such notifications to users whose datasets are not up2date.
             """
             continue
-        # currentTimestampSeconds = getCurrentDate().timestamp()
         secondsPassedSinceLastAccountActivity = user.getSecondsPassedSinceLastAccountActivity()
         secondsPassedSinceLastAccountDeletionWarning = getCurrentDate().timestamp() - user.timestampLastTimeWarnedAboutUpcomingAutoAccountDeletion
         if secondsPassedSinceLastAccountActivity >= MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER and secondsPassedSinceLastAccountDeletionWarning > MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING and user.timesInformedAboutUpcomingAutoAccountDeletion < MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION:
@@ -203,9 +186,12 @@ async def notifyUsersAboutUpcomingAccountDeletion(bkbot) -> None:
             text += '\nÖffne das Hauptmenü einmalig mit /start, um dem Bot zu zeigen, dass du noch lebst.'
             text += f'\nWahlweise kannst du deinen Account mit /{Commands.DELETE_ACCOUNT} selbst löschen.'
             await bkbot.sendMessageWithUserBlockedHandling(user=user, userDB=userDB, text=text, parse_mode='HTML', disable_web_page_preview=True)
+            if text not in user.pendingNotifications:
+                notificationlist = user.pendingNotifications + [text]
+                user.pendingNotifications = notificationlist
             user.store(db=userDB)
-            numberOfMessagesSent += 1
-    logging.info('Number of users informed about account deletion: ' + str(numberOfMessagesSent))
+            numberOfCollectedNotifications += 1
+    logging.info('Number of users who will soon be informed about account deletion: ' + str(numberOfCollectedNotifications))
 
 
 class ChannelUpdateMode(Enum):
@@ -229,7 +215,8 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     if infoDBDoc.dateLastSuccessfulChannelUpdate is not None:
         passedSeconds = (datetime.now() - infoDBDoc.dateLastSuccessfulChannelUpdate).total_seconds()
         logging.info("Passed seconds since last channel update: " + str(passedSeconds))
-    activeCoupons = bkbot.crawler.getFilteredCouponsAsDict(CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
+    activeCoupons = bkbot.crawler.getFilteredCouponsAsDict(
+        CouponFilter(activeOnly=True, allowedCouponTypes=BotAllowedCouponTypes, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
     channelDB = bkbot.couchdb[DATABASES.TELEGRAM_CHANNEL]
     # All coupons we want to send out this run
     couponsToSendOut = {}
@@ -267,23 +254,25 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Collect coupons to send out in this run.
     if updateMode == ChannelUpdateMode.RESEND_ALL:
         couponsToSendOut = activeCoupons
-    elif updateMode == ChannelUpdateMode.RESUME_CHANNEL_UPDATE:
+    else:
+        # ChannelUpdateMode.RESUME_CHANNEL_UPDATE
         # Collect all coupons that haven't been sent into the channel at all or were sent into the channel more than X seconds ago (= "old" entries)
         allFromNowOn = False
         for coupon in activeCoupons.values():
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
-            if allFromNowOn or channelCoupon is None or channelCoupon.channelMessageID_image_and_qr_date_posted is None or (datetime.now() - channelCoupon.channelMessageID_image_and_qr_date_posted).total_seconds() > 16 * 60 * 60 or channelCoupon.channelMessageID_text_date_posted is None or (datetime.now() - channelCoupon.channelMessageID_text_date_posted).total_seconds() > 16 * 60 * 60:
+            if allFromNowOn or channelCoupon is None or channelCoupon.channelMessageID_image_and_qr_date_posted is None or (
+                    datetime.now() - channelCoupon.channelMessageID_image_and_qr_date_posted).total_seconds() > 16 * 60 * 60 or channelCoupon.channelMessageID_text_date_posted is None or (
+                    datetime.now() - channelCoupon.channelMessageID_text_date_posted).total_seconds() > 16 * 60 * 60:
                 # Coupon has not been posted into channel yet or has been posted in there too long ago -> Add to list of coupons to re-send later
                 couponsToSendOut[coupon.id] = coupon
                 # One coupon was missing/incomplete? Re-send all after this one.
                 allFromNowOn = True
-    else:
-        # This should never happen!
-        logging.warning("Unsupported ChannelUpdateMode! Developer mistake?!")
 
     if numberOfCouponsNewToThisChannel != len(newCoupons):
         # During normal usage this should never happen
-        logging.warning("Developer mistake or DB has been updated without sending channel update in between for at least 2 days: Number of 'new' coupons to send into channel is: " + str(numberOfCouponsNewToThisChannel) + " but should be: " + str(len(newCoupons)))
+        logging.warning(
+            "Developer mistake or DB has been updated without sending channel update in between for at least 2 days: Number of 'new' coupons to send into channel is: " + str(
+                numberOfCouponsNewToThisChannel) + " but should be: " + str(len(newCoupons)))
     if len(couponsToSendOut) > 0:
         # Send relevant coupons into chat
         logging.info(f"Sending out {len(couponsToSendOut)}/{len(activeCoupons)} coupons...")
@@ -331,13 +320,30 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             # Send coupon information as text (= last message for this coupon)
             logging.debug("Sending new coupon messages 2/2: Coupon text")
             couponTextMsg = await asyncio.create_task(bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=couponText, parse_mode='HTML', disable_notification=True,
-                                              disable_web_page_preview=True))
+                                                                        disable_web_page_preview=True))
             channelCoupon.channelMessageID_text = couponTextMsg.message_id
             channelCoupon.channelMessageID_text_date_posted = datetime.now()
             # Update DB
             channelCoupon.store(channelDB)
 
-    await bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB, infoDBDoc=infoDBDoc)
+    await bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB,
+                                                   infoDBDoc=infoDBDoc)
+
+    notYetAvailableCoupons = bkbot.crawler.getFilteredCouponsAsList(CouponFilter(activeOnly=False, isNotYetActive=True))
+    notYetAvailableCouponsText = None
+    if len(notYetAvailableCoupons) > 0:
+        notYetAvailableCoupons = sorted(notYetAvailableCoupons,
+                                        key=lambda x: 0 if x.getStartDatetime() is None else x.getStartDatetime().timestamp())
+        notYetAvailableCouponsText = "<b>Demnächst verfügbare Coupons:</b>"
+        for notYetAvailableCoupon in notYetAvailableCoupons:
+            datetimeCouponAvailable = notYetAvailableCoupon.getStartDatetime()
+            thisCouponText = "Ab "
+            if datetimeCouponAvailable is not None:
+                thisCouponText += datetimeCouponAvailable.strftime('%d.%m.%Y')
+            else:
+                thisCouponText += "?"
+            thisCouponText += " | " + notYetAvailableCoupon.generateCouponShortText(highlightIfNew=False, includeVeggieSymbol=False)
+            notYetAvailableCouponsText += "\n" + thisCouponText
 
     """ Generate new information message text. """
     infoText = '<b>Heutiges Update:</b>'
@@ -353,6 +359,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += '\n<b>------</b>'
     if DEBUGNOTIFICATOR:
         infoText += '\n<b>' + SYMBOLS.WARNING + 'Debug Modus!!!' + SYMBOLS.WARNING + '</b>'
+        infoText += "\n---"
     if bkbot.maintenanceMode:
         infoText += '\n<b>' + SYMBOLS.DENY + 'Wartungsmodus!' + SYMBOLS.DENY
         infoText += '\nDie Funktionalität von Bot/Channel kann derzeit nicht gewährleistet werden!'
@@ -360,7 +367,11 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += '</b>'
     missingPaperCouponsText = bkbot.crawler.getMissingPaperCouponsText()
     if missingPaperCouponsText is not None:
-        infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons: </b>' + missingPaperCouponsText
+        infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons:</b>' + missingPaperCouponsText
+    if notYetAvailableCouponsText is not None:
+        infoText += '\n' + notYetAvailableCouponsText
+        infoText += "\n---"
+
     infoText += "\nTechnisch bedingt werden die Coupons täglich erneut in diesen Channel geschickt."
     infoText += "\nStören dich die Benachrichtigungen?"
     infoText += "\nErstelle eine Verknüpfung: Drücke oben auf den Namen des Chats -> Rechts auf die drei Punkte -> Verknüpfung hinzufügen (funktioniert auch mit Bots)"
@@ -379,7 +390,8 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Store old informationMessageID for later deletion
     if infoDBDoc.informationMessageID is not None:
         infoDBDoc.addMessageIDToDelete(infoDBDoc.informationMessageID)
-    newMsg = await asyncio.create_task(bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True))
+    newMsg = await asyncio.create_task(
+        bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True))
     # Store new messageID
     infoDBDoc.informationMessageID = newMsg.message_id
     infoDBDoc.dateLastSuccessfulChannelUpdate = datetime.now()
@@ -460,7 +472,6 @@ async def nukeChannel(bkbot):
         infoDoc.store(infoDB)
     await deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc)
     logging.info("Nuke channel DONE! --> Total time needed: " + getFormattedPassedTime(timestampStart))
-
 
 # def editMessageAndWait(bkbot, messageID: Union[int, str, None], messageText) -> bool:
 #     """ WRAPPER!

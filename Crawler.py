@@ -334,7 +334,7 @@ class BKCrawler:
                 plu = couponBK['shortCode']
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=plu, title=titleFull, subtitle=subtitle, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP)
-                coupon.webviewID = couponBK.get('_id')
+                coupon.webviewID = couponBK.get('loyaltyEngineId')
                 # TODO: Check where those tags are located in new API
                 offerTags = couponBK.get('offerTags')
                 if offerTags is not None and len(offerTags) > 0:
@@ -1277,6 +1277,8 @@ class BKCrawler:
             coupon = Coupon.load(couponDB, uniqueCouponID)
             if filter.activeOnly and not coupon.isValid():
                 # Skip expired coupons if needed
+                continue
+            elif filter.isNotYetActive is not None and coupon.isNotYetActive() != filter.isNotYetActive:
                 continue
             elif filter.allowedCouponTypes is not None and coupon.type not in filter.allowedCouponTypes:
                 # Skip non-allowed coupon-types

@@ -21,6 +21,7 @@ class CouponFilter(BaseModel):
     """ removeDuplicates: Enable to filter duplicated coupons for same products - only returns cheapest of all
      If the same product is available as paper- and app coupon, App coupon is preferred."""
     activeOnly: Optional[bool] = True
+    isNotYetActive: Optional[Union[bool, None]] = None
     containsFriesAndCoke: Optional[Union[bool, None]] = None
     removeDuplicates: Optional[
         bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
@@ -359,6 +360,8 @@ class Coupon(Document):
             return True
 
     def isEligibleForDuplicateRemoval(self):
+        """ Returns true if coupon title can be used to remove duplicates.
+         """
         if self.type == CouponType.PAYBACK:
             return False
         else:
@@ -690,6 +693,7 @@ class User(Document):
             addedDate=DateTimeField()
         ))
     couponViewSortModes = DictField(default={})
+    pendingNotifications = ListField(TextField())
     # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
     timestampLastTimeBotUsed = FloatField(default=0)
     timestampLastTimeNotificationSentSuccessfully = FloatField(default=0)
