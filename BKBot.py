@@ -1,10 +1,9 @@
 import argparse
 import asyncio
-import logging
 import math
 import traceback
 from copy import deepcopy
-from typing import Tuple, Coroutine
+from typing import Tuple
 
 from couchdb import Database
 from furl import furl, urllib
@@ -370,9 +369,14 @@ class BKBot:
             if self.publicChannelName is not None:
                 menuText += f"\nVollständige Papiercouponbögen sind im <a href=\"{self.getPublicChannelFAQLink()}\">FAQ</a> verlinkt."
             menuText += '</b>'
+        if self.crawler.cachedFutureCouponsText is not None:
+            menuText += '\n---'
+            menuText += '\n' + self.crawler.cachedFutureCouponsText
+
         if self.isAdmin(user):
             infoDB = self.crawler.getInfoDB()
             infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
+            menuText += '\n---'
             menuText += '\n<b>Admin Panel:</b>'
             menuText += '\nAdmin Commands:'
             menuText += '\n/' + Commands.MAINTENANCE + ' - Wartungsmodus toggeln'
@@ -446,7 +450,8 @@ class BKBot:
         text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoRecentlyUsedBot)
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
         text += '\nAnzahl gültige Coupons: ' + str(len(couponDB))
-        text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
+        text += f'\nAnzahl bald verfügbarer Coupons: {len(self.crawler.cachedFutureCoupons)}'
+        text += f'\nAnzahl gültige Angebote: {len(self.crawler.getOffersActive())}'
         text += f'\nStatistiken generiert am: {formatDateGermanHuman(self.statsCachedTimestamp)}'
         text += '\n---'
         text += '\nDein BetterKing Account:'
@@ -959,7 +964,7 @@ class BKBot:
 
     def generateCouponShortTextWithHyperlinkToChannelPost(self, coupon: Coupon, messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
-        text = "<b>" + coupon.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
+        text = "<b>" + coupon.getPLUOrUniqueIDOrRedemptionHint() + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
             messageID) + "\">" + coupon.getTitleShortened(includeVeggieSymbol=True) + "</a>"
         priceFormatted = coupon.getPriceFormatted()
         if priceFormatted is not None:
@@ -1527,20 +1532,22 @@ class BKBot:
 
     async def sendMessageWithUserBlockedHandling(self, user: User, userDB: Database, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
                           disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
-                          reply_markup: ReplyMarkup = None
-                          ) -> Union[Message, None]:
+                          reply_markup: ReplyMarkup = None,
+                          allowUpdateDB: bool = True) -> Union[Message, None]:
         try:
             msg = await self.processMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
                                              disable_web_page_preview=disable_web_page_preview,
                                              reply_markup=reply_markup)
             if user.updateNotificationReceivedActivityTimestamp() or user.botBlockedCounter > 0:
-                user.store(db=userDB)
+                if allowUpdateDB:
+                    user.store(db=userDB)
             return msg
         except Forbidden:
             logging.info(f"User blocked bot: {user.id}")
             user.botBlockedCounter += 1
             user.timestampLastTimeBlockedBot = datetime.now().timestamp()
-            user.store(db=userDB)
+            if allowUpdateDB:
+                user.store(db=userDB)
             return None
 
     async def sendPhoto(self, chat_id: Union[int, str], photo, caption: Union[None, str] = None,
@@ -1630,7 +1637,7 @@ class BKBot:
             logging.info(f"Notifying user {index + 1}/{len(usersWithPendingNotifications)} | Pending notifications: {len(userToNotify.pendingNotifications)}")
             # Send all pending notifications
             for notificationText in userToNotify.pendingNotifications:
-                await self.sendMessageWithUserBlockedHandling(user=userToNotify, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True)
+                await self.sendMessageWithUserBlockedHandling(user=userToNotify, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True, allowUpdateDB=False)
             userToNotify.pendingNotifications = []
             dbDocumentUpdates.append(userToNotify)
             if dbDocumentUpdates == 10 or isLastItem:

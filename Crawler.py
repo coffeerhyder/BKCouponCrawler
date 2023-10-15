@@ -82,6 +82,8 @@ class BKCrawler:
         self.exportCSVs = False
         self.missingPaperCouponPLUs = []
         self.cachedMissingPaperCouponsText = None
+        self.cachedFutureCouponsText = None
+        self.cachedFutureCoupons = []
         # Create required DBs
         if DATABASES.INFO_DB not in self.couchdb:
             logging.info("Creating missing DB: " + DATABASES.INFO_DB)
@@ -155,7 +157,7 @@ class BKCrawler:
         self.addExtraCoupons(crawledCouponsDict={}, immediatelyAddToDB=True)
         # Make sure that our cache gets filled on init
         couponDB = self.getCouponDB()
-        self.updateCache(couponDB)
+        self.updateCaches(couponDB)
         self.updateCachedMissingPaperCouponsInfo(couponDB)
 
     def setKeepHistoryDB(self, keepHistory: bool):
@@ -225,7 +227,7 @@ class BKCrawler:
         migrationActionRequired = False
         if not migrationActionRequired:
             return
-        userDB = self.getUserDB()
+        # userDB = self.getUserDB()
         # keysMapping = {"timestampExpire": "timestampExpireInternal", "dateFormattedExpire": "dateFormattedExpireInternal", "timestampExpire2": "timestampExpire", "dateFormattedExpire2": "dateFormattedExpire"}
 
         # for userID in userDB:
@@ -256,7 +258,7 @@ class BKCrawler:
             # self.checkProductiveOffersDBImagesIntegrity()
             logging.info("Total crawl duration: " + getFormattedPassedTime(timestampStart))
         finally:
-            self.updateCache(couponDB=self.getCouponDB(), offerDB=self.getOfferDB())
+            self.updateCaches(couponDB=self.getCouponDB(), offerDB=self.getOfferDB())
 
     def crawlCoupons(self, crawledCouponsDict: dict):
         """ Crawls coupons from App API.
@@ -265,7 +267,9 @@ class BKCrawler:
         # Docs: https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default
         # Official live instance: https://www.burgerking.de/rewards/offers
         # Old one: https://euc1-prod-bk.rbictg.com/graphql
-        req = httpx.get(url='https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default?operationName=featureSortedLoyaltyOffers&variables=%7B%22id%22%3A%22feature-loyalty-offers-ui-singleton%22%7D&query=query+featureSortedLoyaltyOffers%28%24id%3AID%21%29%7BLoyaltyOffersUI%28id%3A%24id%29%7B_id+sortedSystemwideOffers%7B...SystemwideOffersFragment+__typename%7D__typename%7D%7Dfragment+SystemwideOffersFragment+on+SystemwideOffer%7B_id+_type+loyaltyEngineId+name%7BlocaleRaw%3AdeRaw+__typename%7Ddescription%7BlocaleRaw%3AdeRaw+__typename%7DmoreInfo%7BlocaleRaw%3AdeRaw+__typename%7DhowToRedeem%7BenRaw+__typename%7DbackgroundImage%7B...MenuImageFragment+__typename%7DshortCode+mobileOrderOnly+redemptionMethod+daypart+redemptionType+upsellOptions%7B_id+loyaltyEngineId+description%7BlocaleRaw%3AdeRaw+__typename%7DlocalizedImage%7Blocale%3Ade%7B...MenuImagesFragment+__typename%7D__typename%7Dname%7BlocaleRaw%3AdeRaw+__typename%7D__typename%7DofferPrice+marketPrice%7B...on+Item%7B_id+_type+vendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D...on+Combo%7B_id+_type+vendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D__typename%7DlocalizedImage%7Blocale%3Ade%7B...MenuImagesFragment+__typename%7D__typename%7DuiPattern+lockedOffersPanel%7BcompletedChallengeHeader%7BlocaleRaw%3AdeRaw+__typename%7DcompletedChallengeDescription%7BlocaleRaw%3AdeRaw+__typename%7D__typename%7DpromoCodePanel%7BpromoCodeDescription%7BlocaleRaw%3AdeRaw+__typename%7DpromoCodeLabel%7BlocaleRaw%3AdeRaw+__typename%7DpromoCodeLink+__typename%7Dincentives%7B__typename+...on+Combo%7B_id+_type+mainItem%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7DisOfferBenefit+__typename%7D...on+Item%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D...on+Picker%7B_id+_type+options%7Boption%7B__typename+...on+Combo%7B_id+_type+mainItem%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D...on+Item%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D%7D__typename%7DisOfferBenefit+__typename%7D...on+OfferDiscount%7B_id+_type+discountValue+discountType+__typename%7D...on+OfferActivation%7B_id+_type+__typename%7D...on+SwapMapping%7B_type+__typename%7D%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7Drules%7B...on+RequiresAuthentication%7BrequiresAuthentication+__typename%7D...on+LoyaltyBetweenDates%7BstartDate+endDate+__typename%7D__typename%7D__typename%7Dfragment+MenuImageFragment+on+Image%7Bhotspot%7Bx+y+height+width+__typename%7Dcrop%7Btop+bottom+left+right+__typename%7Dasset%7Bmetadata%7Blqip+palette%7Bdominant%7Bbackground+foreground+__typename%7D__typename%7D__typename%7D_id+__typename%7D__typename%7Dfragment+MenuImagesFragment+on+Images%7Bapp%7B...MenuImageFragment+__typename%7Dkiosk%7B...MenuImageFragment+__typename%7DimageDescription+__typename%7Dfragment+VendorConfigsFragment+on+VendorConfigs%7Bcarrols%7B...VendorConfigFragment+__typename%7DcarrolsDelivery%7B...VendorConfigFragment+__typename%7Dncr%7B...VendorConfigFragment+__typename%7DncrDelivery%7B...VendorConfigFragment+__typename%7Doheics%7B...VendorConfigFragment+__typename%7DoheicsDelivery%7B...VendorConfigFragment+__typename%7Dpartner%7B...VendorConfigFragment+__typename%7DpartnerDelivery%7B...VendorConfigFragment+__typename%7DproductNumber%7B...VendorConfigFragment+__typename%7DproductNumberDelivery%7B...VendorConfigFragment+__typename%7Dsicom%7B...VendorConfigFragment+__typename%7DsicomDelivery%7B...VendorConfigFragment+__typename%7Dqdi%7B...VendorConfigFragment+__typename%7DqdiDelivery%7B...VendorConfigFragment+__typename%7Dqst%7B...VendorConfigFragment+__typename%7DqstDelivery%7B...VendorConfigFragment+__typename%7Drpos%7B...VendorConfigFragment+__typename%7DrposDelivery%7B...VendorConfigFragment+__typename%7DsimplyDelivery%7B...VendorConfigFragment+__typename%7DsimplyDeliveryDelivery%7B...VendorConfigFragment+__typename%7Dtablet%7B...VendorConfigFragment+__typename%7DtabletDelivery%7B...VendorConfigFragment+__typename%7D__typename%7Dfragment+VendorConfigFragment+on+VendorConfig%7BpluType+parentSanityId+pullUpLevels+constantPlu+discountPlu+quantityBasedPlu%7Bquantity+plu+qualifier+__typename%7DmultiConstantPlus%7Bquantity+plu+qualifier+__typename%7DparentChildPlu%7Bplu+childPlu+__typename%7DsizeBasedPlu%7BcomboPlu+comboSize+__typename%7D__typename%7D', headers=HEADERS, timeout=120)
+        req = httpx.get(
+            url='https://czqk28jt.apicdn.sanity.io/v1/graphql/prod_bk_de/default?operationName=featureSortedLoyaltyOffers&variables=%7B%22id%22%3A%22feature-loyalty-offers-ui-singleton%22%7D&query=query+featureSortedLoyaltyOffers%28%24id%3AID%21%29%7BLoyaltyOffersUI%28id%3A%24id%29%7B_id+sortedSystemwideOffers%7B...SystemwideOffersFragment+__typename%7D__typename%7D%7Dfragment+SystemwideOffersFragment+on+SystemwideOffer%7B_id+_type+loyaltyEngineId+name%7BlocaleRaw%3AdeRaw+__typename%7Ddescription%7BlocaleRaw%3AdeRaw+__typename%7DmoreInfo%7BlocaleRaw%3AdeRaw+__typename%7DhowToRedeem%7BenRaw+__typename%7DbackgroundImage%7B...MenuImageFragment+__typename%7DshortCode+mobileOrderOnly+redemptionMethod+daypart+redemptionType+upsellOptions%7B_id+loyaltyEngineId+description%7BlocaleRaw%3AdeRaw+__typename%7DlocalizedImage%7Blocale%3Ade%7B...MenuImagesFragment+__typename%7D__typename%7Dname%7BlocaleRaw%3AdeRaw+__typename%7D__typename%7DofferPrice+marketPrice%7B...on+Item%7B_id+_type+vendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D...on+Combo%7B_id+_type+vendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D__typename%7DlocalizedImage%7Blocale%3Ade%7B...MenuImagesFragment+__typename%7D__typename%7DuiPattern+lockedOffersPanel%7BcompletedChallengeHeader%7BlocaleRaw%3AdeRaw+__typename%7DcompletedChallengeDescription%7BlocaleRaw%3AdeRaw+__typename%7D__typename%7DpromoCodePanel%7BpromoCodeDescription%7BlocaleRaw%3AdeRaw+__typename%7DpromoCodeLabel%7BlocaleRaw%3AdeRaw+__typename%7DpromoCodeLink+__typename%7Dincentives%7B__typename+...on+Combo%7B_id+_type+mainItem%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7DisOfferBenefit+__typename%7D...on+Item%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D...on+Picker%7B_id+_type+options%7Boption%7B__typename+...on+Combo%7B_id+_type+mainItem%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D...on+Item%7B_id+_type+operationalItem%7Bdaypart+__typename%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7D__typename%7D%7D__typename%7DisOfferBenefit+__typename%7D...on+OfferDiscount%7B_id+_type+discountValue+discountType+__typename%7D...on+OfferActivation%7B_id+_type+__typename%7D...on+SwapMapping%7B_type+__typename%7D%7DvendorConfigs%7B...VendorConfigsFragment+__typename%7Drules%7B...on+RequiresAuthentication%7BrequiresAuthentication+__typename%7D...on+LoyaltyBetweenDates%7BstartDate+endDate+__typename%7D__typename%7D__typename%7Dfragment+MenuImageFragment+on+Image%7Bhotspot%7Bx+y+height+width+__typename%7Dcrop%7Btop+bottom+left+right+__typename%7Dasset%7Bmetadata%7Blqip+palette%7Bdominant%7Bbackground+foreground+__typename%7D__typename%7D__typename%7D_id+__typename%7D__typename%7Dfragment+MenuImagesFragment+on+Images%7Bapp%7B...MenuImageFragment+__typename%7Dkiosk%7B...MenuImageFragment+__typename%7DimageDescription+__typename%7Dfragment+VendorConfigsFragment+on+VendorConfigs%7Bcarrols%7B...VendorConfigFragment+__typename%7DcarrolsDelivery%7B...VendorConfigFragment+__typename%7Dncr%7B...VendorConfigFragment+__typename%7DncrDelivery%7B...VendorConfigFragment+__typename%7Doheics%7B...VendorConfigFragment+__typename%7DoheicsDelivery%7B...VendorConfigFragment+__typename%7Dpartner%7B...VendorConfigFragment+__typename%7DpartnerDelivery%7B...VendorConfigFragment+__typename%7DproductNumber%7B...VendorConfigFragment+__typename%7DproductNumberDelivery%7B...VendorConfigFragment+__typename%7Dsicom%7B...VendorConfigFragment+__typename%7DsicomDelivery%7B...VendorConfigFragment+__typename%7Dqdi%7B...VendorConfigFragment+__typename%7DqdiDelivery%7B...VendorConfigFragment+__typename%7Dqst%7B...VendorConfigFragment+__typename%7DqstDelivery%7B...VendorConfigFragment+__typename%7Drpos%7B...VendorConfigFragment+__typename%7DrposDelivery%7B...VendorConfigFragment+__typename%7DsimplyDelivery%7B...VendorConfigFragment+__typename%7DsimplyDeliveryDelivery%7B...VendorConfigFragment+__typename%7Dtablet%7B...VendorConfigFragment+__typename%7DtabletDelivery%7B...VendorConfigFragment+__typename%7D__typename%7Dfragment+VendorConfigFragment+on+VendorConfig%7BpluType+parentSanityId+pullUpLevels+constantPlu+discountPlu+quantityBasedPlu%7Bquantity+plu+qualifier+__typename%7DmultiConstantPlus%7Bquantity+plu+qualifier+__typename%7DparentChildPlu%7Bplu+childPlu+__typename%7DsizeBasedPlu%7BcomboPlu+comboSize+__typename%7D__typename%7D',
+            headers=HEADERS, timeout=120)
         print(req.text)
         apiResponse = req.json()
         if self.storeCouponAPIDataAsJson:
@@ -335,7 +339,7 @@ class BKCrawler:
                 coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=plu, title=titleFull, subtitle=subtitle, titleShortened=shortenProductNames(titleFull),
                                 type=CouponType.APP)
                 coupon.webviewID = couponBK.get('loyaltyEngineId')
-                # TODO: Check where those tags are located in new API
+                # TODO: Check where those tags are located in new API endpoint
                 offerTags = couponBK.get('offerTags')
                 if offerTags is not None and len(offerTags) > 0:
                     tagsStringArray = []
@@ -416,7 +420,6 @@ class BKCrawler:
                 logging.info(coupon)
             logging.info(getLogSeparatorString())
         logging.info(f'Total coupons crawl time: {getFormattedPassedTime(timestampCrawlStart)}')
-
 
     def crawlCoupons1OLD_DEPRECATED(self, apiResponse: dict, crawledCouponsDict: dict):
         """ Stores coupons from App API, generates- and adds some special strings to DB for later usage. """
@@ -502,7 +505,7 @@ class BKCrawler:
             if DEBUGCRAWLER:
                 apiResponse = loads(requests.get('http://localhost/bkcrawler/coupons2_latest.json').text)
             else:
-                apiResponse = httpx.get('https://mo.burgerking-app.eu/api/v2/stores/'+ str(storeID) + '/menu', headers=HEADERS_OLD).json()
+                apiResponse = httpx.get('https://mo.burgerking-app.eu/api/v2/stores/' + str(storeID) + '/menu', headers=HEADERS_OLD).json()
                 if self.storeCouponAPIDataAsJson:
                     # Save API response so we can easily use this data for local testing later on.
                     saveJson('crawler/coupons2_latest.json', apiResponse)
@@ -724,10 +727,9 @@ class BKCrawler:
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         couponDB = self.getCouponDB()
         self.addCouponsToDB(couponDB=couponDB, couponsToAddToDB=couponsToAddToDB)
-        self.updateCachedMissingPaperCouponsInfo(couponDB)
         # Cleanup DB
         deleteCouponDocs = {}
-        modifyCouponDocsUnreliableAPIWorkaround = {}
+        # modifyCouponDocsUnreliableAPIWorkaround = {}
         # 2023-03-17: Unfinished work
         # doAPIWorkaroundHandling = False
         for uniqueCouponID in couponDB:
@@ -1078,18 +1080,27 @@ class BKCrawler:
                                  'Ablaufdatum': coupon.getExpireDateFormatted()
                                  })
 
-    def updateCache(self, couponDB: Database, offerDB: Database = None):
+    def updateCaches(self, couponDB: Database, offerDB: Database = None):
         """ Updates cache containing all existent coupon sources e.g. used be the Telegram bot to display them inside
         main menu without having to do any DB requests. """
+        # Nullification
+        self.cachedFutureCouponsText = None
+        self.cachedFutureCoupons.clear()
+        # End of nullification
         newCachedAvailableCouponCategories = {}
+        futureCoupons = []
         for couponID in couponDB:
             coupon = Coupon.load(couponDB, couponID)
             if coupon.isValid():
                 category = newCachedAvailableCouponCategories.setdefault(coupon.type, CouponCategory(
                     coupons=coupon.type))
                 category.updateWithCouponInfo(coupon)
+            elif coupon.isNotYetActive():
+                futureCoupons.append(coupon)
         # Overwrite old cache
         self.cachedAvailableCouponCategories = newCachedAvailableCouponCategories
+        self.cachedFutureCoupons = sorted(futureCoupons,
+                                   key=lambda x: 0 if x.getStartDatetime() is None else x.getStartDatetime().timestamp())
         if offerDB is not None:
             validOffers = []
             for offerID in offerDB:
@@ -1097,9 +1108,21 @@ class BKCrawler:
                 if offerIsValid(offer):
                     validOffers.append(offer)
             self.cachedNumberofAvailableOffers = len(validOffers)
-
-    def getCachedCouponCategory(self, couponSrc: Union[CouponType, int]):
-        return self.cachedAvailableCouponCategories.get(couponSrc)
+        self.updateCachedMissingPaperCouponsInfo(couponDB=couponDB)
+        if len(self.cachedFutureCoupons) > 0:
+            # Sort coupons by "release date"
+            self.cachedFutureCouponsText = f"<b>{SYMBOLS.WHITE_DOWN_POINTING_BACKHAND} [{len(self.cachedFutureCoupons)}] Demnächst verfügbare Coupons:</b>"
+            for futureCoupon in self.cachedFutureCoupons:
+                datetimeCouponAvailable = futureCoupon.getStartDatetime()
+                if datetimeCouponAvailable is not None:
+                    startDateFormatted = datetimeCouponAvailable.strftime('%d.%m.%Y')
+                else:
+                    startDateFormatted = "?"
+                couponDescr = futureCoupon.generateCouponShortText(highlightIfNew=False, includeVeggieSymbol=False)
+                # couponDescr = futureCoupon.getTitleShortened(includeVeggieSymbol=False)
+                # couponDescr = futureCoupon.appendPriceInfoText(couponDescr)
+                thisCouponText = f"<b>{startDateFormatted}</b> | " + couponDescr
+                self.cachedFutureCouponsText += "\n" + thisCouponText
 
     def updateCachedMissingPaperCouponsInfo(self, couponDB: Database):
         paperCouponMapping = getCouponMappingForCrawler()
@@ -1109,33 +1132,35 @@ class BKCrawler:
             if mappingCoupon.id not in couponDB:
                 missingPaperPLUs.append(mappingCoupon.plu)
         missingPaperPLUs.sort()
-        self.missingPaperCouponPLUs = missingPaperPLUs
-        for missingPLU in missingPaperPLUs:
-            if self.cachedMissingPaperCouponsText is None:
-                self.cachedMissingPaperCouponsText = missingPLU
-            else:
-                self.cachedMissingPaperCouponsText += ', ' + missingPLU
-        if self.cachedMissingPaperCouponsText is not None:
+        if len(missingPaperPLUs) > 0:
+            self.missingPaperCouponPLUs = missingPaperPLUs
+            for missingPLU in missingPaperPLUs:
+                if self.cachedMissingPaperCouponsText is None:
+                    self.cachedMissingPaperCouponsText = missingPLU
+                else:
+                    self.cachedMissingPaperCouponsText += ', ' + missingPLU
             logging.info("Missing paper coupons: " + self.cachedMissingPaperCouponsText)
 
+    def getCachedCouponCategory(self, couponSrc: Union[CouponType, int]):
+        return self.cachedAvailableCouponCategories.get(couponSrc)
+
     def getMissingPaperCouponsText(self) -> Union[str, None]:
-        if len(self.missingPaperCouponPLUs) > 0:
-            cachedMissingPaperCouponsText = ''
-            for missingPLU in self.missingPaperCouponPLUs:
-                if len(cachedMissingPaperCouponsText) == 0:
-                    cachedMissingPaperCouponsText = missingPLU
-                else:
-                    cachedMissingPaperCouponsText += ', ' + missingPLU
-            return cachedMissingPaperCouponsText
-        else:
+        if len(self.missingPaperCouponPLUs) == 0:
             return None
+        cachedMissingPaperCouponsText = ''
+        for missingPLU in self.missingPaperCouponPLUs:
+            if len(cachedMissingPaperCouponsText) == 0:
+                cachedMissingPaperCouponsText = missingPLU
+            else:
+                cachedMissingPaperCouponsText += ', ' + missingPLU
+        return cachedMissingPaperCouponsText
 
     def addCouponsToDB(self, couponDB: Database, couponsToAddToDB: Union[dict, List[Coupon]]) -> bool:
-        if isinstance(couponsToAddToDB, dict):
-            couponsToAddToDB = list(couponsToAddToDB.values())
         if len(couponsToAddToDB) == 0:
             # Nothing to do
             return False
+        if isinstance(couponsToAddToDB, dict):
+            couponsToAddToDB = list(couponsToAddToDB.values())
         infoDatabase = self.couchdb[DATABASES.INFO_DB]
         infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
         numberofCouponsNew = 0
@@ -1196,7 +1221,6 @@ class BKCrawler:
                 newCouponIDs.append(crawledCoupon.id)
         logging.info(f'Pushing {len(dbUpdates)} coupon DB updates')
         couponDB.update(dbUpdates)
-        self.updateCachedMissingPaperCouponsInfo(couponDB)
         logging.info("Coupons new: " + str(numberofCouponsNew))
         if len(newCouponIDs) > 0:
             logging.info("New IDs: " + str(newCouponIDs))
@@ -1312,7 +1336,6 @@ class BKCrawler:
         else:
             return desiredCoupons
 
-
     def getFilteredCouponsAsList(
             self, filters: CouponFilter, sortIfSortCodeIsGivenInCouponFilter: bool = True
     ) -> List[Coupon]:
@@ -1421,7 +1444,6 @@ def getLogSeparatorString() -> str:
 
 if __name__ == '__main__':
     crawler = BKCrawler()
-    crawler.setCrawlOnlyBotCompatibleCoupons(True)
     crawler.setExportCSVs(False)
     crawler.setKeepHistoryDB(False)
     crawler.setKeepSimpleHistoryDB(False)

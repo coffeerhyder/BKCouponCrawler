@@ -267,6 +267,7 @@ class SYMBOLS:
     GIFT = '🎁'
     PARK = '🅿️'
     CIRLCE_BLUE = '🔵'
+    # SOON = '🔜'
 
 
 def getFilenameFromURL(url: str) -> str:

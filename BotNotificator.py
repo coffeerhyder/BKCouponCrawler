@@ -15,6 +15,7 @@ from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCou
 
 WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
+# TODO: Remove this, add parameter handling so that no code changes are needed for this debug switch.
 DEBUGNOTIFICATOR = False
 
 
@@ -329,21 +330,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     await bkbot.sendCouponOverviewWithChannelLinks(chat_id=bkbot.getPublicChannelChatID(), coupons=activeCoupons, useLongCouponTitles=False, channelDB=channelDB, infoDB=infoDB,
                                                    infoDBDoc=infoDBDoc)
 
-    notYetAvailableCoupons = bkbot.crawler.getFilteredCouponsAsList(CouponFilter(activeOnly=False, isNotYetActive=True))
-    notYetAvailableCouponsText = None
-    if len(notYetAvailableCoupons) > 0:
-        notYetAvailableCoupons = sorted(notYetAvailableCoupons,
-                                        key=lambda x: 0 if x.getStartDatetime() is None else x.getStartDatetime().timestamp())
-        notYetAvailableCouponsText = "<b>Demnächst verfügbare Coupons:</b>"
-        for notYetAvailableCoupon in notYetAvailableCoupons:
-            datetimeCouponAvailable = notYetAvailableCoupon.getStartDatetime()
-            thisCouponText = "Ab "
-            if datetimeCouponAvailable is not None:
-                thisCouponText += datetimeCouponAvailable.strftime('%d.%m.%Y')
-            else:
-                thisCouponText += "?"
-            thisCouponText += " | " + notYetAvailableCoupon.generateCouponShortText(highlightIfNew=False, includeVeggieSymbol=False)
-            notYetAvailableCouponsText += "\n" + thisCouponText
+    notYetAvailableCouponsText = bkbot.crawler.cachedFutureCouponsText
 
     """ Generate new information message text. """
     infoText = '<b>Heutiges Update:</b>'
@@ -365,6 +352,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         infoText += '\nDie Funktionalität von Bot/Channel kann derzeit nicht gewährleistet werden!'
         infoText += '\nFalls vorhanden, bitte die angepinnten Infos im Channel beachten.'
         infoText += '</b>'
+        infoText += "\n---"
     missingPaperCouponsText = bkbot.crawler.getMissingPaperCouponsText()
     if missingPaperCouponsText is not None:
         infoText += '\n<b>' + SYMBOLS.WARNING + 'Derzeit im Channel fehlende Papiercoupons:</b>' + missingPaperCouponsText
