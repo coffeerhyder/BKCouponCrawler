@@ -1,10 +1,9 @@
 import argparse
 import asyncio
-import logging
 import math
 import traceback
 from copy import deepcopy
-from typing import Tuple, Coroutine
+from typing import Tuple
 
 from couchdb import Database
 from furl import furl, urllib
@@ -14,7 +13,7 @@ from telegram._utils.types import ReplyMarkup, ODVInput
 from telegram.error import RetryAfter, BadRequest, Forbidden
 from telegram.ext import CommandHandler, CallbackContext, ConversationHandler, CallbackQueryHandler, MessageHandler, Application, filters
 
-from BotNotificator import updatePublicChannel, notifyUsersAboutNewCoupons, ChannelUpdateMode, nukeChannel, cleanupChannel, notifyUsersAboutUpcomingAccountDeletion, \
+from BotNotificator import updatePublicChannel, collectNewCouponsNotifications, ChannelUpdateMode, nukeChannel, cleanupChannel, collectUserDeleteNotifications, \
     notifyAdminsAboutProblems
 from BotUtils import *
 from BaseUtils import *
@@ -356,7 +355,7 @@ class BKBot:
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
         if self.isAdmin(user) and user.settings.displayAdminButtons:
             allButtons.append(
-                [InlineKeyboardButton(SYMBOLS.WARNING + 'ChannelCoupons erneut senden', callback_data=CallbackVars.ADMIN_RESEND_COUPONS)])
+                [InlineKeyboardButton(SYMBOLS.WARNING + 'ChannelCouponÜbersicht erneut senden', callback_data=CallbackVars.ADMIN_RESEND_COUPONS)])
             allButtons.append(
                 [InlineKeyboardButton(SYMBOLS.WARNING + 'Nuke Channel', callback_data=CallbackVars.ADMIN_NUKE_CHANNEL)])
         reply_markup = InlineKeyboardMarkup(allButtons)
@@ -370,9 +369,14 @@ class BKBot:
             if self.publicChannelName is not None:
                 menuText += f"\nVollständige Papiercouponbögen sind im <a href=\"{self.getPublicChannelFAQLink()}\">FAQ</a> verlinkt."
             menuText += '</b>'
+        if self.crawler.cachedFutureCouponsText is not None:
+            menuText += '\n---'
+            menuText += '\n' + self.crawler.cachedFutureCouponsText
+
         if self.isAdmin(user):
             infoDB = self.crawler.getInfoDB()
             infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
+            menuText += '\n---'
             menuText += '\n<b>Admin Panel:</b>'
             menuText += '\nAdmin Commands:'
             menuText += '\n/' + Commands.MAINTENANCE + ' - Wartungsmodus toggeln'
@@ -446,7 +450,8 @@ class BKBot:
         text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoRecentlyUsedBot)
         text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
         text += '\nAnzahl gültige Coupons: ' + str(len(couponDB))
-        text += '\nAnzahl gültige Angebote: ' + str(len(self.crawler.getOffersActive()))
+        text += f'\nAnzahl bald verfügbarer Coupons: {len(self.crawler.cachedFutureCoupons)}'
+        text += f'\nAnzahl gültige Angebote: {len(self.crawler.getOffersActive())}'
         text += f'\nStatistiken generiert am: {formatDateGermanHuman(self.statsCachedTimestamp)}'
         text += '\n---'
         text += '\nDein BetterKing Account:'
@@ -959,7 +964,7 @@ class BKBot:
 
     def generateCouponShortTextWithHyperlinkToChannelPost(self, coupon: Coupon, messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
-        text = "<b>" + coupon.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
+        text = "<b>" + coupon.getPLUOrUniqueIDOrRedemptionHint() + "</b> | <a href=\"https://t.me/" + self.getPublicChannelName() + '/' + str(
             messageID) + "\">" + coupon.getTitleShortened(includeVeggieSymbol=True) + "</a>"
         priceFormatted = coupon.getPriceFormatted()
         if priceFormatted is not None:
@@ -1319,7 +1324,7 @@ class BKBot:
                     continue
         self.deleteInactiveAccounts()
         await self.batchProcessAutoDeleteUsersUnavailableFavorites()
-        await self.notifyUsers()
+        await self.collectUserNotificationsAndNotifyAdminsAboutProblems()
         await self.cleanupPublicChannel()
         await self.cleanupCaches()
         logging.info('Batch process done.')
@@ -1359,11 +1364,11 @@ class BKBot:
             logging.warning("Resume of public channel update failed")
             return False
 
-    async def notifyUsers(self) -> Union[None, bool]:
+    async def collectUserNotificationsAndNotifyAdminsAboutProblems(self) -> Union[None, bool]:
         """ Notify users about expired favorite coupons that are back or new coupons depending on their settings. """
         try:
-            await notifyUsersAboutNewCoupons(self)
-            await notifyUsersAboutUpcomingAccountDeletion(self)
+            await collectNewCouponsNotifications(self)
+            await collectUserDeleteNotifications(self)
             await notifyAdminsAboutProblems(self)
             return True
         except Exception:
@@ -1527,20 +1532,22 @@ class BKBot:
 
     async def sendMessageWithUserBlockedHandling(self, user: User, userDB: Database, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
                           disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
-                          reply_markup: ReplyMarkup = None
-                          ) -> Union[Message, None]:
+                          reply_markup: ReplyMarkup = None,
+                          allowUpdateDB: bool = True) -> Union[Message, None]:
         try:
             msg = await self.processMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
                                              disable_web_page_preview=disable_web_page_preview,
                                              reply_markup=reply_markup)
             if user.updateNotificationReceivedActivityTimestamp() or user.botBlockedCounter > 0:
-                user.store(db=userDB)
+                if allowUpdateDB:
+                    user.store(db=userDB)
             return msg
         except Forbidden:
             logging.info(f"User blocked bot: {user.id}")
             user.botBlockedCounter += 1
             user.timestampLastTimeBlockedBot = datetime.now().timestamp()
-            user.store(db=userDB)
+            if allowUpdateDB:
+                user.store(db=userDB)
             return None
 
     async def sendPhoto(self, chat_id: Union[int, str], photo, caption: Union[None, str] = None,
@@ -1612,13 +1619,40 @@ class BKBot:
         """ Wrapper. Only call this if you do not wish to write to the userDB in the calling methods otherwise you're wasting resources! """
         return getUserFromDB(self.crawler.getUserDB(), userID, addIfNew=addIfNew, updateUsageTimestamp=updateUsageTimestamp)
 
+    async def sendPendingNotifications(self) -> None:
+        userDB = self.crawler.getUserDB()
+        usersWithPendingNotifications = []
+        for userIDStr in userDB:
+            user = User.load(userDB, userIDStr)
+            if len(user.pendingNotifications) > 0:
+                usersWithPendingNotifications.append(user)
+        if len(usersWithPendingNotifications) == 0:
+            logging.debug('User notify: Nothing to do')
+            return
+        timeStart = datetime.now()
+        index = 0
+        dbDocumentUpdates = []
+        for userToNotify in usersWithPendingNotifications:
+            isLastItem = index == len(usersWithPendingNotifications) - 1
+            logging.info(f"Notifying user {index + 1}/{len(usersWithPendingNotifications)} | Pending notifications: {len(userToNotify.pendingNotifications)}")
+            # Send all pending notifications
+            for notificationText in userToNotify.pendingNotifications:
+                await self.sendMessageWithUserBlockedHandling(user=userToNotify, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True, allowUpdateDB=False)
+            userToNotify.pendingNotifications = []
+            dbDocumentUpdates.append(userToNotify)
+            if dbDocumentUpdates == 10 or isLastItem:
+                # Update DB
+                userDB.update(dbDocumentUpdates)
+            index += 1
+        logging.info(f"Notify users done | Duration: {(datetime.now() - timeStart)}")
 
-async def dailyRoutine(hour: int, minute: int, bkbot):
+
+async def dailyRoutine(bkbot):
     """ Runs task daily at specific time.
      Does not catch up run if desired time has already passed on the day this is executed first time.
      """
-    ranOnce = False
-    debug = False
+    hour = 0
+    minute = 1
     while True:
         now = datetime.now()
         todayAtTargetTime = datetime(now.year, now.month, now.day, hour, minute)
@@ -1632,15 +1666,18 @@ async def dailyRoutine(hour: int, minute: int, bkbot):
             timediffTomorrow = tomorrowAtTargetTime - now
             print(f"Daily batch execution will happen at {hour}:{minute} TOMORROW in {timediffTomorrow}")
             waitSeconds = timediffTomorrow.total_seconds()
-        if debug:
-            if ranOnce:
-                waitSeconds = 300
-                print(f"Debug: Only waiting a short time seconds: {waitSeconds}")
-            else:
-                waitSeconds = 0
         await asyncio.sleep(waitSeconds)
         await bkbot.batchProcess()
-        ranOnce = True
+
+async def notificationRoutine(bkbot):
+    """ Sends pending notifications to user every X time. """
+    while True:
+        await asyncio.sleep(300)
+        try:
+            await bkbot.sendPendingNotifications()
+        except Exception as e:
+            logging.info("Exception happened during sending notifications:")
+            logging.info(e)
 
 
 def main():
@@ -1665,8 +1702,10 @@ def main():
     elif bkbot.args.migrate:
         bkbot.crawler.migrateDBs()
     if bkbot.args.usernotify:
-        loop.create_task(bkbot.notifyUsers())
-    loop.create_task(dailyRoutine(0, 1, bkbot))
+        loop.create_task(bkbot.collectUserNotificationsAndNotifyAdminsAboutProblems())
+        loop.create_task(bkbot.sendPendingNotifications())
+    loop.create_task(dailyRoutine(bkbot))
+    loop.create_task(notificationRoutine(bkbot))
     bkbot.startBot()
 
 

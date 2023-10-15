@@ -21,6 +21,7 @@ class CouponFilter(BaseModel):
     """ removeDuplicates: Enable to filter duplicated coupons for same products - only returns cheapest of all
      If the same product is available as paper- and app coupon, App coupon is preferred."""
     activeOnly: Optional[bool] = True
+    isNotYetActive: Optional[Union[bool, None]] = None
     containsFriesAndCoke: Optional[Union[bool, None]] = None
     removeDuplicates: Optional[
         bool] = False  # Enable to filter duplicated coupons for same products - only returns cheapest of all
@@ -192,10 +193,13 @@ class Coupon(Document):
     def __str__(self):
         return f'{self.id} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}  | WEBVIEW: {self.getWebviewURL()}'
 
-    def getPLUOrUniqueID(self) -> str:
+    def getPLUOrUniqueIDOrRedemptionHint(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
+        showQrHintWhenPLUIsUnavailable = True
         if self.plu is not None:
             return self.plu
+        elif showQrHintWhenPLUIsUnavailable:
+            return '!QR!'
         else:
             return self.id
 
@@ -359,6 +363,8 @@ class Coupon(Document):
             return True
 
     def isEligibleForDuplicateRemoval(self):
+        """ Returns true if coupon title can be used to remove duplicates.
+         """
         if self.type == CouponType.PAYBACK:
             return False
         else:
@@ -517,7 +523,7 @@ class Coupon(Document):
         couponText = ''
         if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
-        couponText += self.getPLUOrUniqueID() + " | " + self.getTitleShortened(includeVeggieSymbol=includeVeggieSymbol)
+        couponText += self.getPLUOrUniqueIDOrRedemptionHint() + " | " + self.getTitleShortened(includeVeggieSymbol=includeVeggieSymbol)
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -526,14 +532,14 @@ class Coupon(Document):
         couponText = ''
         if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
-        couponText += "<b>" + self.getPLUOrUniqueID() + "</b> | " + self.getTitleShortened(includeVeggieSymbol=True)
+        couponText += "<b>" + self.getPLUOrUniqueIDOrRedemptionHint() + "</b> | " + self.getTitleShortened(includeVeggieSymbol=True)
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
     def generateCouponShortTextFormattedWithHyperlinkToChannelPost(self, highlightIfNew: bool, includeVeggieSymbol: bool, publicChannelName: str,
                                                                    messageID: int) -> str:
         """ Returns e.g. "Y15 | 2Whopper+M🍟+0,4Cola (https://t.me/betterkingpublic/1054) | 8,99€" """
-        couponText = "<b>" + self.getPLUOrUniqueID() + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
+        couponText = "<b>" + self.getPLUOrUniqueIDOrRedemptionHint() + "</b> | <a href=\"https://t.me/" + publicChannelName + '/' + str(
             messageID) + "\">"
         if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
@@ -548,7 +554,7 @@ class Coupon(Document):
         if self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.getTitle()
-        couponText += "\n<b>" + self.getPLUOrUniqueID() + "</b>"
+        couponText += "\n<b>" + self.getPLUOrUniqueIDOrRedemptionHint() + "</b>"
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -561,7 +567,7 @@ class Coupon(Document):
             couponText += SYMBOLS.NEW
         couponText += self.getTitle()
         couponText += "</a>"
-        couponText += "\n<b>" + self.getPLUOrUniqueID() + "</b>"
+        couponText += "\n<b>" + self.getPLUOrUniqueIDOrRedemptionHint() + "</b>"
         couponText = self.appendPriceInfoText(couponText)
         return couponText
 
@@ -583,6 +589,8 @@ class Coupon(Document):
         if self.description is not None:
             couponText += "\n" + self.description
         webviewURL = self.getWebviewURL()
+        if self.plu is None:
+            couponText += f'\n{SYMBOLS.WARNING} Keine nennbare PLU verfügbar -> QR Code zeigen!'
         if webviewURL is not None:
             couponText += f"\n{SYMBOLS.ARROW_RIGHT}<a href=\"{webviewURL}\">Webansicht</a>"
         return couponText
@@ -592,6 +600,7 @@ class Coupon(Document):
         if self.plu is not None and self.plu != self.id:
             return '<b>' + self.plu + '</b>' + ' | ' + self.id
         else:
+            # No PLU available or PLU equals ID (This is e.g. the case for Payback coupons)
             return '<b>' + self.id + '</b>'
 
     def appendPriceInfoText(self, couponText: str) -> str:
@@ -690,6 +699,7 @@ class User(Document):
             addedDate=DateTimeField()
         ))
     couponViewSortModes = DictField(default={})
+    pendingNotifications = ListField(TextField())
     # Rough timestamp when user user start commenad of bot last time -> Can be used to delete inactive users after X time
     timestampLastTimeBotUsed = FloatField(default=0)
     timestampLastTimeNotificationSentSuccessfully = FloatField(default=0)
