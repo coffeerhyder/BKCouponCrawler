@@ -163,6 +163,7 @@ optional arguments:
 Siehe BKBot.py -> ``__init__``
 
 # TODOs
+* Dafür sorgen, dass der Bot auch dann am Laufen bleibt, wenn beim Start kein Internet verfügbar ist und er somit in ein Timeout läuft (Abbruch in application.run_polling)
 * Zeitberechnungen refactoring: timedelta überall verwenden wo möglich
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen
 * Die Transparenz bei (mybk) Couponbildern durch gelb ersetzen

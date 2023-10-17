@@ -1390,7 +1390,7 @@ class BKBot:
             return False
 
     def startBot(self):
-        self.application.run_polling()
+        self.application.run_polling(timeout=300, read_timeout=300, write_timeout=300, connect_timeout=300)
 
     def stopBot(self):
         self.application.stop()
