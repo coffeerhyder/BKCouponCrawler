@@ -193,13 +193,20 @@ class Coupon(Document):
     def __str__(self):
         return f'{self.id} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}  | WEBVIEW: {self.getWebviewURL()}'
 
+    def forceDisplayQR(self) -> bool:
+        if self.plu is None:
+            # No readable PLU code -> QR code is needed to order this item.
+            return True
+        else:
+            return False
+
     def getPLUOrUniqueIDOrRedemptionHint(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
         showQrHintWhenPLUIsUnavailable = True
         if self.plu is not None:
             return self.plu
         elif showQrHintWhenPLUIsUnavailable:
-            return '!QR!'
+            return 'QR!'
         else:
             return self.id
 

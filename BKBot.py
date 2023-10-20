@@ -847,7 +847,7 @@ class BKBot:
         await self.displayCouponWithImage(update, context, coupon, user)
         # Post user-menu into chat
         menuText = 'Coupon Details'
-        if not user.settings.displayQR:
+        if not user.settings.displayQR and not coupon.forceDisplayQR():
             menuText += '\n' + SYMBOLS.INFORMATION + 'Möchtest du QR-Codes angezeigt bekommen?\nSiehe Hauptmenü -> Einstellungen'
         await self.sendMessage(chat_id=update.effective_message.chat_id, text=menuText, parse_mode='HTML',
                                reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=callbackBack)]]))
@@ -903,7 +903,7 @@ class BKBot:
         couponText = coupon.generateCouponLongTextFormattedWithDescription(highlightIfNew=True)
         if additionalText is not None:
             couponText += '\n' + additionalText
-        if user.settings.displayQR:
+        if user.settings.displayQR or coupon.forceDisplayQR():
             # We need to send two images -> Send as album
             photoCoupon = InputMediaPhoto(media=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML')
             photoQR = InputMediaPhoto(media=self.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
