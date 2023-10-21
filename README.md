@@ -138,9 +138,10 @@ optional arguments:
 2. Per ``crontab -e`` in crontab wechseln.
 3. Folgendes hinzufügen:  
 ```
-# Bot nach Reboot starten. Die Wartezeit wird benötigt, damit CouchDB genug Zeit hat zu starten.  
-@reboot sleep 180 && cd /username/bla/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1  
-# Updates nachts automatisch ausführen
+# Bot Start Script alle X Minuten ausführen um sicherzugehen, dass der Bot immer läuft
+*/1 * * * * sh /root/betterking/BKCouponCrawler/bkstart.sh
+
+# Optionale Commands: Updates nachts automatisch ausführen
 00 03 * * * root /usr/bin/apt update -q -y >> /var/log/apt/automaticupdates.log
 30 03 * * * root /usr/bin/apt upgrade -q -y >> /var/log/apt/automaticupdates.log
 # Jede Nacht um 4 Uhr neustarten
