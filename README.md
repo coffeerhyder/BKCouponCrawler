@@ -285,9 +285,8 @@ McDonald's
 Sonstige
 01. billigepizza.netlify.app | Pizzapreise bei Domino's optimieren
 —> Video
- (https://www.youtube.com/watch?v=rChjUHveYxI)02. mistersnax.com | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich
-03. t.me/NordseeCouponsBot | Nordsee Coupons Bot
-Channel: t.me/nordseecoupons
+ (https://www.youtube.com/watch?v=rChjUHveYxI)  
+02. mistersnax.com | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich
 
 Linksammlung BK:
 01. burgerking.de/sparkings | Spar Kings
