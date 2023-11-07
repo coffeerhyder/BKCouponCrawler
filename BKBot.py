@@ -552,12 +552,12 @@ class BKBot:
                 includeVeggieSymbol = view.includeVeggieSymbol
             while len(buttons) < maxCouponsPerPage and index < len(coupons):
                 coupon = coupons[index]
-                if user.isFavoriteCoupon(coupon) and view.highlightFavorites:
-                    buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts,
-                                                                               includeVeggieSymbol=includeVeggieSymbol)
+                buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts, includeVeggieSymbol=includeVeggieSymbol)
+                if user.isFavoriteCoupon(coupon):
                     currentPageContainsAtLeastOneFavoriteCoupon = True
-                else:
-                    buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts, includeVeggieSymbol=includeVeggieSymbol)
+                    if view.highlightFavorites:
+                        # Highlight item in list so user can see favourites easier
+                        buttonText = SYMBOLS.STAR + buttonText
                 buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
                 index += 1
             numberofCouponsOnCurrentPage = len(buttons)
@@ -646,7 +646,7 @@ class BKBot:
         user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.easterEggCounter += 1
         user.store(db=userDB)
-        logging.info(f"User {user.id} found easter egg times {user.easterEggCounter}")
+        logging.info(f"User {user.id} found easter egg times: {user.easterEggCounter}")
         text = "🥚<b>Glückwunsch! Du hast das Easter Egg gefunden!</b>"
         text += "\nKlicke <a href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">HIER</a>, um es anzusehen ;)"
         text += "\nDrücke /start, um das Menü neu zu laden."

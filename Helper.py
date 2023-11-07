@@ -137,12 +137,13 @@ def shortenProductNames(couponTitle: str) -> str:
     couponTitle = replaceCaseInsensitive('Double', 'Dbl', couponTitle)
     couponTitle = replaceCaseInsensitive('Long', 'Lng', couponTitle)
     couponTitle = replaceRegex(re.compile('(?i)Nuggets?'), 'Nugg', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)Plant[\s-]*Based'), 'Plant', couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)Plant[\s-]*Based'), 'Plnt', couponTitle)
     couponTitle = replaceCaseInsensitive('Triple', 'Trple', couponTitle)
     couponTitle = replaceCaseInsensitive('Veggie', 'Veg', couponTitle)
     couponTitle = replaceCaseInsensitive('Whopper', 'Whppr', couponTitle)
     couponTitle = replaceCaseInsensitive('Steakhouse', 'SteakH', couponTitle)
     couponTitle = replaceRegex(re.compile(r'(?i)X[\s-]*tra'), 'Xtra', couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)Onion\s*Rings'), 'ORings', couponTitle)
 
     # drinkUnitRegEx = re.compile('(?i)(0[.,]\\d{1,2})\\s*L').search(couponTitle)
     # if drinkUnitRegEx:

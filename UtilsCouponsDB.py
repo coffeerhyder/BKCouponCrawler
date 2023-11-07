@@ -202,13 +202,14 @@ class Coupon(Document):
 
     def getPLUOrUniqueIDOrRedemptionHint(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
-        showQrHintWhenPLUIsUnavailable = True
         if self.plu is not None:
             return self.plu
-        elif showQrHintWhenPLUIsUnavailable:
-            return 'QR!'
         else:
-            return self.id
+            showQrHintWhenPLUIsUnavailable = True
+            if showQrHintWhenPLUIsUnavailable:
+                return 'QR! ' + self.id
+            else:
+                return self.id
 
     def getFirstLetterOfPLU(self) -> Union[str, None]:
         """ Returns first letter of PLU if PLU is given and starts with a single letter followed by numbers-only. """
@@ -587,7 +588,12 @@ class Coupon(Document):
         if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.getTitle() + '\n'
-        couponText += self.getPLUInformationFormatted()
+        # Add PLU information
+        if self.plu is not None and self.plu != self.id:
+            couponText += '<b>' + self.plu + '</b>' + ' | ' + self.id
+        else:
+            # No PLU available or PLU equals ID (This is e.g. the case for Payback coupons)
+            couponText += '<b>' + self.id + '</b>'
         couponText = self.appendPriceInfoText(couponText)
         """ Expire date should be always given but we can't be 100% sure! """
         expireDateFormatted = self.getExpireDateFormatted()
@@ -601,14 +607,6 @@ class Coupon(Document):
         if webviewURL is not None:
             couponText += f"\n{SYMBOLS.ARROW_RIGHT}<a href=\"{webviewURL}\">Webansicht</a>"
         return couponText
-
-    def getPLUInformationFormatted(self) -> str:
-        """ Returns e.g. <b>123</b> | 67407 """
-        if self.plu is not None and self.plu != self.id:
-            return '<b>' + self.plu + '</b>' + ' | ' + self.id
-        else:
-            # No PLU available or PLU equals ID (This is e.g. the case for Payback coupons)
-            return '<b>' + self.id + '</b>'
 
     def appendPriceInfoText(self, couponText: str) -> str:
         priceFormatted = self.getPriceFormatted()
