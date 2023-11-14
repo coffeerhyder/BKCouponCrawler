@@ -1,4 +1,4 @@
-from UtilsCoupons2 import coupon2FixProductTitle
+from Helper import shortenProductNames
 
 """ Class to test product title replacements for type "coupons2". """
 
@@ -16,7 +16,7 @@ oldProductTitles = [
 ]
 
 for oldTitle in oldProductTitles:
-    newTitle = coupon2FixProductTitle(oldTitle)
+    newTitle = shortenProductNames(oldTitle)
     if newTitle == oldTitle:
         print("Unchanged: " + oldTitle)
     else:

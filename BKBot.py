@@ -612,8 +612,8 @@ class BKBot:
             raise BetterBotException('<b>Du hast noch keine Favoriten!</b>', InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
         if coupons is None:
             # Perform DB request if not already done before
-            coupons = self.crawler.getFilteredCouponsAsDict(filter=CouponViews.FAVORITES.getFilter())
-        userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=sortCoupons)
+            coupons = self.crawler.getFilteredCouponsAsDict(couponfilter=CouponViews.FAVORITES.getFilter())
+        userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, returnSortedCoupons=sortCoupons)
         if len(userFavoritesInfo.couponsAvailable) == 0:
             errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar:</b>'
             errorMessage += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
@@ -810,9 +810,9 @@ class BKBot:
             addDeletePaybackCardButton = True
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.PROTOCOL_BK + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
-        menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs auch 'Upselling Artikel' genannt."
+        menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs auch <i>Upselling Artikel</i> genannt."
         if user.hasStoredSortModes():
-            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Gespeicherte Sortierungen löschen",
+            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Sortierungen zurücksetzen",
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
             menuText += "\n---"
             menuText += f"\nEs gibt gespeicherte Coupon Sortierungen für {len(user.couponViewSortModes)} Coupon Ansichten, die beim Klick auf den zurücksetzen Button ebenfalls gelöscht werden."
@@ -823,7 +823,7 @@ class BKBot:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
-            userFavoritesInfo = user.getUserFavoritesInfo(self.crawler.getFilteredCouponsAsDict(CouponViews.FAVORITES.getFilter()), sortCoupons=True)
+            userFavoritesInfo = user.getUserFavoritesInfo(self.crawler.getFilteredCouponsAsDict(CouponViews.FAVORITES.getFilter()), returnSortedCoupons=True)
             if len(userFavoritesInfo.couponsUnavailable) > 0:
                 keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavoritesInfo.couponsUnavailable)) + ")?*²",
                                                       callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
@@ -1228,7 +1228,7 @@ class BKBot:
         coupons = self.getFilteredCouponsAsDict(couponFilter=CouponFilter())
         dbUpdates = []
         for user in usersToDeleteExpiredFavorites:
-            userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=False)
+            userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, returnSortedCoupons=False)
             if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0:
                 for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
                     user.deleteFavoriteCouponID(unavailableCoupon.id)

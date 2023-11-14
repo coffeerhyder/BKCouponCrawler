@@ -820,7 +820,7 @@ class User(Document):
         dummyUser = User()
         self.paybackCard = dummyUser.paybackCard
 
-    def getUserFavoritesInfo(self, couponsFromDB: dict, sortCoupons: bool) -> UserFavoritesInfo:
+    def getUserFavoritesInfo(self, couponsFromDB: dict, returnSortedCoupons: bool) -> UserFavoritesInfo:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
         Coupons from DB are required to get current dataset of available favorites.
@@ -841,7 +841,7 @@ class User(Document):
         # Sort all coupon arrays by price
         if self.settings.hideDuplicates:
             availableFavoriteCoupons = removeDuplicatedCoupons(availableFavoriteCoupons)
-        if sortCoupons:
+        if returnSortedCoupons:
             favoritesFilter = CouponViews.FAVORITES.getFilter()
             availableFavoriteCoupons = sortCouponsAsList(availableFavoriteCoupons, favoritesFilter.sortCode)
             unavailableFavoriteCoupons = sortCouponsAsList(unavailableFavoriteCoupons, favoritesFilter.sortCode)

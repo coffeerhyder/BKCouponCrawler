@@ -156,6 +156,10 @@ def shortenProductNames(couponTitle: str) -> str:
     couponTitle = couponTitle.replace(' ', '')
     # E.g. "...Chili-Cheese"
     couponTitle = couponTitle.replace('-', '')
+    removeOR = re.compile(r'(\s*oder\s*)').search(couponTitle)
+    if removeOR:
+        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
+    couponTitle = replaceRegex(re.compile(r'\s*zum\s*Preis\s*von\s*(1!?|einem|einer)'), '', couponTitle)
     # couponTitle = couponTitle.replace(' + ', '+')
     return couponTitle
 
@@ -163,10 +167,6 @@ def shortenProductNames(couponTitle: str) -> str:
 def sanitizeCouponTitle(couponTitle: str) -> str:
     """ Generic method which sanitizes strings and removes unneeded symbols such as trademark symbols. """
     couponTitle = couponTitle.replace('®', '')
-    removeOR = re.compile(r'(\s*oder\s*)').search(couponTitle)
-    if removeOR:
-        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
-    couponTitle = replaceRegex(re.compile(r'\s*zum\s*Preis\s*von\s*(1!?|einem|einer)'), '', couponTitle)
     couponTitle = couponTitle.strip()
     return couponTitle
 
