@@ -329,50 +329,43 @@ Tabelle: Buchstabencodes für alle Monate:
 | November  | CB   |
 | Dezember  | VM   |
 
-### Online Vorbestellung Recherche
-Über die BK App kann man in einigen Filialen [online vorbestellen](https://www.bundesverband-systemgastronomie.de/de/bdsnachricht/schnell-einfach-flexibel-bestellen-abholen-bei-burger-king-r.html).  
-Hier lassen sich in der App die App Gutscheine auswählen, aber auch QR Codes scannen.
-* Es sind alle PLUs bestellbar, auch laut Datum abgelaufene --> Vermutlich alles, was zu einem Produkt führt, das aktuell einen `availability_type` von `available` hat.
-* Es befinden sich fast alle App- UND Papiercoupons im "Filial-spezifischen" Endpoint: `mo.burgerking-app.eu/api/v2/stores/486/menu`
-* Unterschiedliche Filialen können einen unterschiedlichen Pool von Coupons akzeptieren, aber die meisten Coupons funktionieren in allen Filialen
-* Die online aufgelisteten Gutscheine sind nicht alle, die akzeptiert werden: beispielsweise können aktuell gültige Papiercoupons teilweise fehlen, obwohl Restaurants Papiercoupons generell akzeptieren -> Bedeutet im Klartext: Manche Papiercoupons lassen sich bei manchen Restaurants nicht in der online Vorbestellung nutzen, obwohl sie offline in der Filiale funktionieren müssten -> Fehler in der BK DB?! -> Ergibt einfach keinen Sinn
-* Seit ca. September 2021 scheint die Vorbestellen Funktion bei allen BK Filialen entfernt worden zu sein. Kennt man die FilialIDs, die Vorbestellungen akzeptierten, kann man noch immer Coupons über den Endpoint abfragen.
-
 ### Danke an
 * https://github.com/3dik/bkoder
 * https://edik.ch/posts/hack-the-burger-king.html
 * https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
 * https://limits.tginfo.me/de-DE
+* https://www.mydealz.de/profile/jokergermany
+* Alle MyDealz User, die die neuen Papier- und Paybackcoupons posten
 
 ### Kleine Linksammlung
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
 * https://www.burgerking.de/rewards/offers (Coupons direkt über die BK Webseite)
 * https://pr0gramm.com/user/FishEater23/uploads/4730464
 * https://ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/
+* https://github.com/reteps/burger-king-api-wrapper
+* https://github.com/robsonkades/clone-burger-king-app-with-expo
+* https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
+* https://mcbroken.com/
 
 ### Ähnliche Projekte | funktionierend
 Name | Beschreibung | Live-Instanz
 --- | --- | ---
-- | https://github.com/reteps/burger-king-api-wrapper | -
-- | https://github.com/robsonkades/clone-burger-king-app-with-expo | -
+Generisches BK Projekt | https://github.com/reteps/burger-king-api-wrapper | -
+Generisches BK Projekt | https://github.com/robsonkades/clone-burger-king-app-with-expo | -
 mccoupon.deals | McDonalds Coupons ohne App, [Autor](https://www.mydealz.de/profile/Jicu) | https://www.mccoupon.deals/
 billigepizza.netlify.app | Pizzapreise von Domino's optimieren | https://billigepizza.netlify.app/
 MisterSnax (ehemals Spätzlehunter) | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich | https://mistersnax.com/
-NordseeCoupons | Nordsee Coupons Bot | https://t.me/nordseecoupons , [Bot](https://t.me/NordseeCouponsBot)
 
-* https://github.com/reteps/burger-king-api-wrapper
-* https://github.com/robsonkades/clone-burger-king-app-with-expo
-* https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
-* [pbcp.de/partner/burger-king](https://pbcp.de/partner/burger-king)
-* https://mcbroken.com/
+
 
 ### Ähnliche Projekte | down/defekt
-Name | Beschreibung | Live-Instanz | Down seit
---- | --- | --- | ---
-freecokebot aka gimmecockbot | McDonalds gratis Getränke | https://t.me/gimmecockbot (Alternativ https://t.me/freecokebot) | 10.11.2022
-bk.eris.cc | BK Coupons ohne App, [Autor](https://gist.github.com/printfuck) | https://bk.eris.cc/ | 10.11.2022
-mcdonalds4free_bot | McDonalds Getränke kostenlos, [MyDealz Thread](https://www.mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092) | https://t.me/mcdonalds4free_bot | 15.01.2023
-Würger King | Burger King Coupons | https://wurgerking.wfr.moe/  ([Quellcode](https://github.com/WebFreak001/WurgerKing)) | 31.12.2022
+Name | Beschreibung                                                                                                                                                  | Live-Instanz                                                                          | Down/Kaputt seit
+--- |---------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------| ---
+freecokebot aka gimmecockbot | McDonalds gratis Getränke                                                                                                                                     | https://t.me/gimmecockbot (Alternativ https://t.me/freecokebot)                       | 10.11.2022
+bk.eris.cc | BK Coupons ohne App, [Autor](https://gist.github.com/printfuck)                                                                                               | https://bk.eris.cc/                                                                   | 10.11.2022
+mcdonalds4free_bot | McDonalds Getränke kostenlos, [MyDealz Thread](https://www.mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092) | https://t.me/mcdonalds4free_bot                                                       | 15.01.2023
+Würger King | Burger King Coupons                                                                                                                                           | https://wurgerking.wfr.moe/  ([Quellcode](https://github.com/WebFreak001/WurgerKing)) | 31.12.2022
+NordseeCoupons | Nordsee Coupons Bot | https://t.me/NordseeCouponsBot und https://t.me/nordseecoupons     | 23.11.2023
 
 #### Ideen für ähnliche Projekte
 * Couponplatz Crawler/Bot
