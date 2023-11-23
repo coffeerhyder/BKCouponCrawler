@@ -49,6 +49,7 @@ async def collectNewCouponsNotifications(bkbot) -> None:
      """
     # List of user documents that were changed and need to be pushed to DB
     dbUserUpdateList = set()
+    separator = '---'
 
     numberofFavoriteNotifications = 0
     logging.info('Computing new coupons\' notification messages...')
@@ -99,11 +100,12 @@ async def collectNewCouponsNotifications(bkbot) -> None:
                 newCouponsListForThisUsersNotification = newCoupons
             if len(newCouponsListForThisUsersNotification) > 0:
                 if len(notificationtext) > 0:
-                    notificationtext += "\n---\n"
+                    notificationtext += f"\n{separator}\n"
                 notificationtext += "<b>" + SYMBOLS.NEW + str(
                     len(newCouponsListForThisUsersNotification)) + " neue Coupons verfügbar:</b>" + bkbot.getNewCouponsTextWithChannelHyperlinks(
                     newCouponsListForThisUsersNotification, 49)
         if len(notificationtext) > 0:
+            notificationtext += f"\n{separator}"
             # Complete user text and save it to send it later
             if bkbot.getPublicChannelName() is None:
                 # Different text in case someone sets up this bot without a public channel (kinda makes no sense).
