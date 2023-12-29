@@ -766,9 +766,11 @@ class BKBot:
         """
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         self.adminOrException(user)
+        timebefore = getCurrentDate()
         await self.editOrSendMessage(update, text="Starte Channel Nuke...", parse_mode='HTML')
         await nukeChannel(self)
-        await self.editOrSendMessage(update, text=SYMBOLS.CONFIRM + "Channel Nuke erledigt", parse_mode='HTML')
+        tdelta = getCurrentDate() - timebefore
+        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM} Channel Nuke erledigt in {tdelta.seconds} Sekunden", parse_mode='HTML')
         return CallbackVars.MENU_MAIN
 
     async def displaySettings(self, update: Update, context: CallbackContext, user: User):

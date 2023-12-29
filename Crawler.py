@@ -523,6 +523,7 @@ class BKCrawler:
         logging.info("Total coupon processing time: " + getFormattedPassedTime(timestampStart))
 
     def paperCouponsHandling_DEPRECATED(self, crawledCouponsDict: dict):
+        # TODO: Remove this old code
         """ Old handling to auto detect paper coupons """
         # Detect paper coupons
         paperCouponMapping = getCouponMappingForCrawler()

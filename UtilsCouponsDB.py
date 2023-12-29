@@ -412,19 +412,15 @@ class Coupon(Document):
             return False
 
     def getStartDatetime(self) -> Union[datetime, None]:
+        """ Returns datetime from which coupon is valid. Not all coupons got a startDatetime. """
         if self.timestampStart is not None and self.timestampStart > 0:
             return datetime.fromtimestamp(self.timestampStart, getTimezone())
         else:
             # Start date must not always be given
             return None
 
-    def getExpireDatetime(self) -> Union[datetime, None]:
-        if self.timestampExpire is not None:
-            return datetime.fromtimestamp(self.timestampExpire, getTimezone())
-        else:
-            # This should never happen
-            logging.warning("Found coupon without expiredate: " + self.id)
-            return None
+    def getExpireDatetime(self) -> datetime:
+        return datetime.fromtimestamp(self.timestampExpire, getTimezone())
 
     def getExpireDateFormatted(self, fallback: Union[str, None] = None) -> Union[str, None]:
         if self.timestampExpire is not None:
