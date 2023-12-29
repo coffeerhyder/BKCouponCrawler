@@ -193,15 +193,23 @@ class Coupon(Document):
     def __str__(self):
         return f'{self.id} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}  | WEBVIEW: {self.getWebviewURL()}'
 
+    def forceDisplayQR(self) -> bool:
+        if self.plu is None:
+            # No readable PLU code -> QR code is needed to order this item.
+            return True
+        else:
+            return False
+
     def getPLUOrUniqueIDOrRedemptionHint(self) -> str:
         """ Returns PLU if existant, returns UNIQUE_ID otherwise. """
-        showQrHintWhenPLUIsUnavailable = True
         if self.plu is not None:
             return self.plu
-        elif showQrHintWhenPLUIsUnavailable:
-            return '!QR!'
         else:
-            return self.id
+            showQrHintWhenPLUIsUnavailable = True
+            if showQrHintWhenPLUIsUnavailable:
+                return 'QR! ' + self.id
+            else:
+                return self.id
 
     def getFirstLetterOfPLU(self) -> Union[str, None]:
         """ Returns first letter of PLU if PLU is given and starts with a single letter followed by numbers-only. """
@@ -404,19 +412,15 @@ class Coupon(Document):
             return False
 
     def getStartDatetime(self) -> Union[datetime, None]:
+        """ Returns datetime from which coupon is valid. Not all coupons got a startDatetime. """
         if self.timestampStart is not None and self.timestampStart > 0:
             return datetime.fromtimestamp(self.timestampStart, getTimezone())
         else:
             # Start date must not always be given
             return None
 
-    def getExpireDatetime(self) -> Union[datetime, None]:
-        if self.timestampExpire is not None:
-            return datetime.fromtimestamp(self.timestampExpire, getTimezone())
-        else:
-            # This should never happen
-            logging.warning("Found coupon without expiredate: " + self.id)
-            return None
+    def getExpireDatetime(self) -> datetime:
+        return datetime.fromtimestamp(self.timestampExpire, getTimezone())
 
     def getExpireDateFormatted(self, fallback: Union[str, None] = None) -> Union[str, None]:
         if self.timestampExpire is not None:
@@ -580,7 +584,12 @@ class Coupon(Document):
         if highlightIfNew and self.isNewCoupon():
             couponText += SYMBOLS.NEW
         couponText += self.getTitle() + '\n'
-        couponText += self.getPLUInformationFormatted()
+        # Add PLU information
+        if self.plu is not None and self.plu != self.id:
+            couponText += '<b>' + self.plu + '</b>' + ' | ' + self.id
+        else:
+            # No PLU available or PLU equals ID (This is e.g. the case for Payback coupons)
+            couponText += '<b>' + self.id + '</b>'
         couponText = self.appendPriceInfoText(couponText)
         """ Expire date should be always given but we can't be 100% sure! """
         expireDateFormatted = self.getExpireDateFormatted()
@@ -594,14 +603,6 @@ class Coupon(Document):
         if webviewURL is not None:
             couponText += f"\n{SYMBOLS.ARROW_RIGHT}<a href=\"{webviewURL}\">Webansicht</a>"
         return couponText
-
-    def getPLUInformationFormatted(self) -> str:
-        """ Returns e.g. <b>123</b> | 67407 """
-        if self.plu is not None and self.plu != self.id:
-            return '<b>' + self.plu + '</b>' + ' | ' + self.id
-        else:
-            # No PLU available or PLU equals ID (This is e.g. the case for Payback coupons)
-            return '<b>' + self.id + '</b>'
 
     def appendPriceInfoText(self, couponText: str) -> str:
         priceFormatted = self.getPriceFormatted()
@@ -815,7 +816,7 @@ class User(Document):
         dummyUser = User()
         self.paybackCard = dummyUser.paybackCard
 
-    def getUserFavoritesInfo(self, couponsFromDB: dict, sortCoupons: bool) -> UserFavoritesInfo:
+    def getUserFavoritesInfo(self, couponsFromDB: dict, returnSortedCoupons: bool) -> UserFavoritesInfo:
         """
         Gathers information about the given users' favorite available/unavailable coupons.
         Coupons from DB are required to get current dataset of available favorites.
@@ -836,7 +837,7 @@ class User(Document):
         # Sort all coupon arrays by price
         if self.settings.hideDuplicates:
             availableFavoriteCoupons = removeDuplicatedCoupons(availableFavoriteCoupons)
-        if sortCoupons:
+        if returnSortedCoupons:
             favoritesFilter = CouponViews.FAVORITES.getFilter()
             availableFavoriteCoupons = sortCouponsAsList(availableFavoriteCoupons, favoritesFilter.sortCode)
             unavailableFavoriteCoupons = sortCouponsAsList(unavailableFavoriteCoupons, favoritesFilter.sortCode)

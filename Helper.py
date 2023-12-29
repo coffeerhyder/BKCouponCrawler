@@ -137,21 +137,23 @@ def shortenProductNames(couponTitle: str) -> str:
     couponTitle = replaceCaseInsensitive('Double', 'Dbl', couponTitle)
     couponTitle = replaceCaseInsensitive('Long', 'Lng', couponTitle)
     couponTitle = replaceRegex(re.compile('(?i)Nuggets?'), 'Nugg', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)Plant[\s-]*Based'), 'Plant', couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)Plant[\s-]*Based'), 'Plnt', couponTitle)
     couponTitle = replaceCaseInsensitive('Triple', 'Trple', couponTitle)
     couponTitle = replaceCaseInsensitive('Veggie', 'Veg', couponTitle)
     couponTitle = replaceCaseInsensitive('Whopper', 'Whppr', couponTitle)
     couponTitle = replaceCaseInsensitive('Steakhouse', 'SteakH', couponTitle)
     couponTitle = replaceRegex(re.compile(r'(?i)X[\s-]*tra'), 'Xtra', couponTitle)
-
-    # drinkUnitRegEx = re.compile('(?i)(0[.,]\\d{1,2})\\s*L').search(couponTitle)
-    # if drinkUnitRegEx:
-    #     couponTitle = couponTitle.replace(drinkUnitRegEx.group(0), drinkUnitRegEx.group(1) + " L")
-    # couponTitle = replaceRegex(re.compile('(?i)(0[.,]\\d{1,2})\\s*L'), '0,4 L', couponTitle)
-    # couponTitle = replaceRegex(re.compile('(?i)0[.,]4\\s*L'), '0,4 L', couponTitle)
-    # couponTitle = replaceRegex(re.compile('(?i)0[.,]5\\s*L'), '0,5 L', couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)Onion\s*Rings'), 'ORings', couponTitle)
+    removeOR = re.compile(r'(\s*oder\s*)').search(couponTitle)
+    if removeOR:
+        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
+    couponTitle = replaceRegex(re.compile(r'\s*zum\s*Preis\s*von\s*(1!?|einem|einer)'), '', couponTitle)
+    # 2023-12-29
+    couponTitle = replaceRegex(re.compile(r'(?i)\s*\|\s*King\s*Smart\s*Menü'), '', couponTitle)
+    # 2023-12-29
+    couponTitle = replaceRegex(re.compile(r'(?i)\smit\s'), '&', couponTitle)
     couponTitle = replaceRegex(re.compile(r'(?i)Jr\s*\.'), 'Jr', couponTitle)
-    """ Uahh removing all spaces makes it more ugly but we need to save that space! """
+    # Do some more basic replacements
     couponTitle = couponTitle.replace(' ', '')
     # E.g. "...Chili-Cheese"
     couponTitle = couponTitle.replace('-', '')
@@ -162,10 +164,6 @@ def shortenProductNames(couponTitle: str) -> str:
 def sanitizeCouponTitle(couponTitle: str) -> str:
     """ Generic method which sanitizes strings and removes unneeded symbols such as trademark symbols. """
     couponTitle = couponTitle.replace('®', '')
-    removeOR = re.compile(r'(\s*oder\s*)').search(couponTitle)
-    if removeOR:
-        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
-    couponTitle = replaceRegex(re.compile(r'\s*zum\s*Preis\s*von\s*(1!?|einem|einer)'), '', couponTitle)
     couponTitle = couponTitle.strip()
     return couponTitle
 

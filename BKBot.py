@@ -552,12 +552,12 @@ class BKBot:
                 includeVeggieSymbol = view.includeVeggieSymbol
             while len(buttons) < maxCouponsPerPage and index < len(coupons):
                 coupon = coupons[index]
-                if user.isFavoriteCoupon(coupon) and view.highlightFavorites:
-                    buttonText = SYMBOLS.STAR + coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts,
-                                                                               includeVeggieSymbol=includeVeggieSymbol)
+                buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts, includeVeggieSymbol=includeVeggieSymbol)
+                if user.isFavoriteCoupon(coupon):
                     currentPageContainsAtLeastOneFavoriteCoupon = True
-                else:
-                    buttonText = coupon.generateCouponShortText(highlightIfNew=user.settings.highlightNewCouponsInCouponButtonTexts, includeVeggieSymbol=includeVeggieSymbol)
+                    if view.highlightFavorites:
+                        # Highlight item in list so user can see favourites easier
+                        buttonText = SYMBOLS.STAR + buttonText
                 buttons.append([InlineKeyboardButton(buttonText, callback_data="?a=dc&plu=" + coupon.id + "&cb=" + urllib.parse.quote(urlquery_callbackBack.url))])
                 index += 1
             numberofCouponsOnCurrentPage = len(buttons)
@@ -612,8 +612,8 @@ class BKBot:
             raise BetterBotException('<b>Du hast noch keine Favoriten!</b>', InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
         if coupons is None:
             # Perform DB request if not already done before
-            coupons = self.crawler.getFilteredCouponsAsDict(filter=CouponViews.FAVORITES.getFilter())
-        userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=sortCoupons)
+            coupons = self.crawler.getFilteredCouponsAsDict(couponfilter=CouponViews.FAVORITES.getFilter())
+        userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, returnSortedCoupons=sortCoupons)
         if len(userFavoritesInfo.couponsAvailable) == 0:
             errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar:</b>'
             errorMessage += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
@@ -646,7 +646,7 @@ class BKBot:
         user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         user.easterEggCounter += 1
         user.store(db=userDB)
-        logging.info(f"User {user.id} found easter egg times {user.easterEggCounter}")
+        logging.info(f"User {user.id} found easter egg times: {user.easterEggCounter}")
         text = "🥚<b>Glückwunsch! Du hast das Easter Egg gefunden!</b>"
         text += "\nKlicke <a href=\"https://www.youtube.com/watch?v=dQw4w9WgXcQ\">HIER</a>, um es anzusehen ;)"
         text += "\nDrücke /start, um das Menü neu zu laden."
@@ -766,9 +766,11 @@ class BKBot:
         """
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         self.adminOrException(user)
+        timebefore = getCurrentDate()
         await self.editOrSendMessage(update, text="Starte Channel Nuke...", parse_mode='HTML')
         await nukeChannel(self)
-        await self.editOrSendMessage(update, text=SYMBOLS.CONFIRM + "Channel Nuke erledigt", parse_mode='HTML')
+        tdelta = getCurrentDate() - timebefore
+        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM} Channel Nuke erledigt in {tdelta.seconds} Sekunden", parse_mode='HTML')
         return CallbackVars.MENU_MAIN
 
     async def displaySettings(self, update: Update, context: CallbackContext, user: User):
@@ -810,9 +812,9 @@ class BKBot:
             addDeletePaybackCardButton = True
         menuText = SYMBOLS.WRENCH + "<b>Einstellungen:</b>"
         menuText += "\nNicht alle Filialen nehmen alle Gutschein-Typen!\nPrüfe die Akzeptanz von App- bzw. Papiercoupons vorm Bestellen über den <a href=\"" + URLs.PROTOCOL_BK + URLs.BK_KING_FINDER + "\">KINGFINDER</a>."
-        menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs auch 'Upselling Artikel' genannt."
+        menuText += "\n*¹ Versteckte Coupons sind meist überteuerte große Menüs auch <i>Upselling Artikel</i> genannt."
         if user.hasStoredSortModes():
-            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Gespeicherte Sortierungen löschen",
+            keyboard.append([InlineKeyboardButton(SYMBOLS.WARNING + "Sortierungen zurücksetzen",
                                                   callback_data=CallbackVars.MENU_SETTINGS_RESET)])
             menuText += "\n---"
             menuText += f"\nEs gibt gespeicherte Coupon Sortierungen für {len(user.couponViewSortModes)} Coupon Ansichten, die beim Klick auf den zurücksetzen Button ebenfalls gelöscht werden."
@@ -823,7 +825,7 @@ class BKBot:
             keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + 'Payback Karte löschen', callback_data=CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD)])
         if len(user.favoriteCoupons) > 0:
             # Additional DB request required so let's only jump into this handling if the user has at least one favorite coupon.
-            userFavoritesInfo = user.getUserFavoritesInfo(self.crawler.getFilteredCouponsAsDict(CouponViews.FAVORITES.getFilter()), sortCoupons=True)
+            userFavoritesInfo = user.getUserFavoritesInfo(self.crawler.getFilteredCouponsAsDict(CouponViews.FAVORITES.getFilter()), returnSortedCoupons=True)
             if len(userFavoritesInfo.couponsUnavailable) > 0:
                 keyboard.append([InlineKeyboardButton(SYMBOLS.DENY + "Abgelaufene Favoriten löschen (" + str(len(userFavoritesInfo.couponsUnavailable)) + ")?*²",
                                                       callback_data=CallbackVars.MENU_SETTINGS_DELETE_UNAVAILABLE_FAVORITE_COUPONS)])
@@ -847,7 +849,7 @@ class BKBot:
         await self.displayCouponWithImage(update, context, coupon, user)
         # Post user-menu into chat
         menuText = 'Coupon Details'
-        if not user.settings.displayQR:
+        if not user.settings.displayQR and not coupon.forceDisplayQR():
             menuText += '\n' + SYMBOLS.INFORMATION + 'Möchtest du QR-Codes angezeigt bekommen?\nSiehe Hauptmenü -> Einstellungen'
         await self.sendMessage(chat_id=update.effective_message.chat_id, text=menuText, parse_mode='HTML',
                                reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton(SYMBOLS.BACK, callback_data=callbackBack)]]))
@@ -903,7 +905,7 @@ class BKBot:
         couponText = coupon.generateCouponLongTextFormattedWithDescription(highlightIfNew=True)
         if additionalText is not None:
             couponText += '\n' + additionalText
-        if user.settings.displayQR:
+        if user.settings.displayQR or coupon.forceDisplayQR():
             # We need to send two images -> Send as album
             photoCoupon = InputMediaPhoto(media=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML')
             photoQR = InputMediaPhoto(media=self.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
@@ -1228,7 +1230,7 @@ class BKBot:
         coupons = self.getFilteredCouponsAsDict(couponFilter=CouponFilter())
         dbUpdates = []
         for user in usersToDeleteExpiredFavorites:
-            userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, sortCoupons=False)
+            userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, returnSortedCoupons=False)
             if len(userUnavailableFavoriteCouponInfo.couponsUnavailable) > 0:
                 for unavailableCoupon in userUnavailableFavoriteCouponInfo.couponsUnavailable:
                     user.deleteFavoriteCouponID(unavailableCoupon.id)
@@ -1390,7 +1392,7 @@ class BKBot:
             return False
 
     def startBot(self):
-        self.application.run_polling()
+        self.application.run_polling(timeout=300, read_timeout=300, write_timeout=300, connect_timeout=300)
 
     def stopBot(self):
         self.application.stop()
