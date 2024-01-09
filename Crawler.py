@@ -184,7 +184,7 @@ class BKCrawler:
 
     def downloadProductiveCouponDBImagesAndCreateQRCodes(self):
         """ Downloads coupons images and generates QR codes for current productive coupon DB. """
-        timestampStart = datetime.now().timestamp()
+        dateStart = datetime.now()
         couponDB = self.getCouponDB()
         # Step 1: Create QR images
         coupons = []
@@ -197,7 +197,7 @@ class BKCrawler:
         for coupon in coupons:
             if downloadCouponImageIfNonExistant(coupon):
                 numberofDownloadedImages += 1
-        logging.info(f"Number of coupon images downloaded: {numberofDownloadedImages} | Duration: {getFormattedPassedTime(timestampStart)}")
+        logging.info(f"Number of coupon images downloaded: {numberofDownloadedImages} | Duration: {datetime.now() - dateStart}")
 
     def migrateDBs(self):
         """ Migrate DBs from old to new version - leave this function empty if there is nothing to migrate. """
@@ -263,11 +263,12 @@ class BKCrawler:
             upsellOptions = couponBKTmp.get('upsellOptions')
             if upsellOptions is not None:
                 for upsellOption in upsellOptions:
+                    upsellID = upsellOption.get('_id')
                     upsellType = upsellOption.get('_type')
                     upsellShortCode = upsellOption.get('shortCode')
                     if upsellType != 'offer' or upsellShortCode is None:
                         # Skip invalid items: This should never happen
-                        logging.info("Found invalid upsell object: " + str(upsellOption))
+                        logging.info(f"Found invalid/unsupported upsell object: {upsellID=}")
                         continue
                     bkCoupons.append(upsellOption)
             index = 0
@@ -296,19 +297,15 @@ class BKCrawler:
                         titleFull = title
                     else:
                         subtitle = subtitle.strip()
-                        ignoreRegex = re.compile(r'(?i)Im King Menü \(\+[^)]+\)')
-                        ignoreTitleRegex = ignoreRegex.search(title)
-                        ignoreSubtitleRegex = ignoreRegex.search(subtitle)
-                        if len(subtitle) == 0 or subtitle.isspace():
+                        titleShortened = shortenProductNames(title)
+                        subtitleShortened = shortenProductNames(subtitle)
+                        if len(subtitleShortened) == 0 or subtitleShortened.isspace():
                             # Useless subtitle -> Use title only
                             titleFull = title
-                        elif ignoreTitleRegex:
+                        elif len(titleShortened) == 0 or titleShortened.isspace():
                             # Useless title -> Use subtitle only
                             titleFull = subtitle
-                        elif ignoreSubtitleRegex:
-                            # Useless subtitle -> Use title only
-                            titleFull = title
-                        elif title == subtitle:
+                        elif titleShortened == subtitleShortened:  # Small hack: Shorten titles before comparing them
                             # Title and subtitle are the same -> Use title only
                             titleFull = title
                         else:
@@ -316,7 +313,7 @@ class BKCrawler:
                             titleFull = title + ' ' + subtitle
                             # Log seemingly strange values
                             if not subtitle.startswith('+'):
-                                logging.info(f'Coupon {uniqueCouponID}: Possible subtitle which should not be included in coupon title: {subtitle} | {titleFull=}')
+                                logging.info(f'Coupon {uniqueCouponID}: Possible subtitle which should not be included in coupon title: {subtitle=} | {title=} | {titleFull=}')
 
                 titleFull = sanitizeCouponTitle(titleFull)
                 price = couponBK['offerPrice']
@@ -327,12 +324,11 @@ class BKCrawler:
                 # TODO: Check where those tags are located in new API endpoint
                 offerTags = couponBK.get('offerTags')
                 if offerTags is not None and len(offerTags) > 0:
+                    # 2023-01-09: Looks like this field doesn't exist anymore
                     tagsStringArray = []
                     for offerTag in offerTags:
                         tagsStringArray.append(offerTag['value'])
                     coupon.tags = tagsStringArray
-                else:
-                    logging.info(f'Detected coupon without tags: {coupon.id}')
                 if index > 0:
                     # First item = Real coupon, all others = upsell/"hidden" coupon(s)
                     coupon.isHidden = True
@@ -365,22 +361,25 @@ class BKCrawler:
                 except:
                     # Dontcare
                     logging.warning('Failed to find BetterExpiredate for coupon: ' + coupon.id)
-                rulesHere = couponBK['rules']
-                rulesAll = []
-                for ruleSet in rulesHere:
-                    ruleSetsChilds = ruleSet.get('rules')
-                    if ruleSetsChilds is not None:
-                        for ruleSetsChild in ruleSetsChilds:
-                            rulesAll.append(ruleSetsChild)
-                    else:
-                        rulesAll.append(ruleSet)
-                dateformatStart = '%Y-%m-%d'
-                dateformatEnd = '%Y-%m-%d %H:%M:%S'
-                for rule in rulesAll:
-                    if rule['__typename'] == 'LoyaltyBetweenDates':
-                        datetimeStart = datetime.strptime(rule['startDate'], dateformatStart)
-                        datetimeExpire2 = datetime.strptime(rule['endDate'] + ' 23:59:59', dateformatEnd)
-                        break
+                rulesHere = couponBK.get('rules')
+                if rulesHere is not None:
+                    rulesAll = []
+                    for ruleSet in rulesHere:
+                        ruleSetsChilds = ruleSet.get('rules')
+                        if ruleSetsChilds is not None:
+                            for ruleSetsChild in ruleSetsChilds:
+                                rulesAll.append(ruleSetsChild)
+                        else:
+                            rulesAll.append(ruleSet)
+                    dateformatStart = '%Y-%m-%d'
+                    dateformatEnd = '%Y-%m-%d %H:%M:%S'
+                    for rule in rulesAll:
+                        if rule['__typename'] == 'LoyaltyBetweenDates':
+                            datetimeStart = datetime.strptime(rule['startDate'], dateformatStart)
+                            datetimeExpire2 = datetime.strptime(rule['endDate'] + ' 23:59:59', dateformatEnd)
+                            break
+                else:
+                    logging.info(f'Coupon without rules field: {coupon.id}')
                 if datetimeExpire1 is None and datetimeExpire2 is None:
                     # This should never happen
                     logging.warning(f'WTF failed to find any expiredate for coupon: {uniqueCouponID}')
@@ -441,9 +440,7 @@ class BKCrawler:
 
     def processCrawledCoupons(self, crawledCouponsDict: dict):
         """ Process crawled coupons: Apply necessary corrections and update DB. """
-        timestampStart = datetime.now().timestamp()
-        # Detect paper coupons
-        self.paperCouponsHandling_DEPRECATED(crawledCouponsDict)
+        dateStart = datetime.now()
         """ Now tag original price values for 'duplicated' coupons: If we got two coupons containing the same product but we only found the original price for one of them,
          we can set this on the other one(s) too. """
         couponTitleMapping = getCouponTitleMapping(crawledCouponsDict)
@@ -516,137 +513,11 @@ class BKCrawler:
         # Update timestamp of last complete run in DB
         infoDBDoc.dateLastSuccessfulCrawlRun = datetime.now()
         infoDBDoc.store(infoDatabase)
-        logging.info("Coupons deleted: " + str(len(deleteCouponDocs)))
+        logging.info(f"Coupons deleted: {len(deleteCouponDocs)}")
         if len(deleteCouponDocs) > 0:
-            logging.info("Coupons deleted IDs: " + str(list(deleteCouponDocs.keys())))
-        logging.info("Coupon processing done | Total number of coupons in DB: " + str(len(couponDB)))
-        logging.info("Total coupon processing time: " + getFormattedPassedTime(timestampStart))
-
-    def paperCouponsHandling_DEPRECATED(self, crawledCouponsDict: dict):
-        # TODO: Remove this old code
-        """ Old handling to auto detect paper coupons """
-        # Detect paper coupons
-        paperCouponMapping = getCouponMappingForCrawler()
-        usedMappingToFindPaperCoupons = False
-        for coupon in crawledCouponsDict.values():
-            paperCouponOverride = paperCouponMapping.get(coupon.id)
-            if paperCouponOverride is not None:
-                usedMappingToFindPaperCoupons = True
-                coupon.type = CouponType.PAPER
-                coupon.timestampExpire = paperCouponOverride.timestampExpire
-                coupon.plu = paperCouponOverride.plu
-
-        foundPaperCoupons = []
-        if usedMappingToFindPaperCoupons:
-            # New/current handling
-            for crawledCoupon in crawledCouponsDict.values():
-                if crawledCoupon.type == CouponType.PAPER:
-                    foundPaperCoupons.append(crawledCoupon)
-        else:
-            # Old/fallback handling -> DEPRECATED
-            # Create a map containing char -> coupons e.g. {"X": {"plu": "1234"}}
-            pluCharMap = {}
-            for uniqueCouponID, coupon in crawledCouponsDict.items():
-                # Check if we got a valid "paper PLU"
-                firstLetterOfPLU = coupon.getFirstLetterOfPLU()
-                if firstLetterOfPLU is not None:
-                    pluCharMap.setdefault(firstLetterOfPLU, []).append(coupon)
-            # Remove all results that cannot be paper coupons by length
-            for pluIdentifier, coupons in pluCharMap.copy().items():
-                if len(coupons) != 46 and len(coupons) != 47:
-                    del pluCharMap[pluIdentifier]
-            """ Now do some workarounds/corrections of our results.
-             This was necessary because as of 09-2021 e.g. current paper coupons' PLUs started with letter "A" but were listed with letter "F" in the BK DB.
-             """
-            # corrections = {"F": "A"}
-            corrections = {}  # 2021-11-28: No corrections required
-            if len(corrections) > 0:
-                paperCouponConfig = PaperCouponHelper.getActivePaperCouponInfo()
-                for oldChar, newChar in corrections.items():
-                    if oldChar in pluCharMap and newChar in paperCouponConfig.keys():
-                        logging.info("Correcting paper coupons starting with " + oldChar + " --> " + newChar)
-                        if newChar in pluCharMap:
-                            # Edge case: This is very very unlikely going to happen!
-                            logging.warning("Correction failed due to possible collision: " + newChar + " already exists in our results!")
-                            continue
-                        else:
-                            coupons = pluCharMap[oldChar]
-                            for coupon in coupons:
-                                coupon.plu = newChar + coupon.plu[1:]
-                            del pluCharMap[oldChar]
-                            pluCharMap[newChar] = coupons
-            # Store possible paper coupon short-PLU numbers without chars e.g. {"B": [1, 2, 3], "C": [1, 2, 3] }
-            foundPaperCouponMap = {}
-            if len(pluCharMap) > 0:
-                # Logging
-                couponCharsLogtext = ''
-                for paperPLUChar, coupons in pluCharMap.items():
-                    if len(couponCharsLogtext) > 0:
-                        couponCharsLogtext += ', '
-                    couponCharsLogtext += paperPLUChar + "(" + str(len(coupons)) + " items)"
-                logging.info("Auto-found the following " + str(len(pluCharMap)) + " possible paper coupon char(s): " + couponCharsLogtext)
-                allowAutoDetectedPaperCoupons = False  # 2021-11-15: Added this switch as their DB is f*cked at this moment so the auto-detection found wrong coupons.
-                # Evaluate our findings
-                if allowAutoDetectedPaperCoupons:
-                    for paperPLUChar, paperCoupons in pluCharMap.items():
-                        # We assume that these coupons are paper coupons
-                        logging.info("Auto detected paper coupon char is: " + paperPLUChar)
-                        # Update data of these coupons and add them to DB later
-                        # https://www.quora.com/In-Python-what-is-the-cleanest-way-to-get-a-datetime-for-the-start-of-today
-                        today = datetime.today()  # or datetime.now to use local timezone
-                        todayDayEnd = datetime(year=today.year, month=today.month,
-                                               day=today.day, hour=23, minute=59, second=59)
-                        # Add them with fake validity of 2 days
-                        artificialExpireTimestamp = todayDayEnd.timestamp() + 2 * 24 * 60
-                        for paperCoupon in paperCoupons:
-                            paperCoupon.type = CouponType.PAPER
-                            paperCoupon.timestampExpire = artificialExpireTimestamp
-                            paperCoupon.dateFormattedExpire = formatDateGerman(datetime.fromtimestamp(artificialExpireTimestamp))
-                            paperCoupon.isUnsafeExpiredate = True
-                            paperCoupon.description = SYMBOLS.INFORMATION + "Das hier eingetragene Ablaufdatum ist vorläufig und wird zeitnah korrigiert!"
-                        foundPaperCouponMap[paperPLUChar] = paperCoupons
-            if len(paperCouponMapping) > 0 and len(foundPaperCouponMap) == 0:
-                # This should never happen
-                logging.warning("Failed to find any paper coupons alhough we expect some to be there!")
-
-            """ Check for missing paper coupons based on the ones we found.
-            2021-09-29: Now we do filter by array size before so this handling is pretty much useless but let's keep it anyways.
-            """
-            logging.debug("Looking for missing paper coupons...")
-            for paperChar, paperCoupons in foundPaperCouponMap.items():
-                # Now get a list of the numbers only and consider: paperCoupons may contain duplicates but we don't want those in paperCouponNumbersList!
-                paperCouponNumbersList = []
-                for coupon in paperCoupons:
-                    couponNumber = int(coupon.plu[1:])
-                    if couponNumber not in paperCouponNumbersList:
-                        paperCouponNumbersList.append(couponNumber)
-                # Sort list to easily find highest number
-                paperCouponNumbersList.sort()
-                highestPaperPLUNumber = paperCouponNumbersList[len(paperCouponNumbersList) - 1]
-                # Now collect possibly missing paper coupons
-                # Even if all "real" paper coupons are found, it may happen that the last one, usually number 47 is not found as thart is a dedicated Payback coupon
-                if highestPaperPLUNumber != len(paperCouponNumbersList):
-                    missingPaperPLUs = []
-                    paybackDummyPLUNumber = 47
-                    # paybackDummyPLU = paperChar + str(paybackDummyPLUNumber) --> C47
-                    for numberToCheck in range(1, highestPaperPLUNumber + 1):
-                        if numberToCheck == paybackDummyPLUNumber:
-                            # Skip this
-                            continue
-                        plu = paperChar + str(numberToCheck)
-                        if numberToCheck not in paperCouponNumbersList:
-                            missingPaperPLUs.append(plu)
-                    if len(missingPaperPLUs) > 0:
-                        logging.info("Paper coupons NOT OK: " + paperChar + " | Found items: " + str(len(paperCoupons)) + " | Possibly missing PLUs: " + str(missingPaperPLUs))
-                        for missingPaperPLU in missingPaperPLUs:
-                            self.missingPaperCouponPLUs.append(missingPaperPLU)
-                else:
-                    # Looks like we found all paper coupons :)
-                    logging.info("Paper coupons OK: " + paperChar + " [" + str(len(paperCoupons)) + "]")
-            for paperCoupons in foundPaperCouponMap.values():
-                for paperCoupon in paperCoupons:
-                    foundPaperCoupons.append(paperCoupon)
-        logging.info('Detected ' + str(len(foundPaperCoupons)) + ' paper coupons')
+            logging.info(f"Coupons deleted IDs: {list(deleteCouponDocs.keys())}")
+        logging.info(f"Coupon processing done | Total number of coupons in DB: {len(couponDB)}")
+        logging.info(f"Total coupon processing time: {datetime.now() - dateStart}")
 
     def updateHistoryEntry(self, historyDB, primaryKey: str, newData):
         """ Adds/Updates entry inside given database. """
