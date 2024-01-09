@@ -147,7 +147,8 @@ def shortenProductNames(couponTitle: str) -> str:
     removeOR = re.compile(r'(\s*oder\s*)').search(couponTitle)
     if removeOR:
         couponTitle = couponTitle.replace(removeOR.group(0), ', ')
-    couponTitle = replaceRegex(re.compile(r'\s*zum\s*Preis\s*von\s*(1!?|einem|einer)'), '', couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)\s*zum\s*Preis\s*von\s*(1!?|einem|einer)'), '', couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)Im King Menü \(\+[^)]+\)'), '', couponTitle)
     # 2023-12-29
     couponTitle = replaceRegex(re.compile(r'(?i)\s*\|\s*King\s*Smart\s*Menü'), '', couponTitle)
     # 2023-12-29

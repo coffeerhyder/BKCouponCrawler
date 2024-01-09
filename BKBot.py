@@ -752,12 +752,14 @@ class BKBot:
     async def botAdminResendChannelCoupons(self, update: Update, context: CallbackContext):
         user = self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
         self.adminOrException(user)
+        timebefore = datetime.now()
         await self.editOrSendMessage(update, text="Aktualisiere Channel...", parse_mode='HTML')
         channelUpdateResult = await self.renewPublicChannel()
         if channelUpdateResult is True:
-            await self.editOrSendMessage(update, text=SYMBOLS.CONFIRM + "Channelupdate erfolgreich", parse_mode='HTML')
+            text = f'{SYMBOLS.CONFIRM} Channelupdate erfolgreich'
         else:
-            await self.editOrSendMessage(update, text=SYMBOLS.WARNING + "Channelupdate fehlgeschlagen", parse_mode='HTML')
+            text = f'{SYMBOLS.WARNING} Channelupdate fehlgeschlagen'
+        await self.sendMessage(chat_id=user.id, text=f'{text} | Dauer: {datetime.now() - timebefore}', parse_mode='HTML')
         return CallbackVars.MENU_MAIN
 
     async def botAdminNukeChannel(self, update: Update, context: CallbackContext):
@@ -1284,6 +1286,7 @@ class BKBot:
 
     def deleteInactiveAccounts(self) -> None:
         """ Deletes all inactive accounts from DB and informs user about that account deletion. """
+        logging.info('Collecting users to delete')
         usersToDelete = []
         userDB = self.crawler.getUserDB()
         for userID in userDB:
@@ -1300,7 +1303,7 @@ class BKBot:
         if len(usersToDelete) > 0:
             logging.info(f'Deleting {len(usersToDelete)} inactive users from DB')
             userDB.purge(docs=usersToDelete)
-        pass
+        # End of function
 
     async def batchProcess(self):
         """ Runs all processes which should only run once per day. """
@@ -1409,6 +1412,7 @@ class BKBot:
         """ Sends all given coupons to given chat_id separated by source and split into multiple messages as needed. """
         couponsSeparatedByType = getCouponsSeparatedByType(coupons)
         if infoDBDoc is not None:
+            # Legacy code
             # Mark old coupon overview messageIDs for deletion
             oldCategoryMsgIDs = infoDBDoc.getAllCouponCategoryMessageIDs()
             if len(oldCategoryMsgIDs) > 0:

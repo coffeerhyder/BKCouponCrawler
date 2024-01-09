@@ -391,11 +391,11 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
 
 async def cleanupChannel(bkbot):
     logging.info("Channel cleanup started")
-    timestampStart = datetime.now().timestamp()
+    dateStart = datetime.now()
     infoDB = bkbot.couchdb[DATABASES.INFO_DB]
     infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
     await deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc)
-    logging.info("Channel cleanup done | Total time needed: " + getFormattedPassedTime(timestampStart))
+    logging.info(f"Channel cleanup done | Total time needed: {datetime.now() - dateStart}")
 
 
 async def deleteLeftoverMessageIDsToDelete(bkbot, infoDB: Database, infoDoc) -> int:

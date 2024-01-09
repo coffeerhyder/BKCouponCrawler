@@ -8,14 +8,14 @@ from telegram import InlineKeyboardMarkup
 
 from Helper import SYMBOLS
 
-VERSION = '2.0.9'
+VERSION = '2.1.0'
 
 """ Place static stuff into this class. """
 
 
 def getBotImpressum() -> str:
     # 2022-04-26: Add some love for Ukraine (RE stupid war RU vs UA 2022)
-    text = f"BetterKing Bot v.{VERSION} | {SYMBOLS.FLAG_UA}{SYMBOLS.HEART}"
+    text = f"BetterKing Bot v.{VERSION} | est. 2020 | {SYMBOLS.FLAG_UA}{SYMBOLS.HEART}"
     text += f"\n<i>Made with {SYMBOLS.HEART} and {SYMBOLS.BEER} during {SYMBOLS.CORONA}"
     text += "\nKontakt: bkfeedback@pm.me</i>"
     return text
