@@ -8,6 +8,7 @@ Burger King Coupon Telegram Bot
 * Alle Burger King Coupons ohne App & Accountzwang
 * Crawler und Bot getrennt: Crawler kann einfach für andere Projekte verwendet werden
 * Coupons sortiert, aufgeräumt und teils mit zusätzlichen Informationen
+* Coupons einfach beliebig filterbar und sortierbar
 
 **Video:**  
 https://www.bitchute.com/video/eoMYCfag5oiM/
@@ -55,33 +56,7 @@ bash couchdb-dump.sh -r -c -H 127.0.0.1 -d telegram_users -f telegram_users.json
 **Falls nur der Crawler benötigt wird, reicht die CouchDB URL (mit Zugangsdaten)!**
 
 ## Optional: Papiercoupons hinzufügen  
-1. Die `config_paper_coupons.json` wie folgt befüllen:  
-Gäbe es derzeit z.B. Papiercoupons mit dem Buchstaben ``B`` und Ablaufdatum  ``05.03.2021`` **und** ``C`` mit dem Ablaufdatum ``23.04.2021``, müsste die json Datei wie folgt angepasst werden:
-   
-```
-{
-{
-  "B": {
-    "expire_date": "2021-03-05"
-  },
-  "C": {
-    "expire_date": "2021-04-23"
-  }
-}
-}   
-```  
-2. Datei `paper_coupon_data/paper_coupon_helper_ids_NOCHAR.txt` erstellen und mit allen IDs der Papiercoupons befüllen z.B.:  
-```
-31734:906
-23236:909
-11394:910
-```
-3. Bot einmalig mit dem `crawl` Parameter starten.
-
-## config_extra_coupons.json: Optionale Config zum manuellen Hinzufügen von Coupons, die in keiner der Schnittstellen zu finden sind
-Die `config_extra_coupons.json` ist nützlich, um manuell Coupons hinzuzufügen, die in keiner der BK Datenbanken enthalten sind z.B. [solche](https://www.mydealz.de/gutscheine/gratis-eis-und-softdrink-bei-burger-king-1804058).
-Beispiel:  
-Siehe `config_extra_coupons.json`
+Wird aktualisiert, sobald es wieder eine Möglichkeit gibt, Papiercoupons mit hinzuzufügen.
 
 ### Bot mit Logging in File starten
 ```
@@ -164,7 +139,7 @@ optional arguments:
 Siehe BKBot.py -> ``__init__``
 
 # TODOs
-* Dafür sorgen, dass der Bot auch dann am Laufen bleibt, wenn beim Start kein Internet verfügbar ist und er somit in ein Timeout läuft (Abbruch in application.run_polling)
+* Crawler jede Stunde laufen lassen und Channel aktualisieren, sobald es neue Coupons gibt (+ erzwungenermaßen 1x am Tag)
 * Zeitberechnungen refactoring: timedelta überall verwenden wo möglich
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen
 * Die Transparenz bei (mybk) Couponbildern durch gelb ersetzen
@@ -189,7 +164,7 @@ stats - Statistiken für Nerds
 tschau - 🚫 Meinen Account löschen
  ```
 
-### Bot About
+### [Vorlage] Bot About
 ```
 Burger King Coupons auf Telegram
 Made with ❤ and 🍻 during 😷
@@ -197,7 +172,7 @@ Channel: @BetterKingPublic
 Kontakt: bkfeedback@pm.me
 ```
 
-### Bot Description
+### [Vorlage] Bot Description
 ```
 Burger King Coupons auf Telegram
 - Channel: @BetterKingPublic
@@ -213,16 +188,16 @@ Features:
 Made with ❤ and 🍻 during 😷
 ```
 
-### Channel Description
+### [Vorlage] Channel Description
 ```
-Burger King Coupons auf Telegram
+Burger King Coupons auf Telegram est. 2020
 Made with ❤ and 🍻 during 😷
 Zum Bot: @BetterKingBot
 Kontakt: bkfeedback@pm.me
-Source: github.com/coffeerhyder/BKCouponCrawler
+Quellcode: github.com/coffeerhyder/BKCouponCrawler
 ```
 
-### Channel angepinnter Post mit Papiercoupons Datei & Verlinkung
+### [Vorlage] Channel angepinnter Post mit Papiercoupons Datei & Verlinkung
 ```
 Aktuelle Papiercoupons (gültig bis 24.09.2021):
 Externer Downloadlink: mega.nz/folder/zWQkRIoD#-XRxtHFcyJZcgvOKx4gpZg
@@ -231,7 +206,7 @@ mydealz.de/gutscheine/burger-king-coupons-bundesweit-gultig-bis-23042021-1762251
 mydealz.de/gutscheine/burger-king-coupons-bundesweit-gultig-bis-05032021-1731958
 ```
 
-### Channel angepinnter Post mit Papiercoupons nur Verlinkung (neue Variante ohne extra Upload der Datei)
+### [Vorlage] Channel angepinnter Post mit Papiercoupons nur Verlinkung (neue Variante ohne extra Upload der Datei)
 ```
 Aktuelle Papiercoupons (gültig bis 24.09.2021):
 mydealz.de/gutscheine/burger-king-papier-coupons-bis-2409-1840299
@@ -295,7 +270,7 @@ Linksammlung BK:
 04. burgerking.de/store-locator | KING Finder
 05. ngb.to/threads/betterking-burger-king-coupons-telegram-bot.110780/
 06. pr0gramm.com/user/FishEater23/uploads/4730464
-07. tvnow.de/shows/team-wallraff-reporter-undercover-2384/2022-09/episode-2-team-wallraff-undercover-2022-5209024
+07. plus.rtl.de/video-tv/shows/team-wallraff-reporter-undercover-242031
 ```
 
 ### Test Cases

@@ -427,12 +427,12 @@ async def nukeChannel(bkbot):
     infoDoc = InfoEntry.load(infoDB, DATABASES.INFO_DB)
     if len(channelDB) > 0:
         # Delete all coupons that are currently posted in our channel
-        logging.info("Deleting " + str(len(channelDB)) + " coupons...")
+        logging.info(f"Deleting {len(channelDB)} coupons...")
         index = 0
         initialItemNumber = len(channelDB)
         for couponID in channelDB:
             index += 1
-            logging.info("Working on coupon " + str(index) + "/" + str(initialItemNumber))
+            logging.info(f"Working on coupon {index}/{initialItemNumber}")
             channelCoupon = ChannelCoupon.load(channelDB, couponID)
             messageIDs = channelCoupon.getMessageIDs()
             for messageID in messageIDs:

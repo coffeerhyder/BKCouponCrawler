@@ -40,15 +40,16 @@ DEBUGCRAWLER = False
 class UserStats:
     """ Returns an object containing statistic data about given users Database instance. """
 
-    def __init__(self, usrDB: Database):
+    def __init__(self, userdb: Database):
+        self.numberofUsersTotal = len(userdb)
         self.numberofUsersWhoFoundEasterEgg = 0
         self.numberofFavorites = 0
         self.numberofUsersWhoProbablyBlockedBot = 0
         self.numberofUsersWhoAreEligableForAutoDeletion = 0
         self.numberofUsersWhoRecentlyUsedBot = 0
         self.numberofUsersWhoAddedPaybackCard = 0
-        for userID in usrDB:
-            userTmp = User.load(usrDB, userID)
+        for userID in userdb:
+            userTmp = User.load(userdb, userID)
             if userTmp.hasFoundEasterEgg():
                 self.numberofUsersWhoFoundEasterEgg += 1
             self.numberofFavorites += len(userTmp.favoriteCoupons)
@@ -717,16 +718,14 @@ class BKCrawler:
         self.updateCachedMissingPaperCouponsInfo(couponDB=couponDB)
         if len(self.cachedFutureCoupons) > 0:
             # Sort coupons by "release date"
-            self.cachedFutureCouponsText = f"<b>{SYMBOLS.WHITE_DOWN_POINTING_BACKHAND} [{len(self.cachedFutureCoupons)}] Demnächst verfügbare Coupons:</b>"
+            self.cachedFutureCouponsText = f"<b>{SYMBOLS.WHITE_DOWN_POINTING_BACKHAND}Demnächst verfügbare Coupons{SYMBOLS.WHITE_DOWN_POINTING_BACKHAND}</b>"
             for futureCoupon in self.cachedFutureCoupons:
                 datetimeCouponAvailable = futureCoupon.getStartDatetime()
                 if datetimeCouponAvailable is not None:
                     startDateFormatted = datetimeCouponAvailable.strftime('%d.%m.%Y')
                 else:
                     startDateFormatted = "?"
-                couponDescr = futureCoupon.generateCouponShortText(highlightIfNew=False, includeVeggieSymbol=False)
-                # couponDescr = futureCoupon.getTitleShortened(includeVeggieSymbol=False)
-                # couponDescr = futureCoupon.appendPriceInfoText(couponDescr)
+                couponDescr = futureCoupon.generateCouponShortText(highlightIfNew=False, includeVeggieSymbol=True)
                 thisCouponText = f"<b>{startDateFormatted}</b> | " + couponDescr
                 self.cachedFutureCouponsText += "\n" + thisCouponText
 

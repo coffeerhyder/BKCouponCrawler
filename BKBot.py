@@ -82,7 +82,6 @@ def getUserFromDB(userDB: Database, userID: Union[str, int], addIfNew: bool, upd
         logging.info(f'Storing new userID: {userID}')
         user = User(id=str(userID))
         user.store(userDB)
-
     return user
 
 
@@ -441,22 +440,22 @@ class BKBot:
         couponDB = self.getFilteredCouponsAsList(couponFilter=CouponFilter())
         userStats = self.statsCached
         user = getUserFromDB(userDB=userDB, userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
-        text = '<b>Hallo <s>Nerd</s> ' + update.effective_user.first_name + '</b>'
+        text = f'<b>Hallo <s>Nerd</s> {update.effective_user.first_name}</b>'
         text += '\n<pre>'
-        text += 'Anzahl User im Bot: ' + str(len(userDB))
-        text += '\nAnzahl von Usern gesetzte Favoriten: ' + str(userStats.numberofFavorites)
-        text += '\nAnzahl User, die das Easter-Egg entdeckt haben: ' + str(userStats.numberofUsersWhoFoundEasterEgg)
-        text += '\nAnzahl User, die den Bot wahrscheinlich geblockt haben: ' + str(userStats.numberofUsersWhoProbablyBlockedBot)
+        text += f'Anzahl User im Bot: {len(userDB)}'
+        text += f'\nAnzahl von Usern gesetzte Favoriten: {userStats.numberofFavorites}'
+        text += f'\nAnzahl User, die das Easter-Egg entdeckt haben: {userStats.numberofUsersWhoFoundEasterEgg}'
+        text += f'\nAnzahl User, die den Bot wahrscheinlich geblockt haben: {userStats.numberofUsersWhoProbablyBlockedBot}'
         text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoRecentlyUsedBot)
-        text += '\nAnzahl User, die eine PB Karte hinzugefügt haben: ' + str(userStats.numberofUsersWhoAddedPaybackCard)
-        text += '\nAnzahl gültige Coupons: ' + str(len(couponDB))
+        text += f'\nAnzahl User, die eine PB Karte hinzugefügt haben: {userStats.numberofUsersWhoAddedPaybackCard}'
+        text += f'\nAnzahl gültige Coupons: {len(couponDB)}'
         text += f'\nAnzahl bald verfügbarer Coupons: {len(self.crawler.cachedFutureCoupons)}'
         text += f'\nAnzahl gültige Angebote: {len(self.crawler.getOffersActive())}'
         text += f'\nStatistiken generiert am: {formatDateGermanHuman(self.statsCachedTimestamp)}'
         text += '\n---'
         text += '\nDein BetterKing Account:'
-        text += '\nAnzahl Aufrufe Easter-Egg: ' + str(user.easterEggCounter)
-        text += '\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): ' + str(len(user.favoriteCoupons))
+        text += f'\nAnzahl Aufrufe Easter-Egg: {user.easterEggCounter}'
+        text += f'\nAnzahl gesetzte Favoriten (inkl. abgelaufenen): {len(user.favoriteCoupons)}'
         text += f'\nBot  zuletzt verwendet am: {formatDateGermanHuman(user.timestampLastTimeBotUsed)}'
         text += f'\nLetzte Benachrichtigung vom Bot erhalten am: {formatDateGermanHuman(user.timestampLastTimeNotificationSentSuccessfully)}'
         text += '\n---'
@@ -611,7 +610,7 @@ class BKBot:
         if len(user.favoriteCoupons) == 0:
             raise BetterBotException('<b>Du hast noch keine Favoriten!</b>', InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
         if coupons is None:
-            # Perform DB request if not already done before
+            # Perform DB request only if not already done before
             coupons = self.crawler.getFilteredCouponsAsDict(couponfilter=CouponViews.FAVORITES.getFilter())
         userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, returnSortedCoupons=sortCoupons)
         if len(userFavoritesInfo.couponsAvailable) == 0:
@@ -1451,7 +1450,7 @@ class BKBot:
                     if not coupon.isContainsFriesAndDrink():
                         listContainsAtLeastOneItemWithoutMenu = True
                     elif not hasAddedSeparatorAfterCouponsWithoutMenu and listContainsAtLeastOneItemWithoutMenu:
-                        couponOverviewText += '\n<b>' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + couponCategory.namePluralWithoutSymbol + ' mit Menü' + SYMBOLS.WHITE_DOWN_POINTING_BACKHAND + '</b>'
+                        couponOverviewText += f'\n<b>{SYMBOLS.WHITE_DOWN_POINTING_BACKHAND}{couponCategory.namePluralWithoutSymbol} mit Menü{SYMBOLS.WHITE_DOWN_POINTING_BACKHAND}</b>'
                         hasAddedSeparatorAfterCouponsWithoutMenu = True
                     """ Generates e.g. "Y15 | 2Whopper+M🍟+0,4LCola | 8,99€"
                     Returns the same with hyperlink if a chat_id is given for this coupon e.g.:
@@ -1657,7 +1656,10 @@ async def dailyRoutine(bkbot):
     """ Runs task daily at specific time.
      Does not catch up run if desired time has already passed on the day this is executed first time.
      """
-    hour = 0
+    """ 2024-02-13: They're one hour behind serverside so crawling at 01:01 should get us all current coupons assuming
+     they get added at midnight serverside time.
+    """
+    hour = 1
     minute = 1
     while True:
         now = datetime.now()
