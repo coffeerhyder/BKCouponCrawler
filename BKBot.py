@@ -69,9 +69,6 @@ async def cleanupCache(cacheDict: dict):
             del cacheDict[cacheID]
 
 
-
-
-
 class BKBot:
     my_parser = argparse.ArgumentParser()
     my_parser.add_argument('-fc', '--forcechannelupdatewithresend',
@@ -233,10 +230,11 @@ class BKBot:
         )
         # TODO: Make use of this
         conv_handler4 = ConversationHandler(
-            entry_points=[CallbackQueryHandler(self.botCouponToggleFavorite, pattern=PATTERN.PLU_TOGGLE_FAV)],
+            entry_points=[CallbackQueryHandler(self.botAdminSendMsgToAllUsersSTART, pattern='^' + CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS + '$')],
             states={
-                CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING: [
-                    CallbackQueryHandler(self.botCouponToggleFavorite, pattern=PATTERN.PLU_TOGGLE_FAV),
+                CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS: [
+                    MessageHandler(filters=filters.TEXT and (~filters.COMMAND), callback=self.botAdminSendMsgToAllUsers),
+                    CallbackQueryHandler(self.botDisplayMenuMain, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
                 ],
 
             },
@@ -821,13 +819,20 @@ class BKBot:
         msg = update.message.text
         minLen = 20
         if len(msg) < minLen:
-            await self.editOrSendMessage(update, text=f"{SYMBOLS.WARNING}Ungültige Eingabe: Text ist kleiner als {minLen} Zeichen!", parse_mode='HTML')
+            text = f"{SYMBOLS.WARNING}Ungültige Eingabe: Text ist kleiner als {minLen} Zeichen!"
+            reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
+            await self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML')
             return CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS
         else:
             # TODO: Add functionality
-            timebefore = getCurrentDate()
-            tdelta = getCurrentDate() - timebefore
-            await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Alle User mit aktivierten Benachrichtigungen wurden benachrichtigt.", parse_mode='HTML')
+            usersToNotify = []
+            for userID in self.userdb:
+                user = User.load(db=self.userdb, id=userID)
+                if user.settings.notifyOnBotNewsletter:
+                    usersToNotify.append(user)
+            # timebefore = getCurrentDate()
+            # tdelta = getCurrentDate() - timebefore
+            await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Alle {len(usersToNotify)} User mit aktivierten Benachrichtigungen wurden benachrichtigt.", parse_mode='HTML')
             return ConversationHandler.END
 
     async def displaySettings(self, update: Update, context: CallbackContext, user: User):
@@ -949,7 +954,8 @@ class BKBot:
             menuText = SYMBOLS.DENY + '<b>Falsche Antwort!</b>'
             menuText += f'\nDie richtige Antwort lautet <b>{update.effective_user.id}</b>.'
             await self.editOrSendMessage(update, text=menuText, parse_mode='HTML',
-                                         reply_markup=InlineKeyboardMarkup([[], [InlineKeyboardButton("Ich mag bleiben und fett werden", callback_data=CallbackVars.GENERIC_BACK)]]))
+                                         reply_markup=InlineKeyboardMarkup(
+                                             [[], [InlineKeyboardButton("Ich mag bleiben und fett werden", callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
 
     async def botUserDeleteAccountCancel(self, update: Update, context: CallbackContext):
@@ -1538,8 +1544,9 @@ class BKBot:
                     if couponIndex == len(coupons) - 1:
                         break
                 # Send new post containing current page
-                couponCategoryOverviewMessage = await asyncio.create_task(self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
-                                                                 disable_notification=True))
+                couponCategoryOverviewMessage = await asyncio.create_task(
+                    self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
+                                     disable_notification=True))
                 if infoDBDoc is not None:
                     # Update DB
                     infoDBDoc.addCouponCategoryMessageID(couponType, couponCategoryOverviewMessage.message_id)
@@ -1588,13 +1595,13 @@ class BKBot:
                                          reply_markup=reply_markup)
 
     async def sendMessageWithUserBlockedHandling(self, user: User, userDB: Database, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
-                          disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
-                          reply_markup: ReplyMarkup = None,
-                          allowUpdateDB: bool = True) -> Union[Message, None]:
+                                                 disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
+                                                 reply_markup: ReplyMarkup = None,
+                                                 allowUpdateDB: bool = True) -> Union[Message, None]:
         try:
             msg = await self.processMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
-                                             disable_web_page_preview=disable_web_page_preview,
-                                             reply_markup=reply_markup)
+                                            disable_web_page_preview=disable_web_page_preview,
+                                            reply_markup=reply_markup)
             if user.updateNotificationReceivedActivityTimestamp() or user.botBlockedCounter > 0:
                 if allowUpdateDB:
                     user.store(db=userDB)
@@ -1690,7 +1697,8 @@ class BKBot:
             logging.info(f"Notifying user {index + 1}/{len(usersWithPendingNotifications)} | Pending notifications: {len(userToNotify.pendingNotifications)}")
             # Send all pending notifications
             for notificationText in userToNotify.pendingNotifications:
-                await self.sendMessageWithUserBlockedHandling(user=userToNotify, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True, allowUpdateDB=False)
+                await self.sendMessageWithUserBlockedHandling(user=userToNotify, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True,
+                                                              allowUpdateDB=False)
             userToNotify.pendingNotifications = []
             dbDocumentUpdates.append(userToNotify)
             if dbDocumentUpdates == 10 or isLastItem:
@@ -1750,7 +1758,6 @@ async def dailyRoutine(bkbot):
             waitSeconds = timediffTomorrow.total_seconds()
         await asyncio.sleep(waitSeconds)
         await bkbot.batchProcess()
-
 
 
 async def notificationRoutine(bkbot):
