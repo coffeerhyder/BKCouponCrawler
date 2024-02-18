@@ -48,6 +48,7 @@ class UserStats:
         self.numberofUsersWhoAreEligableForAutoDeletion = 0
         self.numberofUsersWhoRecentlyUsedBot = 0
         self.numberofUsersWhoAddedPaybackCard = 0
+        self.numberofUsersWhoEnabledBotNewsletter = 0
         for userID in userdb:
             userTmp = User.load(userdb, userID)
             if userTmp.hasFoundEasterEgg():
@@ -61,6 +62,8 @@ class UserStats:
                 self.numberofUsersWhoAreEligableForAutoDeletion += 1
             elif userTmp.hasRecentlyUsedBot():
                 self.numberofUsersWhoRecentlyUsedBot += 1
+            if userTmp.settings.notifyOnBotNewsletter:
+                self.numberofUsersWhoEnabledBotNewsletter += 1
 
 
 class BKCrawler:

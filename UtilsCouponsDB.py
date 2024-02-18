@@ -676,6 +676,7 @@ class User(Document):
             displayBKWebsiteURLs=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
             displayFAQLinkButton=BooleanField(default=True),
+            displayDonateButton=BooleanField(default=True),
             displayAdminButtons=BooleanField(default=True),
             displayPlantBasedCouponsWithinGenericCategories=BooleanField(default=True),
             displayHiddenUpsellingAppCouponsWithinGenericCategories=BooleanField(default=True),
@@ -683,6 +684,7 @@ class User(Document):
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             notifyMeAsAdminIfThereAreProblems=BooleanField(default=True),
+            notifyOnBotNewsletter=BooleanField(default=True),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
             highlightNewCouponsInCouponButtonTexts=BooleanField(default=True),
             highlightVeggieCouponsInCouponButtonTexts=BooleanField(default=True),
@@ -1164,6 +1166,11 @@ USER_SETTINGS_ON_OFF = {
         "description": "FAQ Button zeigen",
         "default": True
     },
+    "displayDonateButton": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": "Spenden Button zeigen",
+        "default": True
+    },
     "displayAdminButtons": {
         "category": SettingCategories.MAIN_MENU,
         "description": "Admin Buttons anzeigen",
@@ -1222,6 +1229,11 @@ USER_SETTINGS_ON_OFF = {
     "notifyMeAsAdminIfThereAreProblems": {
         "category": SettingCategories.NOTIFICATIONS,
         "description": "Admin Benachrichtigung bei Problemen",
+        "default": True
+    },
+    "notifyOnBotNewsletter": {
+        "category": SettingCategories.NOTIFICATIONS,
+        "description": "Benachrichtigung zu BetterKing Bot-News",
         "default": True
     },
     "autoDeleteExpiredFavorites": {

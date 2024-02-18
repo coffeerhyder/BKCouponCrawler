@@ -141,9 +141,11 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplayFeedbackCodes, pattern='^' + CallbackVars.MENU_FEEDBACK_CODES + '$'),
                     CallbackQueryHandler(self.botAddPaybackCard, pattern="^" + CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD + "$"),
                     CallbackQueryHandler(self.botDisplayPaybackCard, pattern='^' + CallbackVars.MENU_DISPLAY_PAYBACK_CARD + '$'),
+                    CallbackQueryHandler(self.botDisplayDonate, pattern='^' + CallbackVars.MENU_DONATE + '$'),
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$'),
                     CallbackQueryHandler(self.botAdminResendChannelCoupons, pattern='^' + CallbackVars.ADMIN_RESEND_COUPONS + '$'),
                     CallbackQueryHandler(self.botAdminNukeChannel, pattern='^' + CallbackVars.ADMIN_NUKE_CHANNEL + '$'),
+                    CallbackQueryHandler(self.botAdminSendMsgToAllUsersSTART, pattern='^' + CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS + '$'),
                 ],
                 CallbackVars.MENU_OFFERS: [
                     CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
@@ -190,6 +192,11 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
                     MessageHandler(filters.TEXT, self.botDeletePaybackCard),
                 ],
+                CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS: [
+                    # Back to settings menu
+                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
+                    MessageHandler(filters.TEXT, self.botAdminSendMsgToAllUsers),
+                ],
             },
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="MainConversationHandler",
@@ -224,10 +231,23 @@ class BKBot:
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="CouponToggleFavoriteWithImageHandler",
         )
+        # TODO: Make use of this
+        conv_handler4 = ConversationHandler(
+            entry_points=[CallbackQueryHandler(self.botCouponToggleFavorite, pattern=PATTERN.PLU_TOGGLE_FAV)],
+            states={
+                CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING: [
+                    CallbackQueryHandler(self.botCouponToggleFavorite, pattern=PATTERN.PLU_TOGGLE_FAV),
+                ],
+
+            },
+            fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
+            name="AdminNewsletterSender",
+        )
         app = self.application
         app.add_handler(conv_handler)
         app.add_handler(conv_handler2)
         app.add_handler(conv_handler3)
+        # app.add_handler(conv_handler4)
         app.add_handler(CommandHandler('stats', self.botDisplayStats))
         app.add_handler(MessageHandler(filters=filters.TEXT and (~filters.COMMAND), callback=self.botConfused))
 
@@ -292,9 +312,9 @@ class BKBot:
         await self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
     async def botDisplayMenuMain(self, update: Update, context: CallbackContext):
-        userID = str(update.effective_user.id)
-        isNewUser = userID not in self.userdb
-        user = await self.getUser(userID=userID, addIfNew=True, updateUsageTimestamp=True)
+        userIDStr = str(update.effective_user.id)
+        isNewUser = userIDStr not in self.userdb
+        user = await self.getUser(userID=userIDStr, addIfNew=True, updateUsageTimestamp=True)
         allButtons = []
         if self.getPublicChannelName() is not None:
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste + Pics + News', url='https://t.me/' + self.getPublicChannelName())])
@@ -341,12 +361,16 @@ class BKBot:
             allButtons.append([InlineKeyboardButton('Feedback Code Generator', callback_data=CallbackVars.MENU_FEEDBACK_CODES)])
         if self.publicChannelName is not None and user.settings.displayFAQLinkButton:
             allButtons.append([InlineKeyboardButton('FAQ', url=self.getPublicChannelFAQLink())])
+        if user.settings.displayDonateButton:
+            allButtons.append([InlineKeyboardButton('💰Spenden💰', callback_data=CallbackVars.MENU_DONATE)])
         allButtons.append([InlineKeyboardButton(SYMBOLS.WRENCH + 'Einstellungen', callback_data=CallbackVars.MENU_SETTINGS)])
         if self.isAdmin(user) and user.settings.displayAdminButtons:
             allButtons.append(
                 [InlineKeyboardButton(SYMBOLS.WARNING + 'ChannelCouponÜbersicht erneut senden', callback_data=CallbackVars.ADMIN_RESEND_COUPONS)])
             allButtons.append(
                 [InlineKeyboardButton(SYMBOLS.WARNING + 'Nuke Channel', callback_data=CallbackVars.ADMIN_NUKE_CHANNEL)])
+            allButtons.append(
+                [InlineKeyboardButton(SYMBOLS.WARNING + 'Newsletter senden', callback_data=CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS)])
         reply_markup = InlineKeyboardMarkup(allButtons)
         menuText = f'Hallo {update.effective_user.first_name}, <b>Bock auf Fastfood?</b>'
         if isNewUser:
@@ -440,6 +464,7 @@ class BKBot:
         text += f'\nAnzahl User, die den Bot wahrscheinlich geblockt haben: {userStats.numberofUsersWhoProbablyBlockedBot}'
         text += f'\nAnzahl User, die den Bot innerhalb der letzten {MAX_HOURS_ACTIVITY_TRACKING}h genutzt haben: ' + str(userStats.numberofUsersWhoRecentlyUsedBot)
         text += f'\nAnzahl User, die eine PB Karte hinzugefügt haben: {userStats.numberofUsersWhoAddedPaybackCard}'
+        text += f'\nAnzahl User, die den BetterKing Newsletter aktiviert haben: {userStats.numberofUsersWhoEnabledBotNewsletter}'
         text += f'\nAnzahl gültige Coupons: {len(couponDB)}'
         text += f'\nAnzahl bald verfügbarer Coupons: {len(self.crawler.cachedFutureCoupons)}'
         text += f'\nAnzahl gültige Angebote: {len(self.crawler.getOffersActive())}'
@@ -721,7 +746,6 @@ class BKBot:
         return CallbackVars.MENU_OFFERS
 
     async def botDisplayFeedbackCodes(self, update: Update, context: CallbackContext):
-        """ 2021-07-15: New- and unfinished feature """
         numberOfFeedbackCodesToGenerate = 3
         text = f"\n<b>Hier sind {numberOfFeedbackCodesToGenerate} Feedback Codes für dich:</b>"
         for index in range(numberOfFeedbackCodesToGenerate):
@@ -735,6 +759,21 @@ class BKBot:
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
         await self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         return CallbackVars.MENU_FEEDBACK_CODES
+
+    async def botDisplayDonate(self, update: Update, context: CallbackContext):
+        text = f"<b>💰Anonym Spenden!💰</b>"
+        text += "\nBetterKing ist- und bleibt kostenlos!"
+        text += "\nDu kannst meine Arbeit auf folgenden Wegen unterstützen:"
+        text += "\n<b>1. Wunschgutschein (wunschgutschein.de)</b>"
+        text += "\nSchicke einen Wunschgutschein an bkfeedback@pm.me. Falls du weniger als den WG Mindestbetrag von 15€ Spenden möchtest, kannst du deinen gekauften Wunschgutschein einfach selbst teil-einlösen und nur einen kleinen Restbetrag übrig lassen."
+        text += "\nWunschgutscheine kann man in vielen Tankstellen und Supermärkten in Deutschland kaufen."
+        text += "\n<b>2. Kaufland Pfandbon</b>"
+        text += "\nGib in einer beliebigen Kaufland Filiale in Deutschland Pfand ab. Scanne den QR Code des Pfandbons mit einer beliebigen QR Code App und schicke den Inhalt an bkfeedback@pm.me."
+        text += "\n\nDu kannst den Spenden Button jederzeit in den Einstellungen deaktivieren."
+        text += f"\n\nVielen Dank für deine Spende{SYMBOLS.HEART}"
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
+        await self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
+        return CallbackVars.MENU_MAIN
 
     async def botDisplayMenuSettings(self, update: Update, context: CallbackContext):
         user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
@@ -766,6 +805,30 @@ class BKBot:
         tdelta = getCurrentDate() - timebefore
         await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM} Channel Nuke erledigt in {tdelta.seconds} Sekunden", parse_mode='HTML')
         return CallbackVars.MENU_MAIN
+
+    async def botAdminSendMsgToAllUsersSTART(self, update: Update, context: CallbackContext):
+        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        self.adminOrException(user)
+        text = "Gib einen Text ein, der an alle Benutzer mit aktiviertem Newsletter geschickt werden soll."
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
+        await self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML')
+        return CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS
+
+    async def botAdminSendMsgToAllUsers(self, update: Update, context: CallbackContext):
+        """ Sends message/"newsletter" to all users who have that feature enabled. """
+        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        self.adminOrException(user)
+        msg = update.message.text
+        minLen = 20
+        if len(msg) < minLen:
+            await self.editOrSendMessage(update, text=f"{SYMBOLS.WARNING}Ungültige Eingabe: Text ist kleiner als {minLen} Zeichen!", parse_mode='HTML')
+            return CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS
+        else:
+            # TODO: Add functionality
+            timebefore = getCurrentDate()
+            tdelta = getCurrentDate() - timebefore
+            await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Alle User mit aktivierten Benachrichtigungen wurden benachrichtigt.", parse_mode='HTML')
+            return ConversationHandler.END
 
     async def displaySettings(self, update: Update, context: CallbackContext, user: User):
         keyboard = []
@@ -1638,7 +1701,8 @@ class BKBot:
 
     async def getUser(self, userID: Union[str, int], addIfNew: bool, updateUsageTimestamp: bool) -> Union[User, None]:
         """ Returns user from given DB. Adds it to DB if wished and it doesn't exist. """
-        user = User.load(self.userdb, str(userID))
+        userIDStr = str(userID)
+        user = User.load(self.userdb, userIDStr)
         # TODO: Make use of this
         unblockUser = False
         if user is not None:
@@ -1657,7 +1721,7 @@ class BKBot:
             """ New user? --> Add userID to DB if wished. """
             # Add user to DB for the first time
             logging.info(f'Storing new userID: {userID}')
-            user = User(id=str(userID))
+            user = User(id=userIDStr)
             user.store(self.userdb)
         return user
 

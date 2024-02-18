@@ -18,6 +18,8 @@ WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 # TODO: Remove this, add parameter handling so that no code changes are needed for this debug switch.
 DEBUGNOTIFICATOR = False
 
+TEXT_NOTIFICATION_DISABLE = "Du kannst diese Benachrichtigung in den Einstellungen deaktivieren."
+
 
 async def collectNewCouponsNotifications(bkbot) -> None:
     """
@@ -112,6 +114,7 @@ async def collectNewCouponsNotifications(bkbot) -> None:
                 notificationtext += "\nMit /start gelangst du ins Hauptmenü des Bots."
             else:
                 notificationtext += f"\nPer Klick gelangst du zu den jeweiligen Coupons im {bkbot.getPublicChannelHyperlinkWithCustomizedText('Channel')} und mit /start ins Hauptmenü des Bots."
+            notificationtext += "\n" + TEXT_NOTIFICATION_DISABLE
             if notificationtext not in user.pendingNotifications:
                 # Add notification text if it is not already contained in list of pending notifications
                 joinedlist = user.pendingNotifications + [notificationtext]
