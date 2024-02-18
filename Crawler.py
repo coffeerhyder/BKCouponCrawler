@@ -6,7 +6,7 @@ from typing import List
 import httpx
 import qrcode
 import requests
-from couchdb import Document, Database
+from couchdb import Database
 
 import couchdb
 

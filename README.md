@@ -139,6 +139,7 @@ optional arguments:
 Siehe BKBot.py -> ``__init__``
 
 # TODOs
+* [Ausblendbaren!] Spenden-Button einbauen
 * Crawler jede Stunde laufen lassen und Channel aktualisieren, sobald es neue Coupons gibt (+ erzwungenermaßen 1x am Tag)
 * Zeitberechnungen refactoring: timedelta überall verwenden wo möglich
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen

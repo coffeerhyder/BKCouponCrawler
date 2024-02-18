@@ -29,7 +29,7 @@ async def collectNewCouponsNotifications(bkbot) -> None:
     if len(newCoupons) == 0:
         logging.info("No new coupons available to notify users about")
         return
-    userDB = bkbot.crawler.getUserDB()
+    userDB = bkbot.userdb
     """ 
      Build a mapping of normalized coupon titles to coupons.
      This way we can easily find alternatives to users' expired coupons (e.g. when BK decides to raise prices for the same product again).
@@ -144,7 +144,7 @@ async def notifyAdminsAboutProblems(bkbot) -> None:
     if len(text) == 0:
         # No notifications to send out
         return
-    userDB = bkbot.crawler.getUserDB()
+    userDB = bkbot.userdb
     adminUsersToNotify = []
     for adminID in adminIDs:
         adminUser = User.load(userDB, adminID)
@@ -158,7 +158,7 @@ async def notifyAdminsAboutProblems(bkbot) -> None:
 
 
 async def collectUserDeleteNotifications(bkbot) -> None:
-    userDB = bkbot.crawler.getUserDB()
+    userDB = bkbot.userdb
     numberOfCollectedNotifications = 0
     for userID in userDB:
         user = User.load(db=userDB, id=userID)
