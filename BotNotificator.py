@@ -7,7 +7,7 @@ from couchdb import Database
 from telegram import InputMediaPhoto
 
 from BotUtils import getBotImpressum, Commands, ImageCache
-from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes, formatSeconds, formatDateGermanHuman
+from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes, formatSeconds, formatDateGermanHuman, TEXT_NOTIFICATION_DISABLE
 
 from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCouponsByPrice, getCouponTitleMapping, CouponSortModes, \
     MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER, MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING, MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION, \
@@ -17,8 +17,6 @@ WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
 # TODO: Remove this, add parameter handling so that no code changes are needed for this debug switch.
 DEBUGNOTIFICATOR = False
-
-TEXT_NOTIFICATION_DISABLE = "Du kannst diese Benachrichtigung in den Einstellungen deaktivieren."
 
 
 async def collectNewCouponsNotifications(bkbot) -> None:
@@ -313,7 +311,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
             # Update bot cache
             bkbot.couponImageCache[coupon.id] = ImageCache(fileID=msgImage.photo[0].file_id)
             bkbot.couponImageQRCache[coupon.id] = ImageCache(fileID=msgImageQR.photo[0].file_id)
-            # Update our DB
+            # Update DB
             if coupon.id not in channelDB:
                 channelDB[coupon.id] = {}
             channelCoupon = ChannelCoupon.load(channelDB, coupon.id)

@@ -448,3 +448,6 @@ class Paths:
 
 def formatPrice(price: float) -> str:
     return f'{(price / 100):2.2f}'.replace('.', ',') + '€'
+
+
+TEXT_NOTIFICATION_DISABLE = "Du kannst diese Benachrichtigung in den Einstellungen deaktivieren."

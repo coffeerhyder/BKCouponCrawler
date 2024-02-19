@@ -25,7 +25,7 @@ from Crawler import BKCrawler, UserStats
 from UtilsCouponsDB import Coupon, User, ChannelCoupon, InfoEntry, getCouponsSeparatedByType, CouponFilter, UserFavoritesInfo, \
     USER_SETTINGS_ON_OFF, CouponViews, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING, getCouponViewByIndex
 from CouponCategory import CouponCategory
-from Helper import BotAllowedCouponTypes, CouponType
+from Helper import BotAllowedCouponTypes, CouponType, TEXT_NOTIFICATION_DISABLE
 from UtilsOffers import offerGetImagePath
 
 
@@ -119,8 +119,6 @@ class BKBot:
     def initHandlers(self):
         """ Adds all handlers to dispatcher (not error_handlers!!) """
         # Main conversation handler - handles nearly all bot menus.
-        # fallbackMsgHandler = MessageHandler(filters.TEXT, self.botConfused)
-        # fallbackMsgHandler2 = MessageHandler(filters.TEXT and (~filters.COMMAND), self.botConfused)
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', self.botDisplayMenuMain), CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND),
                           CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND), CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND),
@@ -142,7 +140,6 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.MENU_SETTINGS + '$'),
                     CallbackQueryHandler(self.botAdminResendChannelCoupons, pattern='^' + CallbackVars.ADMIN_RESEND_COUPONS + '$'),
                     CallbackQueryHandler(self.botAdminNukeChannel, pattern='^' + CallbackVars.ADMIN_NUKE_CHANNEL + '$'),
-                    CallbackQueryHandler(self.botAdminSendMsgToAllUsersSTART, pattern='^' + CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS + '$'),
                 ],
                 CallbackVars.MENU_OFFERS: [
                     CallbackQueryHandler(self.botDisplayCouponsFromBotMenu, pattern=CallbackPattern.DISPLAY_COUPONS),
@@ -189,11 +186,6 @@ class BKBot:
                     CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
                     MessageHandler(filters.TEXT, self.botDeletePaybackCard),
                 ],
-                CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS: [
-                    # Back to settings menu
-                    CallbackQueryHandler(self.botDisplayMenuSettings, pattern='^' + CallbackVars.GENERIC_BACK + '$'),
-                    MessageHandler(filters.TEXT, self.botAdminSendMsgToAllUsers),
-                ],
             },
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="MainConversationHandler",
@@ -228,7 +220,6 @@ class BKBot:
             fallbacks=[CommandHandler('start', self.botDisplayMenuMain)],
             name="CouponToggleFavoriteWithImageHandler",
         )
-        # TODO: Make use of this
         conv_handler4 = ConversationHandler(
             entry_points=[CallbackQueryHandler(self.botAdminSendMsgToAllUsersSTART, pattern='^' + CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS + '$')],
             states={
@@ -245,7 +236,7 @@ class BKBot:
         app.add_handler(conv_handler)
         app.add_handler(conv_handler2)
         app.add_handler(conv_handler3)
-        # app.add_handler(conv_handler4)
+        app.add_handler(conv_handler4)
         app.add_handler(CommandHandler('stats', self.botDisplayStats))
         app.add_handler(MessageHandler(filters=filters.TEXT and (~filters.COMMAND), callback=self.botConfused))
 
@@ -304,7 +295,7 @@ class BKBot:
         text += '\nKeine Sorge solange der Bot reagiert, lebt er auch noch ;)'
         if self.getPublicChannelName() is not None:
             text += '\nMehr Infos siehe ' + self.getPublicChannelHyperlinkWithCustomizedText('Channel') + '.'
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         if self.isAdmin(user):
             text += '\nWartungsmodus deaktivieren: /' + Commands.MAINTENANCE
         await self.editOrSendMessage(update, text=text, parse_mode='HTML', disable_web_page_preview=True)
@@ -312,7 +303,7 @@ class BKBot:
     async def botDisplayMenuMain(self, update: Update, context: CallbackContext):
         userIDStr = str(update.effective_user.id)
         isNewUser = userIDStr not in self.userdb
-        user = await self.getUser(userID=userIDStr, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=userIDStr)
         allButtons = []
         if self.getPublicChannelName() is not None:
             allButtons.append([InlineKeyboardButton('Alle Coupons Liste + Pics + News', url='https://t.me/' + self.getPublicChannelName())])
@@ -453,7 +444,7 @@ class BKBot:
             self.statsCachedTimestamp = currentDatetime.timestamp()
         couponDB = self.getFilteredCouponsAsList(couponFilter=CouponFilter())
         userStats = self.statsCached
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         text = f'<b>Hallo <s>Nerd</s> {update.effective_user.first_name}</b>'
         text += '\n<pre>'
         text += f'Anzahl User im Bot: {len(userDB)}'
@@ -499,7 +490,7 @@ class BKBot:
         try:
             saveUserToDB = False
             userDB = self.userdb
-            user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=False)
+            user = await self.getUser(userID=update.effective_user.id)
             if user.updateActivityTimestamp():
                 saveUserToDB = True
             if view.allowModifyFilter:
@@ -657,7 +648,7 @@ class BKBot:
         if query is not None:
             await query.answer()
         userDB = self.userdb
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         user.easterEggCounter += 1
         user.store(db=userDB)
         logging.info(f"User {user.id} found easter egg times: {user.easterEggCounter}")
@@ -671,7 +662,7 @@ class BKBot:
         query = update.callback_query
         if query is not None:
             await query.answer()
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         try:
             userFavorites, favoritesInfoText = self.getUserFavoritesAndUserSpecificMenuText(
                 user=user, sortCoupons=True)
@@ -694,7 +685,7 @@ class BKBot:
     async def displayCouponsWithImages(self, update: Update, context: CallbackContext, coupons: list, msgText: str):
         await self.sendMessage(chat_id=update.effective_message.chat_id, text=msgText, parse_mode='HTML')
         index = 0
-        user = await self.getUser(update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(update.effective_user.id)
         showCouponIndexText = False
         for coupon in coupons:
             if showCouponIndexText:
@@ -768,18 +759,18 @@ class BKBot:
         text += "\n<b>2. Kaufland Pfandbon</b>"
         text += "\nGib in einer beliebigen Kaufland Filiale in Deutschland Pfand ab. Scanne den QR Code des Pfandbons mit einer beliebigen QR Code App und schicke den Inhalt an bkfeedback@pm.me."
         text += "\n\nDu kannst den Spenden Button jederzeit in den Einstellungen deaktivieren."
-        text += f"\n\nVielen Dank für deine Spende{SYMBOLS.HEART}"
+        text += f"\n\nVielen Dank für deine Unterstützung{SYMBOLS.HEART}"
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
         await self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
         return CallbackVars.MENU_MAIN
 
     async def botDisplayMenuSettings(self, update: Update, context: CallbackContext):
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         await self.displaySettings(update, context, user)
         return CallbackVars.MENU_SETTINGS
 
     async def botAdminResendChannelCoupons(self, update: Update, context: CallbackContext):
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         self.adminOrException(user)
         timebefore = datetime.now()
         await self.editOrSendMessage(update, text="Aktualisiere Channel...", parse_mode='HTML')
@@ -795,7 +786,7 @@ class BKBot:
         """
         Deletes all channel coupons.
         """
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         self.adminOrException(user)
         timebefore = getCurrentDate()
         await self.editOrSendMessage(update, text="Starte Channel Nuke...", parse_mode='HTML')
@@ -805,7 +796,7 @@ class BKBot:
         return CallbackVars.MENU_MAIN
 
     async def botAdminSendMsgToAllUsersSTART(self, update: Update, context: CallbackContext):
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         self.adminOrException(user)
         text = "Gib einen Text ein, der an alle Benutzer mit aktiviertem Newsletter geschickt werden soll."
         reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
@@ -814,25 +805,31 @@ class BKBot:
 
     async def botAdminSendMsgToAllUsers(self, update: Update, context: CallbackContext):
         """ Sends message/"newsletter" to all users who have that feature enabled. """
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         self.adminOrException(user)
-        msg = update.message.text
         minLen = 20
-        if len(msg) < minLen:
+        if len(update.message.text) < minLen:
             text = f"{SYMBOLS.WARNING}Ungültige Eingabe: Text ist kleiner als {minLen} Zeichen!"
             reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]])
             await self.editOrSendMessage(update, text=text, reply_markup=reply_markup, parse_mode='HTML')
             return CallbackVars.ADMIN_SEND_MSG_TO_ALL_USERS
         else:
-            # TODO: Add functionality
+            msg = f'<b>BetterKing Newsletter</b>'
+            msg += '\n\n' + update.message.text_html
+            msg += f'\n\n{TEXT_NOTIFICATION_DISABLE}'
             usersToNotify = []
             for userID in self.userdb:
                 user = User.load(db=self.userdb, id=userID)
-                if user.settings.notifyOnBotNewsletter:
+                if user.settings.notifyOnBotNewsletter and msg not in user.pendingNotifications:
+                    joinedlist = user.pendingNotifications + [msg]
+                    user.pendingNotifications = joinedlist
                     usersToNotify.append(user)
-            # timebefore = getCurrentDate()
-            # tdelta = getCurrentDate() - timebefore
-            await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Alle {len(usersToNotify)} User mit aktivierten Benachrichtigungen wurden benachrichtigt.", parse_mode='HTML')
+            self.userdb.update(usersToNotify)
+            await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Sende Nachrichten an {len(usersToNotify)} User...", parse_mode='HTML')
+            timebefore = getCurrentDate()
+            await self.sendPendingNotifications()
+            tdelta = getCurrentDate() - timebefore
+            await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Alle {len(usersToNotify)} User mit aktivierten Benachrichtigungen wurden benachrichtigt. | Dauer: {tdelta}", parse_mode='HTML')
             return ConversationHandler.END
 
     async def displaySettings(self, update: Update, context: CallbackContext, user: User):
@@ -906,7 +903,7 @@ class BKBot:
         uniqueCouponID = callbackArgs['plu']
         callbackBack = callbackArgs['cb']
         coupon = Coupon.load(self.coupondb, uniqueCouponID)
-        user = await self.getUser(update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(update.effective_user.id)
         # Send coupon image in chat
         await self.displayCouponWithImage(update, context, coupon, user)
         # Post user-menu into chat
@@ -928,7 +925,7 @@ class BKBot:
         return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
 
     async def botUserDeleteAccountSTART(self, update: Update, context: CallbackContext, callbackBackButton: str):
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=False, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id, addIfNew=False)
         if user is None:
             menuText = f'{SYMBOLS.WARNING}Es existiert kein Benutzer mit der ID <b>{update.effective_user.id}</b> in der Datenbank.'
             menuText += '\nMit /start meldest du dich erstmalig an.'
@@ -940,10 +937,11 @@ class BKBot:
 
     async def botUserDeleteAccount(self, update: Update, context: CallbackContext):
         """ Deletes users' account from DB. """
+        userIDStr = str(update.effective_user.id)
         userInput = None if update.message is None else update.message.text
-        if userInput is not None and userInput == str(update.effective_user.id):
+        if userInput is not None and userInput == userIDStr:
             # Delete user from DB
-            del self.userdb[str(update.effective_user.id)]
+            del self.userdb[userIDStr]
             menuText = SYMBOLS.CONFIRM + 'Dein BetterKing Account wurde vernichtet!'
             menuText += '\nDu kannst diesen Chat nun löschen.'
             menuText += '\n<b>Viel Erfolg beim Abnehmen!</b>'
@@ -952,17 +950,14 @@ class BKBot:
             return ConversationHandler.END
         else:
             menuText = SYMBOLS.DENY + '<b>Falsche Antwort!</b>'
-            menuText += f'\nDie richtige Antwort lautet <b>{update.effective_user.id}</b>.'
+            menuText += f'\nDie richtige Antwort lautet <b>{userIDStr}</b>.'
             await self.editOrSendMessage(update, text=menuText, parse_mode='HTML',
                                          reply_markup=InlineKeyboardMarkup(
                                              [[], [InlineKeyboardButton("Ich mag bleiben und fett werden", callback_data=CallbackVars.GENERIC_BACK)]]))
             return CallbackVars.MENU_SETTINGS_USER_DELETE_ACCOUNT
 
     async def botUserDeleteAccountCancel(self, update: Update, context: CallbackContext):
-        # await self.sendMessage(chat_id=update.effective_user.id, text="Aja dann bleib halt!\nHauptmenü in 3 Sekunden...")
         await self.editOrSendMessage(update, text="Aja dann bleib halt!")
-        # await asyncio.sleep(3)
-        # await self.botDisplayMenuMain(update, context)
         return ConversationHandler.END
 
     async def displayCouponWithImage(self, update: Update, context: CallbackContext, coupon: Coupon, user: User, additionalText: Union[str, None] = None):
@@ -998,7 +993,7 @@ class BKBot:
         query = update.callback_query
         await query.answer()
         uniqueCouponID = re.search(PATTERN.PLU_TOGGLE_FAV, update.callback_query.data).group(1)
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
 
         if uniqueCouponID in user.favoriteCoupons:
             # Delete coupon from favorites
@@ -1009,7 +1004,7 @@ class BKBot:
             coupon = Coupon.load(self.coupondb, uniqueCouponID)
             if coupon is None:
                 # Edge case: Coupon may have been deleted from DB while user had this keyboard open.
-                await self.editOrSendMessage(update, text=SYMBOLS.WARNING + 'Coupon Favoritenstatus kann nicht geändert werden, da dieser Coupon nicht mehr existiert!',
+                await self.editOrSendMessage(update, text=SYMBOLS.WARNING + 'Du kannst diesen Coupon nicht als Favoriten setzen, da er nicht mehr existiert.',
                                              parse_mode='HTML')
                 return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
             user.addFavoriteCoupon(coupon)
@@ -1112,7 +1107,7 @@ class BKBot:
         await update.callback_query.answer()
         settingKey = update.callback_query.data
         dummyUser = User()
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         if user.settings.get(settingKey, dummyUser.settings[settingKey]):
             user.settings[settingKey] = False
         else:
@@ -1123,7 +1118,7 @@ class BKBot:
 
     async def botResetSortSettings(self, update: Update, context: CallbackContext):
         """ Resets users' settings to default """
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         user.couponViewSortModes = {}
         # Update DB
         user.store(self.userdb)
@@ -1133,7 +1128,7 @@ class BKBot:
 
     async def botResetSettings(self, update: Update, context: CallbackContext):
         """ Resets users' settings to default """
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         user.resetSettings()
         # Update DB
         user.store(self.userdb)
@@ -1143,7 +1138,7 @@ class BKBot:
 
     async def botDeleteUnavailableFavoriteCoupons(self, update: Update, context: CallbackContext):
         """ Removes all user selected favorites which are unavailable/expired at this moment. """
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         await self.deleteUsersUnavailableFavorites([user])
         await self.displaySettings(update, context, user)
         return CallbackVars.MENU_SETTINGS
@@ -1165,7 +1160,7 @@ class BKBot:
             else:
                 paybackCardNumber = userInput
             userDB = self.userdb
-            user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+            user = await self.getUser(userID=update.effective_user.id)
             user.addPaybackCard(paybackCardNumber=paybackCardNumber)
             user.store(userDB)
             text = SYMBOLS.CONFIRM + 'Deine Payback Karte wurde eingetragen.'
@@ -1182,7 +1177,7 @@ class BKBot:
         """ Deletes Payback card from users account if his answer is matching his Payback card number. """
         # Validate input
         userDB = self.userdb
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=False, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         paybackCardNumber = user.getPaybackCardNumber()
         if paybackCardNumber is None:
             # This should never happen!
@@ -1207,7 +1202,7 @@ class BKBot:
         return CallbackVars.MENU_SETTINGS_DELETE_PAYBACK_CARD
 
     async def botDisplayPaybackCard(self, update: Update, context: CallbackContext):
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         query = update.callback_query
         if query is not None:
             await query.answer()
@@ -1235,7 +1230,7 @@ class BKBot:
         return ConversationHandler.END
 
     async def botAdminToggleMaintenanceMode(self, update: Update, context: CallbackContext):
-        user = await self.getUser(userID=update.effective_user.id, addIfNew=True, updateUsageTimestamp=True)
+        user = await self.getUser(userID=update.effective_user.id)
         self.adminOrException(user)
         if self.maintenanceMode:
             # Remove all handlers
@@ -1692,29 +1687,27 @@ class BKBot:
         timeStart = datetime.now()
         index = 0
         dbDocumentUpdates = []
-        for userToNotify in usersWithPendingNotifications:
+        for user in usersWithPendingNotifications:
             isLastItem = index == len(usersWithPendingNotifications) - 1
-            logging.info(f"Notifying user {index + 1}/{len(usersWithPendingNotifications)} | Pending notifications: {len(userToNotify.pendingNotifications)}")
+            logging.info(f"Notifying user {index + 1}/{len(usersWithPendingNotifications)} | {user.id} | Pending notifications: {len(user.pendingNotifications)}")
             # Send all pending notifications
-            for notificationText in userToNotify.pendingNotifications:
-                await self.sendMessageWithUserBlockedHandling(user=userToNotify, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True,
+            for notificationText in user.pendingNotifications:
+                await self.sendMessageWithUserBlockedHandling(user=user, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True,
                                                               allowUpdateDB=False)
-            userToNotify.pendingNotifications = []
-            dbDocumentUpdates.append(userToNotify)
+            user.pendingNotifications = []
+            dbDocumentUpdates.append(user)
             if dbDocumentUpdates == 10 or isLastItem:
                 # Update DB
                 userDB.update(dbDocumentUpdates)
             index += 1
         logging.info(f"Notify users done | Duration: {(datetime.now() - timeStart)}")
 
-    async def getUser(self, userID: Union[str, int], addIfNew: bool, updateUsageTimestamp: bool) -> Union[User, None]:
+    async def getUser(self, userID: Union[str, int], addIfNew: bool = True, updateUsageTimestamp: bool = True, unblockUser: bool = True) -> Union[User, None]:
         """ Returns user from given DB. Adds it to DB if wished and it doesn't exist. """
         userIDStr = str(userID)
         user = User.load(self.userdb, userIDStr)
-        # TODO: Make use of this
-        unblockUser = False
         if user is not None:
-            # Store a rough timestamp of when user used bot last time
+            """ Store a rough timestamp of when user used bot last time. """
             storeuser = False
             if updateUsageTimestamp and user.updateActivityTimestamp():
                 storeuser = True
@@ -1728,7 +1721,7 @@ class BKBot:
         elif addIfNew:
             """ New user? --> Add userID to DB if wished. """
             # Add user to DB for the first time
-            logging.info(f'Storing new userID: {userID}')
+            logging.info(f'Storing new userID: {userIDStr}')
             user = User(id=userIDStr)
             user.store(self.userdb)
         return user

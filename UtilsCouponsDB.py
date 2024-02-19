@@ -1233,7 +1233,7 @@ USER_SETTINGS_ON_OFF = {
     },
     "notifyOnBotNewsletter": {
         "category": SettingCategories.NOTIFICATIONS,
-        "description": "Benachrichtigung zu BetterKing Bot-News",
+        "description": "BetterKing TG Newsletter",
         "default": True
     },
     "autoDeleteExpiredFavorites": {
