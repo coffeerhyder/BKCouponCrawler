@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import logging
 import math
 import traceback
 from copy import deepcopy
@@ -826,11 +827,7 @@ class BKBot:
                 user.pendingNotifications = joinedlist
                 usersToNotify.append(user)
         self.userdb.update(usersToNotify)
-        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Sende Nachrichten an {len(usersToNotify)}/{len(self.userdb)} User...", parse_mode='HTML')
-        timebefore = getCurrentDate()
-        await self.sendPendingNotifications()
-        tdelta = getCurrentDate() - timebefore
-        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Alle {len(usersToNotify)} User mit aktivierten Benachrichtigungen wurden benachrichtigt. | Dauer: {tdelta}", parse_mode='HTML')
+        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Alle {len(usersToNotify)} User mit aktivierten Benachrichtigungen werden demnächst benachrichtigt.", parse_mode='HTML')
         return ConversationHandler.END
 
     async def displaySettings(self, update: Update, context: CallbackContext, user: User):
@@ -1230,6 +1227,10 @@ class BKBot:
 
     async def botConfused(self, update: Update, context: CallbackContext):
         """ Execute this whenever user sends message to bot which the bot cannot process. """
+        botChannelName = self.getPublicChannelName()
+        if update.effective_chat.username == botChannelName:
+            logging.info("Do not answer messages posted into own bot controlled group")
+            return ConversationHandler.END
         await self.sendMessage(chat_id=update.effective_chat.id, text='Ich nix verstehen!')
         return ConversationHandler.END
 
@@ -1603,6 +1604,7 @@ class BKBot:
                                                  disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
                                                  reply_markup: ReplyMarkup = None,
                                                  allowUpdateDB: bool = True) -> Union[Message, None]:
+        botblockedHandling = False
         try:
             msg = await self.processMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
                                             disable_web_page_preview=disable_web_page_preview,
@@ -1613,11 +1615,23 @@ class BKBot:
             return msg
         except Forbidden:
             logging.info(f"User blocked bot: {user.id}")
+            botblockedHandling = True
             user.botBlockedCounter += 1
             user.timestampLastTimeBlockedBot = datetime.now().timestamp()
             if allowUpdateDB:
                 user.store(db=userDB)
-            return None
+        except BadRequest as badrequesterror:
+            if badrequesterror.message == 'Chat not found':
+                logging.info(f"User does not exist anymore or user blocked bot: {user.id}")
+                botblockedHandling = True
+            else:
+                raise badrequesterror
+        if botblockedHandling:
+            user.botBlockedCounter += 1
+            user.timestampLastTimeBlockedBot = datetime.now().timestamp()
+            if allowUpdateDB:
+                user.store(db=userDB)
+        return None
 
     async def sendPhoto(self, chat_id: Union[int, str], photo, caption: Union[None, str] = None,
                         parse_mode: Union[None, str] = None, disable_notification: ODVInput[bool] = DEFAULT_NONE,
@@ -1700,15 +1714,19 @@ class BKBot:
         for user in usersWithPendingNotifications:
             isLastItem = index == len(usersWithPendingNotifications) - 1
             logging.info(f"Notifying user {index + 1}/{len(usersWithPendingNotifications)} | {user.id} | Pending notifications: {len(user.pendingNotifications)}")
-            # Send all pending notifications
-            for notificationText in user.pendingNotifications:
-                await self.sendMessageWithUserBlockedHandling(user=user, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True,
-                                                              allowUpdateDB=False)
+            # Send all pending notifications to user
+            try:
+                for notificationText in user.pendingNotifications:
+                    await self.sendMessageWithUserBlockedHandling(user=user, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True,
+                                                                  allowUpdateDB=False)
+            except Exception as e:
+                # TODO: Find a better way than try catch all
+                logging.exception(e)
+                pass
             user.pendingNotifications = []
             dbDocumentUpdates.append(user)
             if len(dbDocumentUpdates) == 10 or isLastItem:
                 # Update DB
-                logging.info(f"DB writeout: {dbDocumentUpdates}")
                 userDB.update(dbDocumentUpdates)
                 dbDocumentUpdates.clear()
             index += 1
