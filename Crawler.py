@@ -6,7 +6,7 @@ from typing import List
 import httpx
 import qrcode
 import requests
-from couchdb import Document, Database
+from couchdb import Database
 
 import couchdb
 
@@ -48,19 +48,26 @@ class UserStats:
         self.numberofUsersWhoAreEligableForAutoDeletion = 0
         self.numberofUsersWhoRecentlyUsedBot = 0
         self.numberofUsersWhoAddedPaybackCard = 0
+        self.numberofUsersWhoEnabledBotNewsletter = 0
+        self.numberofUsersWhoDisabledDonateButton = 0
         for userID in userdb:
-            userTmp = User.load(userdb, userID)
-            if userTmp.hasFoundEasterEgg():
+            user: User = User.load(userdb, userID)
+            if user.hasFoundEasterEgg():
                 self.numberofUsersWhoFoundEasterEgg += 1
-            self.numberofFavorites += len(userTmp.favoriteCoupons)
-            if userTmp.hasProbablyBlockedBot():
+            self.numberofFavorites += len(user.favoriteCoupons)
+            if user.hasProbablyBlockedBot():
                 self.numberofUsersWhoProbablyBlockedBot += 1
-            if userTmp.getPaybackCardNumber() is not None:
+            if user.getPaybackCardNumber() is not None:
                 self.numberofUsersWhoAddedPaybackCard += 1
-            if userTmp.isEligableForAutoDeletion():
+            if user.isEligableForAutoDeletion():
                 self.numberofUsersWhoAreEligableForAutoDeletion += 1
-            elif userTmp.hasRecentlyUsedBot():
+            elif user.hasRecentlyUsedBot():
                 self.numberofUsersWhoRecentlyUsedBot += 1
+            if user.settings.notifyOnBotNewsletter:
+                self.numberofUsersWhoEnabledBotNewsletter += 1
+            if user.settings.displayDonateButton is False:
+                self.numberofUsersWhoDisabledDonateButton += 1
+
 
 
 class BKCrawler:

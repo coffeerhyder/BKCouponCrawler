@@ -1,4 +1,3 @@
-import numbers
 import os
 import random
 import re
@@ -64,7 +63,7 @@ def setImageURLQuality(image_url: str) -> str:
 
 def normalizeString(string: str):
     """ Returns lowercase String with all non-word characters removed. """
-    return replaceRegex(re.compile(r'[\W_]+'), '', string).lower()
+    return re.sub(r'[\W_]+', '', string).lower()
 
 
 def splitStringInPairs(string: str) -> str:
@@ -90,70 +89,53 @@ def shortenProductNames(couponTitle: str) -> str:
     """ Let's start with fixing the fries -> Using an emoji as replacement really shortens product titles with fries! """
     couponTitle = sanitizeCouponTitle(couponTitle)
     pommesReplacement = SYMBOLS.FRIES
-    # pommesReplacement = 'Pomm'
-    couponTitle = replaceRegex(re.compile(r'(?i)kleine(\s*KING)?\s*Pommes'), 'S ' + pommesReplacement, couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)mittlere(\s*KING)?\s*Pommes'), 'M ' + pommesReplacement, couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)große(\s*KING)?\s*Pommes'), 'L ' + pommesReplacement, couponTitle)
-    """ Just in case we missed one case... """
-    couponTitle = replaceRegex(re.compile(r'(?i)KING\s*Pommes'), pommesReplacement, couponTitle)
+    colaReplacement = "🥤"
+    couponTitle = re.sub(r"kleine(\s*KING)?\s*Pommes", r"S" + pommesReplacement, couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"mittlere(\s*KING)?\s*Pommes", r"M" + pommesReplacement, couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"große(\s*KING)?\s*Pommes", r"L" + pommesReplacement, couponTitle, flags=re.IGNORECASE)
+    """ Just in case we missed one fries-case... """
+    couponTitle = re.sub(r"KING\s*(Pommes)", pommesReplacement, couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Coca[\s-]*Cola", colaReplacement, couponTitle, flags=re.IGNORECASE)
     """ E.g. "Big KING" --> "Big K" """
-    regexKingAfterProductName = re.compile(r"(?i)(Big|Bacon|Fish|Halloumi)\s*KING").search(couponTitle)
-    if regexKingAfterProductName:
-        couponTitle = couponTitle.replace(regexKingAfterProductName.group(0), regexKingAfterProductName.group(1) + " K")
+    couponTitle = re.sub(r"(Big|Bacon|Fish|Halloumi)\s*KING", r"\1", couponTitle, flags=re.IGNORECASE)
     """ E.g. "KING Shake" --> "Shake" """
-    regexKingInFrontOfProductTitle = re.compile(r"(?i)KING\s*(Jr\.?\s*Meal|Shake|Nuggets?|Wings?)").search(couponTitle)
-    if regexKingInFrontOfProductTitle:
-        couponTitle = couponTitle.replace(regexKingInFrontOfProductTitle.group(0), regexKingInFrontOfProductTitle.group(1))
+    couponTitle = re.sub(r"KING\s*(Jr\.?\s*Meal|Jr\.?\s*Menü|Shake|Nuggets?|Wings?)", r"\1", couponTitle, flags=re.IGNORECASE)
     """ 'Meta' replaces """
-    # Normalize- and fix drink unit e.g. "0,3 L" or "0.3l" to "0.3" (leave out the unit character to save even more space)
-    drinkUnitRegEx = re.compile(r'(?i)(0[.,]\d{1,2})\s*L').search(couponTitle)
-    if drinkUnitRegEx:
-        couponTitle = couponTitle.replace(drinkUnitRegEx.group(0), drinkUnitRegEx.group(1))
+    # Normalize- and fix drink unit e.g. "0,3 L" or "0.3l" to "0.3" (remove unit character to save even more space)
+    couponTitle = re.sub(r"(0[.,]\d{1,2})\s*L", r"\1", couponTitle, flags=re.IGNORECASE)
     # Normalize 'nugget unit e.g. "6er KING Nuggets" -> "6 KING Nuggets"
-    nuggetUnitRegEx = re.compile(r'(?i)(\d{1,2})er\s*').search(couponTitle)
-    if nuggetUnitRegEx:
-        couponTitle = couponTitle.replace(nuggetUnitRegEx.group(0), nuggetUnitRegEx.group(1))
+    couponTitle = re.sub(r"(\d{1,2})er\s*", r"\1", couponTitle, flags=re.IGNORECASE)
     # E.g. "2x Crispy Chicken" --> 2 Crispy Chicken
-    for match in re.finditer(r'((\d+)[Xx] )([A-Za-z]+)', couponTitle):
-        newAmountStr = match.group(2) + " " + match.group(3)
-        couponTitle = couponTitle.replace(match.group(0), newAmountStr)
-    # "Chicken Nuggets" -> "Nuggets" (because everyone knows what's ment by that and it's shorter!)
-    chickenNuggetsFix = re.compile(r'(?i)Chicken\s*Nuggets').search(couponTitle)
-    if chickenNuggetsFix:
-        couponTitle = couponTitle.replace(chickenNuggetsFix.group(0), "Nuggets")
-    burgerFix = re.compile(r'(?i)(b)urger').search(couponTitle)
-    if burgerFix:
-        # Keep first letter of "burger" as it is (lower-/uppercase) sometimes used as part of one word e.g. "Cheeseburger"
-        b = burgerFix.group(1)
-        couponTitle = replaceCaseInsensitive(burgerFix.group(0), b + 'rgr', couponTitle)
+    couponTitle = re.sub(r"((\d+)[Xx] )([A-Za-z]+)", r"\2 \3", couponTitle, flags=re.IGNORECASE)
+    # "Chicken Nuggets" -> "Nuggets"
+    couponTitle = re.sub(r"Chicken\s*(Nuggets)", r"\1", couponTitle, flags=re.IGNORECASE)
+    # Cheeseburger -> Cheesebrgr
+    couponTitle = re.sub(r"(b)urger", r"\1rgr", couponTitle, flags=re.IGNORECASE)
 
     # Assume that all users know that "Cheddar" is cheese so let's remove this double entry
-    couponTitle = replaceRegex(re.compile(r'(?i)Cheddar\s*Cheese'), 'Cheddar', couponTitle)
-    couponTitle = replaceCaseInsensitive('Chicken', 'Ckn', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)Chili[\s-]*Cheese'), 'CC', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)Coca[\s-]*Cola'), 'Cola', couponTitle)
-    couponTitle = replaceCaseInsensitive('Deluxe', 'Dlx', couponTitle)
-    couponTitle = replaceCaseInsensitive('Dips', 'Dip', couponTitle)
-    couponTitle = replaceCaseInsensitive('Double', 'Dbl', couponTitle)
-    couponTitle = replaceCaseInsensitive('Long', 'Lng', couponTitle)
-    couponTitle = replaceRegex(re.compile('(?i)Nuggets?'), 'Nugg', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)Plant[\s-]*Based'), 'Plnt', couponTitle)
-    couponTitle = replaceCaseInsensitive('Triple', 'Trple', couponTitle)
-    couponTitle = replaceCaseInsensitive('Veggie', 'Veg', couponTitle)
-    couponTitle = replaceCaseInsensitive('Whopper', 'Whppr', couponTitle)
-    couponTitle = replaceCaseInsensitive('Steakhouse', 'SteakH', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)X[\s-]*tra'), 'Xtra', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)Onion\s*Rings'), 'ORings', couponTitle)
-    removeOR = re.compile(r'(\s*oder\s*)').search(couponTitle)
-    if removeOR:
-        couponTitle = couponTitle.replace(removeOR.group(0), ', ')
-    couponTitle = replaceRegex(re.compile(r'(?i)\s*zum\s*Preis\s*von\s*(1!?|einem|einer)'), '', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)Im King Menü \(\+[^)]+\)'), '', couponTitle)
-    # 2023-12-29
-    couponTitle = replaceRegex(re.compile(r'(?i)\s*\|\s*King\s*Smart\s*Menü'), '', couponTitle)
-    # 2023-12-29
-    couponTitle = replaceRegex(re.compile(r'(?i)\smit\s'), '&', couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)Jr\s*\.'), 'Jr', couponTitle)
+    couponTitle = re.sub(r"Cheddar\s*Cheese", r"Cheddar", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Chicken", r"Ckn", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Chili[\s-]*Cheese", r"CC", couponTitle, flags=re.IGNORECASE)
+    # couponTitle = re.sub(r"Coca[\s-]*Cola", r"Cola", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Deluxe", r"Dlx", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Dips", r"Dip", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Double", r"Dbl", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Long", r"Lng", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Nuggets?", r"Nug", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Plant[\s-]*Based", r"Plnt", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Tripp?le", r"Trple", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Veggie", r"Veg", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Whopper", r"Wppr", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Steakhouse", r"SteakH", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"X[\s-]*tra", r"Xtra", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Onion[\s-]*Rings", r"Rings", couponTitle, flags=re.IGNORECASE)
+    # Remove 'oder'
+    couponTitle = re.sub(r"\s*oder\s*", r"", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"\s*zum\s*Preis\s*von\s*(1!?|einem|einer)", r"", couponTitle, flags=re.IGNORECASE)
+    # Remove e.g. "Im KING Menü (+ 50 Cent)"
+    couponTitle = re.sub(r"Im King Menü \(\+[^)]+\)", r"", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r" mit ", r"&", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"Jr\s*\.", r"Jr", couponTitle, flags=re.IGNORECASE)
     # Do some more basic replacements
     couponTitle = couponTitle.replace(' ', '')
     # E.g. "...Chili-Cheese"
@@ -224,15 +206,6 @@ def getCurrentDateIsoFormat() -> str:
     return getCurrentDate().isoformat()
 
 
-def replaceCaseInsensitive(old: str, repl: str, text: str) -> str:
-    """ THX: https://stackoverflow.com/a/15831118 """
-    return re.sub('(?i)' + re.escape(old), lambda m: repl, text)
-
-
-def replaceRegex(old: Pattern, repl: str, text: str) -> str:
-    return re.sub(old, lambda m: repl, text)
-
-
 class SYMBOLS:
     BACK = '⬅Zurück'
     MEAT = '🥩'
@@ -283,11 +256,12 @@ def getFilenameFromURL(url: str) -> str:
 
 
 def couponTitleContainsFriesAndDrink(title: str) -> bool:
-    # Convert title to lowercase for more thoughtless string comparison
     titleLower = title.lower()
-    if re.compile(r'.*king\s*jr\s*\.?\s*meal.*').search(titleLower):
+    if '+' in titleLower and couponTitleContainsFries(titleLower) and couponTitleContainsDrink(titleLower):
         return True
-    elif '+' in titleLower and couponTitleContainsFries(titleLower) and couponTitleContainsDrink(titleLower):
+    elif re.compile(r'.*king\s*jr\s*\.?\s*meal.*').search(titleLower):
+        return True
+    elif re.compile(r'.*king\s*jr\s*\.?\s*menü.*').search(titleLower):
         return True
     else:
         return False
@@ -296,7 +270,7 @@ def couponTitleContainsFriesAndDrink(title: str) -> bool:
 def couponTitleContainsVeggieFood(title: str) -> bool:
     # Convert title to lowercase for more thoughtless string comparison
     if couponTitleContainsPlantBasedFood(title):
-        # All plant based articles
+        # All plant based articles are veggie
         return True
     titleLower = title.lower()
     if 'veggie' in titleLower:
@@ -449,3 +423,6 @@ class Paths:
 
 def formatPrice(price: float) -> str:
     return f'{(price / 100):2.2f}'.replace('.', ',') + '€'
+
+
+TEXT_NOTIFICATION_DISABLE = "Du kannst diese Benachrichtigung in den Einstellungen deaktivieren."

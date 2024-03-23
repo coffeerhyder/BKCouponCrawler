@@ -8,7 +8,7 @@ from telegram import InlineKeyboardMarkup
 
 from Helper import SYMBOLS
 
-VERSION = '2.1.1'
+VERSION = '2.1.2'
 
 """ Place static stuff into this class. """
 
@@ -34,6 +34,7 @@ class CallbackVars:
     FAV_COUPON = 'fav_coupon'
     COUPON_LOOSE_WITH_FAVORITE_SETTING = 'coupon_loose_with_favorite_setting'
     MENU_FEEDBACK_CODES = 'menu_feedback_codes'
+    MENU_DONATE = 'menu_donate'
     MENU_SETTINGS = 'menu_settings'
     MENU_SETTINGS_SORTS_RESET = 'menu_settings_sorts_reset'
     MENU_SETTINGS_RESET = 'menu_settings_reset'
@@ -44,6 +45,7 @@ class CallbackVars:
     EASTER_EGG = 'easter_egg'
     ADMIN_RESEND_COUPONS = 'admin_resend_coupons'
     ADMIN_NUKE_CHANNEL = 'admin_nuke_channel'
+    ADMIN_SEND_MSG_TO_ALL_USERS = 'admin_send_msg_to_all_users'
 
 
 class Commands:

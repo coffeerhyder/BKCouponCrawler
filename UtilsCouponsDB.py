@@ -180,18 +180,16 @@ class Coupon(Document):
     productIDs = ListField(IntegerField())
     type = IntegerField(name='source')  # Legacy. This is called "type" now!
     isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new. Use this as an override of default handling.
-    isHidden = BooleanField(default=False)  # Typically only available for App coupons
-    isUnsafeExpiredate = BooleanField(
-        default=False)  # Set this if timestampExpire is a made up date that is just there to ensure that the coupon is considered valid for a specified time
+    isHidden = BooleanField(default=False)  # Typically only available for upsell App coupons
     description = TextField()
     # TODO: Make use of this once it is possible for users to add coupons to DB via API
-    addedVia = IntegerField()
+    # addedVia = IntegerField()
     tags = ListField(TextField())
     webviewID = TextField()
     webviewURL = TextField()
 
     def __str__(self):
-        return f'{self.id} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}  | WEBVIEW: {self.getWebviewURL()}'
+        return f'{self.id=} | {self.plu} | {self.getTitle()} | {self.getPriceFormatted()} | START: {self.getStartDateFormatted()} | END {self.getExpireDateFormatted()}  | WEBVIEW: {self.getWebviewURL()}'
 
     def forceDisplayQR(self) -> bool:
         if self.plu is None:
@@ -211,16 +209,6 @@ class Coupon(Document):
             else:
                 return self.id
 
-    def getFirstLetterOfPLU(self) -> Union[str, None]:
-        """ Returns first letter of PLU if PLU is given and starts with a single letter followed by numbers-only. """
-        if self.plu is None:
-            return None
-        # Paper coupons usually only contain one char followed by a 1-2 digit number.
-        pluRegEx = re.compile(r'(?i)^([A-Z])\d+$').search(self.plu)
-        if not pluRegEx:
-            return None
-        return pluRegEx.group(1).upper()
-
     def getNormalizedTitle(self) -> Union[str, None]:
         return normalizeString(self.getTitle())
 
@@ -235,11 +223,10 @@ class Coupon(Document):
 
     def getTitleShortened(self, includeVeggieSymbol: bool) -> Union[str, None]:
         shortenedTitle = shortenProductNames(self.getTitle())
-        nutritionSymbol = None
         if includeVeggieSymbol:
             nutritionSymbol = self.getNutritionSymbols()
-        if nutritionSymbol is not None:
-            shortenedTitle = nutritionSymbol + shortenedTitle
+            if nutritionSymbol is not None:
+                shortenedTitle = nutritionSymbol + shortenedTitle
         return shortenedTitle
 
     def getNutritionSymbols(self) -> Union[str, None]:
@@ -297,9 +284,10 @@ class Coupon(Document):
 
     def isPlantBased(self) -> bool:
         if self.tags is not None:
+            # First check tags
             for tag in self.tags:
                 tag = tag.lower()
-                if tag == 'plantbased':
+                if 'plant' in tag:
                     return True
         if couponTitleContainsPlantBasedFood(self.getTitle()):
             return True
@@ -327,7 +315,8 @@ class Coupon(Document):
                     tag = tag.lower()
                     if tag == 'sweetkings':
                         return True
-            return False
+        # If in doubt, the product is not veggie
+        return False
 
     def containsMeat(self) -> bool:
         """ Returns true if this coupon contains at least one article with meat. """
@@ -341,7 +330,7 @@ class Coupon(Document):
             # NoPreference -> Can be anything, most items got this tag only
             for tag in self.tags:
                 tag = tag.lower()
-                if tag == 'beef' or tag == 'chicken':
+                if 'beef' in tag or 'chicken' in tag:
                     return True
 
         titleLower = self.getTitle().lower()
@@ -408,8 +397,7 @@ class Coupon(Document):
                 # This should never happen
                 logging.warning("Coupon.isNewCoupon: WTF invalid date format??")
                 return False
-        else:
-            return False
+        return False
 
     def getStartDatetime(self) -> Union[datetime, None]:
         """ Returns datetime from which coupon is valid. Not all coupons got a startDatetime. """
@@ -676,6 +664,7 @@ class User(Document):
             displayBKWebsiteURLs=BooleanField(default=True),
             displayFeedbackCodeGenerator=BooleanField(default=True),
             displayFAQLinkButton=BooleanField(default=True),
+            displayDonateButton=BooleanField(default=True),
             displayAdminButtons=BooleanField(default=True),
             displayPlantBasedCouponsWithinGenericCategories=BooleanField(default=True),
             displayHiddenUpsellingAppCouponsWithinGenericCategories=BooleanField(default=True),
@@ -683,6 +672,7 @@ class User(Document):
             notifyWhenFavoritesAreBack=BooleanField(default=False),
             notifyWhenNewCouponsAreAvailable=BooleanField(default=False),
             notifyMeAsAdminIfThereAreProblems=BooleanField(default=True),
+            notifyOnBotNewsletter=BooleanField(default=True),
             highlightFavoriteCouponsInButtonTexts=BooleanField(default=True),
             highlightNewCouponsInCouponButtonTexts=BooleanField(default=True),
             highlightVeggieCouponsInCouponButtonTexts=BooleanField(default=True),
@@ -1164,6 +1154,11 @@ USER_SETTINGS_ON_OFF = {
         "description": "FAQ Button zeigen",
         "default": True
     },
+    "displayDonateButton": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": "Spenden Button zeigen",
+        "default": True
+    },
     "displayAdminButtons": {
         "category": SettingCategories.MAIN_MENU,
         "description": "Admin Buttons anzeigen",
@@ -1222,6 +1217,11 @@ USER_SETTINGS_ON_OFF = {
     "notifyMeAsAdminIfThereAreProblems": {
         "category": SettingCategories.NOTIFICATIONS,
         "description": "Admin Benachrichtigung bei Problemen",
+        "default": True
+    },
+    "notifyOnBotNewsletter": {
+        "category": SettingCategories.NOTIFICATIONS,
+        "description": "BetterKing TG Newsletter",
         "default": True
     },
     "autoDeleteExpiredFavorites": {
