@@ -826,7 +826,7 @@ class BKBot:
                 user.pendingNotifications = joinedlist
                 usersToNotify.append(user)
         self.userdb.update(usersToNotify)
-        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Sende Nachrichten an {len(usersToNotify)} User...", parse_mode='HTML')
+        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Sende Nachrichten an {len(usersToNotify)}/{len(self.userdb)} User...", parse_mode='HTML')
         timebefore = getCurrentDate()
         await self.sendPendingNotifications()
         tdelta = getCurrentDate() - timebefore
@@ -1706,9 +1706,11 @@ class BKBot:
                                                               allowUpdateDB=False)
             user.pendingNotifications = []
             dbDocumentUpdates.append(user)
-            if dbDocumentUpdates == 10 or isLastItem:
+            if len(dbDocumentUpdates) == 10 or isLastItem:
                 # Update DB
+                logging.info(f"DB writeout: {dbDocumentUpdates}")
                 userDB.update(dbDocumentUpdates)
+                dbDocumentUpdates.clear()
             index += 1
         logging.info(f"Notify users done | Duration: {(datetime.now() - timeStart)}")
 
@@ -1764,7 +1766,7 @@ async def dailyRoutine(bkbot):
 
 
 async def notificationRoutine(bkbot):
-    """ Sends pending notifications to user every X time. """
+    """ Sends pending notifications to user every X seconds. """
     while True:
         await asyncio.sleep(300)
         try:
