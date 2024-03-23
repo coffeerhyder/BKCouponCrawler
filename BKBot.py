@@ -826,7 +826,7 @@ class BKBot:
                 user.pendingNotifications = joinedlist
                 usersToNotify.append(user)
         self.userdb.update(usersToNotify)
-        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Sende Nachrichten an {len(usersToNotify)} User...", parse_mode='HTML')
+        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Sende Nachrichten an {len(usersToNotify)}/{len(self.userdb)} User...", parse_mode='HTML')
         timebefore = getCurrentDate()
         await self.sendPendingNotifications()
         tdelta = getCurrentDate() - timebefore
