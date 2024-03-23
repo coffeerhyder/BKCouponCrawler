@@ -9,6 +9,7 @@ Burger King Coupon Telegram Bot
 * Crawler und Bot getrennt: Crawler kann einfach für andere Projekte verwendet werden
 * Coupons sortiert, aufgeräumt und teils mit zusätzlichen Informationen
 * Coupons einfach beliebig filterbar und sortierbar
+* Demnächst erscheinende Coupons vorab einsehen
 
 **Video:**  
 https://www.bitchute.com/video/eoMYCfag5oiM/
@@ -54,9 +55,6 @@ bash couchdb-dump.sh -r -c -H 127.0.0.1 -d telegram_users -f telegram_users.json
 | admin_ids           | StringArray | Nein     | Telegram UserIDs der gewünschten Bot Admins                                                          | ["57659679843", "534494657832"]          |
 
 **Falls nur der Crawler benötigt wird, reicht die CouchDB URL (mit Zugangsdaten)!**
-
-## Optional: Papiercoupons hinzufügen  
-Wird aktualisiert, sobald es wieder eine Möglichkeit gibt, Papiercoupons mit hinzuzufügen.
 
 ### Bot mit Logging in File starten
 ```
@@ -134,9 +132,6 @@ optional arguments:
 |6 | ONLINE_ONLY_STORE_SPECIFIC | Coupons, die nur in bestimmten Filialen einlösbar sind -> Derzeit ist das nur ein Platzhalter|
 |7 | SPECIAL | Spezielle Coupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.|
 |8 | PAYBACK | Payback Papiercoupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.|
-
-### Codebeispiel Crawler
-Siehe BKBot.py -> ``__init__``
 
 # TODOs
 * [Ausblendbaren!] Spenden-Button einbauen
@@ -328,22 +323,23 @@ Name | Beschreibung | Live-Instanz
 --- | --- | ---
 Generisches BK Projekt | https://github.com/reteps/burger-king-api-wrapper | -
 Generisches BK Projekt | https://github.com/robsonkades/clone-burger-king-app-with-expo | -
-mccoupon.deals | McDonalds Coupons ohne App, [Autor](https://www.mydealz.de/profile/Jicu) | https://www.mccoupon.deals/
 billigepizza.netlify.app | Pizzapreise von Domino's optimieren | https://billigepizza.netlify.app/
 MisterSnax (ehemals Spätzlehunter) | Lieferando in geiler z.B. Gruppenbestellungen, Preisvergleich | https://mistersnax.com/
 
 
 
 ### Ähnliche Projekte | down/defekt
-Name | Beschreibung                                                                                                                                                  | Live-Instanz                                                                          | Down/Kaputt seit
---- |---------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------| ---
-freecokebot aka gimmecockbot | McDonalds gratis Getränke                                                                                                                                     | https://t.me/gimmecockbot (Alternativ https://t.me/freecokebot)                       | 10.11.2022
-bk.eris.cc | BK Coupons ohne App, [Autor](https://gist.github.com/printfuck)                                                                                               | https://bk.eris.cc/                                                                   | 10.11.2022
+Name | Beschreibung                                                                                                                                                    | Live-Instanz                                                                          | Down/Kaputt seit
+--- |-----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------| ---
+freecokebot aka gimmecockbot | McDonalds gratis Getränke                                                                                                                                       | https://t.me/gimmecockbot (Alternativ https://t.me/freecokebot)                       | 10.11.2022
+bk.eris.cc | BK Coupons ohne App, [Autor](https://gist.github.com/printfuck)                                                                                                 | https://bk.eris.cc/                                                                   | 10.11.2022
 mcdonalds4free_bot | McDonalds Getränke kostenlos, [MyDealz Thread](https://www.mydealz.de/diskussion/mcdonalds-hasst-diesen-trick-freigetranke-free-softdrink-coffee-small-1550092) | https://t.me/mcdonalds4free_bot                                                       | 15.01.2023
-Würger King | Burger King Coupons                                                                                                                                           | https://wurgerking.wfr.moe/  ([Quellcode](https://github.com/WebFreak001/WurgerKing)) | 31.12.2022
-NordseeCoupons | Nordsee Coupons Bot | https://t.me/NordseeCouponsBot und https://t.me/nordseecoupons     | 23.11.2023
+Würger King | Burger King Coupons                                                                                                                                             | https://wurgerking.wfr.moe/  ([Quellcode](https://github.com/WebFreak001/WurgerKing)) | 31.12.2022
+NordseeCoupons | Nordsee Coupons Bot                                                                                                                                             | https://t.me/NordseeCouponsBot und https://t.me/nordseecoupons     | 23.11.2023
+Mccoupon | Mcdonalds Coupons                                                                                                                                               | https://www.mccoupon.deals/    | 25.11.2023
+
 
 #### Ideen für ähnliche Projekte
-* Couponplatz Crawler/Bot
+* Couponplatz Crawler/Bot (aber auch einfach nur, um sie zu ärgern lol)
 * KFC Bot
-* Aral Bot/Channel ([MeinAral App](https://mein.aral.de/service-tools/meinaral-app/))
+* Nordsee Bot
