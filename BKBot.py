@@ -1604,6 +1604,7 @@ class BKBot:
                                                  disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
                                                  reply_markup: ReplyMarkup = None,
                                                  allowUpdateDB: bool = True) -> Union[Message, None]:
+        botblockedHandling = False
         try:
             msg = await self.processMessage(chat_id=user.id, text=text, parse_mode=parse_mode, disable_notification=disable_notification,
                                             disable_web_page_preview=disable_web_page_preview,
@@ -1614,6 +1615,7 @@ class BKBot:
             return msg
         except Forbidden:
             logging.info(f"User blocked bot: {user.id}")
+            botblockedHandling = True
             user.botBlockedCounter += 1
             user.timestampLastTimeBlockedBot = datetime.now().timestamp()
             if allowUpdateDB:
@@ -1621,12 +1623,15 @@ class BKBot:
         except BadRequest as badrequesterror:
             if badrequesterror.message == 'Chat not found':
                 logging.info(f"User does not exist anymore or user blocked bot: {user.id}")
-                user.botBlockedCounter += 1
-                user.timestampLastTimeBlockedBot = datetime.now().timestamp()
-                if allowUpdateDB:
-                    user.store(db=userDB)
+                botblockedHandling = True
             else:
                 raise badrequesterror
+        if botblockedHandling:
+            user.botBlockedCounter += 1
+            user.timestampLastTimeBlockedBot = datetime.now().timestamp()
+            if allowUpdateDB:
+                user.store(db=userDB)
+        return None
 
     async def sendPhoto(self, chat_id: Union[int, str], photo, caption: Union[None, str] = None,
                         parse_mode: Union[None, str] = None, disable_notification: ODVInput[bool] = DEFAULT_NONE,
