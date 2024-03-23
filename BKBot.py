@@ -1231,7 +1231,6 @@ class BKBot:
         if update.effective_chat.username == botChannelName:
             logging.info("Do not answer messages posted into own bot controlled group")
             return ConversationHandler.END
-        print(f'{update.effective_chat.username=}')
         await self.sendMessage(chat_id=update.effective_chat.id, text='Ich nix verstehen!')
         return ConversationHandler.END
 
