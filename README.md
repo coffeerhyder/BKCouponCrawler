@@ -134,7 +134,7 @@ optional arguments:
 |8 | PAYBACK | Payback Papiercoupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.|
 
 # TODOs
-* [Ausblendbaren!] Spenden-Button einbauen
+* Verhindern, dass der Bot auf [Text-]Nachrichten in seinem "eigenen" Bot-Channel reagiert
 * Crawler jede Stunde laufen lassen und Channel aktualisieren, sobald es neue Coupons gibt (+ erzwungenermaßen 1x am Tag)
 * Zeitberechnungen refactoring: timedelta überall verwenden wo möglich
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen

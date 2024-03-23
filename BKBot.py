@@ -826,11 +826,7 @@ class BKBot:
                 user.pendingNotifications = joinedlist
                 usersToNotify.append(user)
         self.userdb.update(usersToNotify)
-        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Sende Nachrichten an {len(usersToNotify)}/{len(self.userdb)} User...", parse_mode='HTML')
-        timebefore = getCurrentDate()
-        await self.sendPendingNotifications()
-        tdelta = getCurrentDate() - timebefore
-        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Alle {len(usersToNotify)} User mit aktivierten Benachrichtigungen wurden benachrichtigt. | Dauer: {tdelta}", parse_mode='HTML')
+        await self.editOrSendMessage(update, text=f"{SYMBOLS.CONFIRM}Alle {len(usersToNotify)} User mit aktivierten Benachrichtigungen werden demnächst benachrichtigt.", parse_mode='HTML')
         return ConversationHandler.END
 
     async def displaySettings(self, update: Update, context: CallbackContext, user: User):
@@ -1708,7 +1704,6 @@ class BKBot:
             dbDocumentUpdates.append(user)
             if len(dbDocumentUpdates) == 10 or isLastItem:
                 # Update DB
-                logging.info(f"DB writeout: {dbDocumentUpdates}")
                 userDB.update(dbDocumentUpdates)
                 dbDocumentUpdates.clear()
             index += 1
