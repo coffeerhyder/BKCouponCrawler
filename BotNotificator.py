@@ -13,7 +13,6 @@ from UtilsCouponsDB import User, ChannelCoupon, InfoEntry, CouponFilter, sortCou
     MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER, MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING, MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION, \
     MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION
 
-WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION = 0
 """ For testing purposes only!! """
 # TODO: Remove this, add parameter handling so that no code changes are needed for this debug switch.
 DEBUGNOTIFICATOR = False
@@ -128,36 +127,6 @@ async def collectNewCouponsNotifications(bkbot) -> None:
     logging.info(f"New coupons notifications collector done | Duration: {(datetime.now() - timeStart)}")
 
 
-async def notifyAdminsAboutProblems(bkbot) -> None:
-    adminIDs = bkbot.cfg.admin_ids
-    if adminIDs is None or len(adminIDs) == 0:
-        # There are no admins
-        return
-    infoDatabase = bkbot.crawler.getInfoDB()
-    infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
-    timedeltaLastSuccessfulRun = datetime.now() - infoDBDoc.dateLastSuccessfulCrawlRun if infoDBDoc.dateLastSuccessfulCrawlRun is not None else None
-    timedeltaLastSuccessfulChannelupdate = datetime.now() - infoDBDoc.dateLastSuccessfulChannelUpdate if infoDBDoc.dateLastSuccessfulChannelUpdate is not None else None
-    text = ''
-    if timedeltaLastSuccessfulRun is not None and timedeltaLastSuccessfulRun.seconds > 48 * 60 * 60:
-        text += f'{SYMBOLS.WARNING} Letzter erfolgreicher Crawlvorgang war am {formatDateGermanHuman(infoDBDoc.dateLastSuccessfulCrawlRun)}'
-    if timedeltaLastSuccessfulChannelupdate is not None and timedeltaLastSuccessfulChannelupdate.seconds > 48 * 60 * 60:
-        text += f'\n{SYMBOLS.WARNING} Letztes erfolgreiches Channelupdate war am {formatDateGermanHuman(infoDBDoc.dateLastSuccessfulChannelUpdate)}'
-    if len(text) == 0:
-        # No notifications to send out
-        return
-    userDB = bkbot.userdb
-    adminUsersToNotify = []
-    for adminID in adminIDs:
-        adminUser = User.load(userDB, adminID)
-        if adminUser is not None and adminUser.settings.notifyMeAsAdminIfThereAreProblems:
-            adminUsersToNotify.append(adminUser)
-    if len(adminUsersToNotify) == 0:
-        logging.info("There are no admins that want to be notified")
-        return
-    for adminUser in adminUsersToNotify:
-        await bkbot.sendMessageWithUserBlockedHandling(user=adminUser, userDB=userDB, text=text, parse_mode='HTML', disable_web_page_preview=True)
-
-
 async def collectUserDeleteNotifications(bkbot) -> None:
     userDB = bkbot.userdb
     numberOfCollectedNotifications = 0
@@ -196,6 +165,36 @@ async def collectUserDeleteNotifications(bkbot) -> None:
             user.store(db=userDB)
             numberOfCollectedNotifications += 1
     logging.info('Number of users who will soon be informed about account deletion: ' + str(numberOfCollectedNotifications))
+
+
+async def notifyAdminsAboutProblems(bkbot) -> None:
+    adminIDs = bkbot.cfg.admin_ids
+    if adminIDs is None or len(adminIDs) == 0:
+        # There are no admins
+        return
+    infoDatabase = bkbot.crawler.getInfoDB()
+    infoDBDoc = InfoEntry.load(infoDatabase, DATABASES.INFO_DB)
+    timedeltaLastSuccessfulRun = datetime.now() - infoDBDoc.dateLastSuccessfulCrawlRun if infoDBDoc.dateLastSuccessfulCrawlRun is not None else None
+    timedeltaLastSuccessfulChannelupdate = datetime.now() - infoDBDoc.dateLastSuccessfulChannelUpdate if infoDBDoc.dateLastSuccessfulChannelUpdate is not None else None
+    text = ''
+    if timedeltaLastSuccessfulRun is not None and timedeltaLastSuccessfulRun.seconds > 48 * 60 * 60:
+        text += f'{SYMBOLS.WARNING} Letzter erfolgreicher Crawlvorgang war am {formatDateGermanHuman(infoDBDoc.dateLastSuccessfulCrawlRun)}'
+    if timedeltaLastSuccessfulChannelupdate is not None and timedeltaLastSuccessfulChannelupdate.seconds > 48 * 60 * 60:
+        text += f'\n{SYMBOLS.WARNING} Letztes erfolgreiches Channelupdate war am {formatDateGermanHuman(infoDBDoc.dateLastSuccessfulChannelUpdate)}'
+    if len(text) == 0:
+        # No notifications to send out
+        return
+    userDB = bkbot.userdb
+    adminUsersToNotify = []
+    for adminID in adminIDs:
+        adminUser = User.load(userDB, adminID)
+        if adminUser is not None and adminUser.settings.notifyMeAsAdminIfThereAreProblems:
+            adminUsersToNotify.append(adminUser)
+    if len(adminUsersToNotify) == 0:
+        logging.info("There are no admins that want to be notified")
+        return
+    for adminUser in adminUsersToNotify:
+        await bkbot.sendMessageWithUserBlockedHandling(user=adminUser, userDB=userDB, text=text, parse_mode='HTML', disable_web_page_preview=True)
 
 
 class ChannelUpdateMode(Enum):
@@ -381,9 +380,10 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     # Store old informationMessageID for later deletion
     if infoDBDoc.informationMessageID is not None:
         infoDBDoc.addMessageIDToDelete(infoDBDoc.informationMessageID)
+    # Send channel update overview message
     newMsg = await asyncio.create_task(
         bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True))
-    # Store new messageID
+    # Store messageID of channel update overview message
     infoDBDoc.informationMessageID = newMsg.message_id
     infoDBDoc.dateLastSuccessfulChannelUpdate = datetime.now()
     infoDBDoc.store(infoDB)
@@ -464,18 +464,3 @@ async def nukeChannel(bkbot):
     await deleteLeftoverMessageIDsToDelete(bkbot, infoDB, infoDoc)
     logging.info("Nuke channel DONE! --> Total time needed: " + getFormattedPassedTime(timestampStart))
 
-# def editMessageAndWait(bkbot, messageID: Union[int, str, None], messageText) -> bool:
-#     """ WRAPPER!
-#      Edits a message from the channel and waits some seconds.
-#      Ignores BadRequest Exceptions (e.g. message has already been deleted before). """
-#     if messageID is None:
-#         return False
-#     try:
-#         bkbot.editMessage(chat_id='@' + bkbot.getPublicChannelName(), message_id=messageID, text=messageText, parse_mode="HTML", disable_web_page_preview=True)
-#         return True
-#     except BadRequest:
-#         """ Typically this means that this message does not exist anymore. """
-#         logging.warning("Failed to edit message with message_id: " + str(messageID))
-#         return False
-#     finally:
-#         time.sleep(WAIT_SECONDS_AFTER_EACH_MESSAGE_OPERATION * 3)

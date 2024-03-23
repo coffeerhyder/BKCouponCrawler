@@ -89,10 +89,9 @@ def shortenProductNames(couponTitle: str) -> str:
     """ Let's start with fixing the fries -> Using an emoji as replacement really shortens product titles with fries! """
     couponTitle = sanitizeCouponTitle(couponTitle)
     pommesReplacement = SYMBOLS.FRIES
-    # pommesReplacement = 'Pomm'
-    couponTitle = replaceRegex(re.compile(r'(?i)kleine(\s*KING)?\s*Pommes'), 'S ' + pommesReplacement, couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)mittlere(\s*KING)?\s*Pommes'), 'M ' + pommesReplacement, couponTitle)
-    couponTitle = replaceRegex(re.compile(r'(?i)große(\s*KING)?\s*Pommes'), 'L ' + pommesReplacement, couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)kleine(\s*KING)?\s*Pommes'), 'S' + pommesReplacement, couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)mittlere(\s*KING)?\s*Pommes'), 'M' + pommesReplacement, couponTitle)
+    couponTitle = replaceRegex(re.compile(r'(?i)große(\s*KING)?\s*Pommes'), 'L' + pommesReplacement, couponTitle)
     """ Just in case we missed one case... """
     couponTitle = replaceRegex(re.compile(r'(?i)KING\s*Pommes'), pommesReplacement, couponTitle)
     """ E.g. "Big KING" --> "Big K" """
@@ -282,7 +281,6 @@ def getFilenameFromURL(url: str) -> str:
 
 
 def couponTitleContainsFriesAndDrink(title: str) -> bool:
-    # Convert title to lowercase for more thoughtless string comparison
     titleLower = title.lower()
     if re.compile(r'.*king\s*jr\s*\.?\s*meal.*').search(titleLower):
         return True
@@ -295,7 +293,7 @@ def couponTitleContainsFriesAndDrink(title: str) -> bool:
 def couponTitleContainsVeggieFood(title: str) -> bool:
     # Convert title to lowercase for more thoughtless string comparison
     if couponTitleContainsPlantBasedFood(title):
-        # All plant based articles
+        # All plant based articles are veggie
         return True
     titleLower = title.lower()
     if 'veggie' in titleLower:
