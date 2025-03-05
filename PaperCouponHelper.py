@@ -20,6 +20,10 @@ def main() -> List[Coupon]:
         "07.03.2025": {
             "thx": "Danke an die MyDealz User DerShitstorm für den hochauflösenden Scan, HalloTheEngineer für das Digitalisieren der Coupons und den Dealersteller, siehe: mydealz.de/deals/burger-king-coupons-gultig-vom-sa-11012025-bis-fr-07032025-2497319",
             "start_date": "11.01.2025"
+        },
+        "25.04.2025": {
+            "thx": "Danke an den MyDealz User HalloTheEngineer für das Digitalisieren der Coupons und den Dealersteller, siehe: mydealz.de/deals/burger-king-coupons-gultig-vom-sa-08032025-bis-fr-25042025-2531675",
+            "start_date": "08.03.2025"
         }
     }
 
@@ -29,6 +33,8 @@ def main() -> List[Coupon]:
     # Liste für alle JSON-Dateien im Ordner
     json_files = [os.path.join(folder_path, file) for file in os.listdir(folder_path) if file.endswith('.json')]
     allresults = []
+    # numberofExpectedCoupons = 48
+    numberofExpectedCoupons = None
     if len(json_files) == 0:
         print("Found zero paper coupon json sources")
         return allresults
@@ -72,8 +78,8 @@ def main() -> List[Coupon]:
             # Log inconsistent stuff
             if len(expireDates) != 1:
                 print(f"Warnung: Ungleiche Ablaufdaten entdeckt! {expireDates}")
-            if len(papercs) != 48:
-                print(f"Warnung | Erwartete Anzahl Papiercoupons: 48 | Gefunden: {len(papercs)}")
+            if numberofExpectedCoupons is not None and len(papercs) != numberofExpectedCoupons:
+                print(f"Warnung | Erwartete Anzahl Papiercoupons: {numberofExpectedCoupons} | Gefunden: {len(papercs)}")
         except:
             traceback.print_exc()
             print(f"Fehler beim Laden oder Verarbeiten der Papiercoupons {json_file} | Index {index}")
