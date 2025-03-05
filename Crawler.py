@@ -476,7 +476,7 @@ class BKCrawler:
         # Now get paper coupons
         papercouponlist = PaperCouponHelper.getValidPaperCouponList()
         if papercouponlist is not None and len(papercouponlist) > 0:
-            logging.info(f"Number of valid paper coupons: {len(papercouponlist)}")
+            logging.info(f"Number of valid [active + coming soon] paper coupons: {len(papercouponlist)}")
             # Add items to existing dict
             for coupon in papercouponlist:
                 validExtraCoupons[coupon.id] = coupon
@@ -799,6 +799,16 @@ class BKCrawler:
                 self.cachedFutureCouponsText += "\n" + thisCouponText
 
     def updateCachedMissingPaperCouponsInfo(self, couponDB: Database):
+        """
+        Checks for missing paper coupons based on number of expected paper coupons.
+        Since 2025-03, BK has reduced the number of paper coupons from 46 to 24.
+        Also now we are adding coupons via pre determined json file which is usually complete.
+        For these reasons, I've disabled this check for now.
+        Reference: https://www.mydealz.de/deals/burger-king-coupons-gultig-vom-sa-11012025-bis-fr-07032025-2497319
+        """
+        determineMissingPaperCoupons = False
+        if not determineMissingPaperCoupons:
+            return
         paperCouponMapping = {}
         for couponID in couponDB:
             coupon = Coupon.load(id=couponID, db=couponDB)
