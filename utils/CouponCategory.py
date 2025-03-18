@@ -1,7 +1,8 @@
 from typing import Union, List
 
 from Helper import SYMBOLS, formatDateGerman, CouponType, formatPrice
-from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
+from utils.CouponViews import CouponSortModes, CouponSortMode
+from models.Coupon import Coupon
 
 
 class CouponCategory:

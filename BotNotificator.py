@@ -9,11 +9,13 @@ from telegram import InputMediaPhoto
 from BotUtils import getBotImpressum, Commands, ImageCache
 from Helper import DATABASES, getCurrentDate, SYMBOLS, getFormattedPassedTime, URLs, BotAllowedCouponTypes, formatSeconds, formatDateGermanHuman, TEXT_NOTIFICATION_DISABLE
 
-from UtilsCouponsDB import sortCouponsByPrice, getCouponTitleMapping, CouponSortModes, \
-    MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER, MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING, MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION, \
+from UtilsCouponsDB import sortCouponsByPrice, getCouponTitleMapping, MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER, MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING, MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION, \
     MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION
-from filters import CouponFilter
-from models import InfoEntry, ChannelCoupon, User
+from utils.CouponViews import CouponSortModes
+from utils.Filters import CouponFilter
+from models.User import User
+from models.InfoEntry import InfoEntry
+from models.ChannelCoupon import ChannelCoupon
 
 
 async def collectNewCouponsNotifications(bkbot) -> None:

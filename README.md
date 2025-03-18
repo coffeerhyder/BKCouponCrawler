@@ -137,10 +137,8 @@ optional arguments:
 * Crawler jede Stunde laufen lassen und Channel aktualisieren, sobald es neue Coupons gibt (+ erzwungenermaßen 1x am Tag)
 * Zeitberechnungen refactoring: timedelta überall verwenden wo möglich
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen
-* Die Transparenz bei (mybk) Couponbildern durch gelb ersetzen
 * Handling mit Datumsangaben prüfen/verbessern
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
-* Infos aus BK Couponbögen mit [opencv](https://opencv.org/) oder einer anderen OCR Lösung extrahieren und damit das Hinzufügen der aktuellen Papiercoupons erleichtern
 * resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei Netzwerkfehlern o.ä.
 
@@ -301,7 +299,7 @@ Tabelle: Buchstabencodes für alle Monate:
 * https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
 * https://limits.tginfo.me/de-DE
 * https://www.mydealz.de/profile/jokergermany
-* Alle MyDealz User, die die neuen Papier- und Paybackcoupons posten
+* Alle MyDealz User, die die neuen Papiercoupons posten
 
 ### Kleine Linksammlung
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
@@ -312,6 +310,7 @@ Tabelle: Buchstabencodes für alle Monate:
 * https://github.com/robsonkades/clone-burger-king-app-with-expo
 * https://www.mccoupon.deals/ | [Autor](https://www.mydealz.de/profile/Jicu) | [Quelle](https://www.mydealz.de/gutscheine/burger-king-gutscheine-mit-plant-based-angeboten-1979906?page=3#comment-36031037)
 * https://mcbroken.com/
+* https://www.reddit.com/r/de/comments/1jbi8iw/ich_habe_hier_mal_die_preise_bei_meinem_lokalen/
 
 ### Ähnliche Projekte | funktionierend
 Name | Beschreibung | Live-Instanz

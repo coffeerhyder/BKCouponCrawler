@@ -6,7 +6,6 @@ from typing import List
 
 import httpx
 import qrcode
-import requests
 from couchdb import Database
 
 import couchdb
@@ -16,16 +15,18 @@ from BotUtils import getImageBasePath, loadConfig
 from Helper import *
 from Helper import getPathImagesOffers, getPathImagesProducts, \
     isValidImageFile, CouponType, Paths
-from UtilsOffers import offerGetImagePath, offerIsValid
-from UtilsCouponsDB import Coupon, getCouponTitleMapping, removeDuplicatedCoupons, sortCoupons, CouponTextRepresentationPLUMode
-from filters import CouponFilter
-from models import InfoEntry, User
-from CouponCategory import CouponCategory
+from UtilsOffers import offerIsValid
+from UtilsCouponsDB import getCouponTitleMapping, removeDuplicatedCoupons, sortCoupons
+from models.Coupon import Coupon, CouponTextRepresentationPLUMode
+from utils.Filters import CouponFilter
+from models.User import User
+from models.InfoEntry import InfoEntry
+from utils.CouponCategory import CouponCategory
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
            "Origin": "https://www.burgerking.de",
            "Content-Type": "application/json",
-           "sec-ch-ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"99\", \"Google Chrome\";v=\"99\"",
+           "sec-ch-ua": "\" Not A;Brand\";v=\"134\", \"Chromium\";v=\"134\", \"Google Chrome\";v=\"134\"",
            "sec-ch-ua-mobile": "?0",
            "sec-ch-ua-platform": "\"Windows\"",
            "sec-fetch-dest": "empty",
@@ -163,16 +164,6 @@ class BKCrawler:
         couponDB = self.getCouponDB()
         self.updateCaches(couponDB)
         self.updateCachedMissingPaperCouponsInfo(couponDB)
-
-    def setKeepHistoryDB(self, keepHistory: bool):
-        """ Enable this if you want the crawler to maintain a history of past coupons/offers and update it on every crawl process. """
-        self.keepHistoryDB = keepHistory
-
-    def setKeepSimpleHistoryDB(self, keepSimpleHistoryDB: bool):
-        """ Enable this if you want the crawler to maintain a simple history of past coupons and update it on every crawl process.
-         Simple means that of every couponID, only the latest version will be kept.
-         """
-        self.keepSimpleHistoryDB = keepSimpleHistoryDB
 
     def setStoreCouponAPIDataAsJson(self, storeCouponAPIDataAsJson: bool):
         """ If enabled, all obtained API json responses will be saved into json files on each run. """
@@ -599,126 +590,12 @@ class BKCrawler:
             couponHistoryDoc = historyDB[primaryKey]
             historyDict = couponHistoryDoc[HISTORYDB.COUPONS_HISTORY_DOC]
             latestHistoryVersion = list(historyDict.values())[len(historyDict) - 1]
-            if hasChanged(latestHistoryVersion, newData):
-                # Data has changed -> Add new entry with timestamp and new data.
-                historyDict[getCurrentDateIsoFormat()] = newData
-                couponHistoryDoc[HISTORYDB.COUPONS_HISTORY_DOC] = historyDict
-                historyDB.save(couponHistoryDoc)
-            else:
-                # Data is the same as last time - no update needed
-                pass
-
-    def checkProductiveCouponsDBImagesIntegrity(self):
-        """ Small helper functions to detect missing images e.g. after manual images folder cleanup. """
-        couponDB = self.getCouponDB()
-        numberOfMissingImages = 0
-        for couponIDStr in couponDB:
-            coupon = Coupon.load(couponDB, couponIDStr)
-            # 2021-04-20: Skip invalid/expired coupons as they're not relevant for the user (we don't access them anyways at this moment).
-            if not coupon.isValid():
-                continue
-            imagePathCoupon = coupon.getImagePath()
-            if not isValidImageFile(imagePathCoupon):
-                logging.warning(couponIDStr + ": Coupon image does not exist: " + imagePathCoupon)
-                numberOfMissingImages += 1
-            imagePathQR = coupon.getImagePathQR()
-            if not isValidImageFile(imagePathQR):
-                logging.warning(couponIDStr + ": QR image does not exist: " + imagePathQR)
-                numberOfMissingImages += 1
-        if numberOfMissingImages > 0:
-            logging.warning("Total number of missing images: " + str(numberOfMissingImages))
-
-    def checkProductiveOffersDBImagesIntegrity(self):
-        """ Small helper functions to detect missing images e.g. after manual images folder cleanup. """
-        offersDB = self.getOfferDB()
-        numberOfMissingImages = 0
-        for offerIDStr in offersDB:
-            offer = offersDB[offerIDStr]
-            if not isValidImageFile(offerGetImagePath(offer)):
-                logging.warning(offerIDStr + ": Offer image does not exist: " + offerGetImagePath(offer))
-                numberOfMissingImages += 1
-        if numberOfMissingImages > 0:
-            logging.warning("Total number of missing images: " + str(numberOfMissingImages))
-
-    def findProductIDsOfCoupons_DEPRECATED(self):
-        """ Finds productIDs of products contained in vouchers.
-        In the future this can be used to e.g. find duplicated coupons or reliably compare coupons to other coupons!
-        E.g. "Long Chicken® + Crispy Chicken + große King Pommes + 0,5 L Coca-Cola®" --> Coupon contains products: 1139, 1136, (0,5L)1098, (große)1143
-        """
-        """ 2021-02-06: Not needed anymore as new handling can find the exact product IDs of coupons with no issue at all! """
-        logging.info("Matching coupon products -> ProductIDs")
-        couponDB = self.getCouponDB()
-        productIDsDB = self.couchdb[DATABASES.PRODUCTS]
-        if len(productIDsDB) == 0:
-            """ Don't continue if the required data is not available. """
-            return
-        for uniqueCouponID in couponDB:
-            coupon = Coupon.load(couponDB, uniqueCouponID)
-            fullCouponTitle = coupon.getTitle()
-            """ Check if coupon contains multiple products """
-            if ' + ' in fullCouponTitle:
-                """ Assume that we got multiple products """
-                unsafeProductTitles = fullCouponTitle.split(' + ')
-            else:
-                """ We only got one product """
-                unsafeProductTitles = [fullCouponTitle]
-            foundProductIDsMap = {}
-            foundProductIDsList = []
-            failedUnsafeProductTitles = []
-            for unsafeProductTitle in unsafeProductTitles:
-                """ First correct unsafe title and remove any quantities present """
-                unsafeProductTitleCleaned = unsafeProductTitle.lower().strip()
-                matchObjectDrinksAtBeginning = re.compile('(?i)^(\\d[.,]\\d\\s*L)\\s*(.+)').search(unsafeProductTitleCleaned)
-                matchObjectDrinksAtEnd = re.compile('(?i)(.+)(\\d[.,]\\d\\s*L)$').search(unsafeProductTitleCleaned)
-                matchObjectGenericQuantityAtBeginning = re.compile('(?i)^(\\d{1,2}( x \\d{1,2})?)\\s*(.+)').search(unsafeProductTitleCleaned)
-                matchObjectGenericFriesQuantity = re.compile('(?i)^(kleine|mittlere|große) (.+)').search(unsafeProductTitleCleaned)
-                if matchObjectDrinksAtBeginning:
-                    """ E.g. "0,5 L Coca-Cola" -> "Coca-Cola" """
-                    unsafeProductTitleCleaned = matchObjectDrinksAtBeginning.group(2)
-                    productQuantityValue = matchObjectDrinksAtBeginning.group(1)
-                elif matchObjectDrinksAtEnd:
-                    """ E.g. "King Shake 0,4L" -> "King Shake" """
-                    unsafeProductTitleCleaned = matchObjectDrinksAtEnd.group(1)
-                    productQuantityValue = matchObjectDrinksAtEnd.group(2)
-                elif matchObjectGenericFriesQuantity:
-                    """ E.g. "große KING Pommes" -> "KING Pommes" """
-                    unsafeProductTitleCleaned = matchObjectGenericFriesQuantity.group(2)
-                    productQuantityValue = matchObjectGenericFriesQuantity.group(1)
-                elif matchObjectGenericQuantityAtBeginning:
-                    """ E.g. "2 x 6 chili cheese nuggets" -> "chili cheese nuggets" """
-                    unsafeProductTitleCleaned = matchObjectGenericQuantityAtBeginning.group(3)
-                    productQuantityValue = matchObjectGenericQuantityAtBeginning.group(1)
-                else:
-                    """ unsafeProductTitleCleaned should already be fine (= doesn't contain any quantity value -> productQuantityValue == 1)!
-                     2021-01-14: Yes wrong data type but at this moment we do not store this data correctly anyways so dontcare!
-                     """
-                    productQuantityValue = '1'
-                    pass
-                """ Prevent RegEx failures - remove spaces at beginning and end! """
-                unsafeProductTitleCleaned = unsafeProductTitleCleaned.strip()
-
-                """ Now check if we can find the productID for the current product! """
-                foundProductID = False
-                for productID in productIDsDB:
-                    product = productIDsDB[productID]
-                    if product['name'].lower() == unsafeProductTitleCleaned:
-                        """ Success! We found the corresponding ID for the current product name! """
-                        foundProductIDsMap[product['id']] = {'name': product['name'], 'quantity': productQuantityValue}
-                        foundProductIDsList.append(product['id'])
-                        foundProductID = True
-                        break
-                """ Save failed items for later """
-                if not foundProductID:
-                    failedUnsafeProductTitles.append(unsafeProductTitleCleaned)
-            """ Log failed items """
-            if len(failedUnsafeProductTitles) > 0:
-                for failedUnsafeProductTitle in failedUnsafeProductTitles:
-                    logging.warning('[ProductIDParserFailure] | ' + failedUnsafeProductTitle)
-            elif Coupon.productIDs.name not in coupon:
-                """ Update coupon in DB with new info. Only do this if we safely found all items AND they haven't been added already. """
-                coupon.productIDs = foundProductIDsMap
-                coupon.store(couponDB)
-        logging.info('ProductID parser done')
+            if not hasChanged(latestHistoryVersion, newData):
+                return
+            # Data has changed -> Add new entry with timestamp and new data.
+            historyDict[getCurrentDateIsoFormat()] = newData
+            couponHistoryDoc[HISTORYDB.COUPONS_HISTORY_DOC] = historyDict
+            historyDB.save(couponHistoryDoc)
 
     def couponCsvExport(self):
         """ Exports coupons DB to CSV (all headers). """
@@ -1051,14 +928,6 @@ class BKCrawler:
             return False
 
 
-def getCouponByID(coupons: List[Coupon], couponID: str) -> Union[Coupon, None]:
-    """ Returns first coupon with desired ID in list. """
-    for coupon in coupons:
-        if coupon.uniqueID == couponID:
-            return coupon
-    return None
-
-
 def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
     """ Returns True if a key of newData is not on originalData or a value has changed. """
     if ignoreKeys is None:
@@ -1097,8 +966,8 @@ def getLogSeparatorString() -> str:
 if __name__ == '__main__':
     crawler = BKCrawler()
     crawler.setExportCSVs(False)
-    crawler.setKeepHistoryDB(False)
-    crawler.setKeepSimpleHistoryDB(False)
+    crawler.keepHistoryDB = False
+    crawler.keepSimpleHistoryDB = False
 
     # crawler.setExportCSVs(True)
     # crawler.setCrawlOnlyBotCompatibleCoupons(False)

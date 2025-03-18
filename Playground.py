@@ -1,9 +1,7 @@
 from datetime import datetime
 
 from Helper import getTimezone
-from UtilsCouponsDB import CouponViews
-
-
+from utils.CouponViews import CouponViews
 
 allViews = CouponViews.__dict__
 

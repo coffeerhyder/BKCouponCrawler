@@ -22,11 +22,15 @@ from BotUtils import loadConfig, ImageCache
 from Helper import *
 from Crawler import BKCrawler, UserStats
 
-from UtilsCouponsDB import Coupon, getCouponsSeparatedByType, UserFavoritesInfo, \
-    USER_SETTINGS_ON_OFF, CouponViews, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING, getCouponViewByIndex, CouponTextRepresentationPLUMode
-from filters import CouponFilter
-from models import InfoEntry, ChannelCoupon, User
-from CouponCategory import CouponCategory
+from UtilsCouponsDB import groupCouponsByType, USER_SETTINGS_ON_OFF, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING
+from utils.CouponViews import CouponViews, getCouponViewByIndex
+from utils.UserFavoritesInfo import UserFavoritesInfo
+from models.Coupon import Coupon, CouponTextRepresentationPLUMode
+from utils.Filters import CouponFilter
+from models.User import User
+from models.InfoEntry import InfoEntry
+from models.ChannelCoupon import ChannelCoupon
+from utils.CouponCategory import CouponCategory
 from Helper import BotAllowedCouponTypes, CouponType, TEXT_NOTIFICATION_DISABLE
 from UtilsOffers import offerGetImagePath
 
@@ -106,8 +110,8 @@ class BKBot:
         else:
             self.crawler = BKCrawler(True)
         self.crawler.setExportCSVs(False)
-        self.crawler.setKeepHistoryDB(False)
-        self.crawler.setKeepSimpleHistoryDB(False)
+        self.crawler.keepSimpleHistoryDB = False
+        self.crawler.keepHistoryDB = False
         self.crawler.storeCouponAPIDataAsJson = False
         self.publicChannelName = self.cfg.public_channel_name
         self.botName = self.cfg.bot_name
@@ -1519,7 +1523,7 @@ class BKBot:
     async def sendCouponOverviewWithChannelLinks(self, chat_id: Union[int, str], coupons: dict, useLongCouponTitles: bool, channelDB: Database, infoDB: Union[None, Database],
                                                  infoDBDoc: Union[None, InfoEntry]):
         """ Sends all given coupons to given chat_id separated by source and split into multiple messages as needed. """
-        couponsSeparatedByType = getCouponsSeparatedByType(coupons)
+        couponsSeparatedByType = groupCouponsByType(coupons)
         if infoDBDoc is not None:
             # Legacy code
             # Mark old coupon overview messageIDs for deletion
