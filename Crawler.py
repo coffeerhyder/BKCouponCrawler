@@ -15,7 +15,7 @@ from BotUtils import getImageBasePath, loadConfig
 from Helper import *
 from Helper import getPathImagesOffers, getPathImagesProducts, \
     isValidImageFile, CouponType, Paths
-from UtilsOffers import offerIsValid
+from utils.UtilsOffers import offerIsValid
 from UtilsCouponsDB import getCouponTitleMapping, removeDuplicatedCoupons, sortCoupons
 from models.Coupon import Coupon, CouponTextRepresentationPLUMode
 from utils.Filters import CouponFilter

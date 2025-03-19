@@ -32,7 +32,7 @@ from models.InfoEntry import InfoEntry
 from models.ChannelCoupon import ChannelCoupon
 from utils.CouponCategory import CouponCategory
 from Helper import BotAllowedCouponTypes, CouponType, TEXT_NOTIFICATION_DISABLE
-from UtilsOffers import offerGetImagePath
+from utils.UtilsOffers import offerGetImagePath
 
 MAX_CACHE_AGE_SECONDS = 7 * 24 * 60 * 60
 
