@@ -19,13 +19,12 @@ class UserFavoritesInfo:
     def getUnavailableFavoritesText(self) -> Union[str, None]:
         if len(self.couponsUnavailable) == 0:
             return None
-        else:
-            unavailableFavoritesText = ''
-            for coupon in self.couponsUnavailable:
-                if len(unavailableFavoritesText) > 0:
-                    unavailableFavoritesText += '\n'
-                unavailableFavoritesText += coupon.id + ' | ' + coupon.getTitleShortened(includeVeggieSymbol=False)
-                priceInfoText = coupon.getPriceInfoText()
-                if priceInfoText is not None:
-                    unavailableFavoritesText += ' | ' + priceInfoText
-            return unavailableFavoritesText
+        unavailableFavoritesText = ''
+        for coupon in self.couponsUnavailable:
+            if len(unavailableFavoritesText) > 0:
+                unavailableFavoritesText += '\n'
+            unavailableFavoritesText += coupon.id + ' | ' + coupon.getTitleShortened(includeVeggieSymbol=False)
+            priceInfoText = coupon.getPriceInfoText()
+            if priceInfoText is not None:
+                unavailableFavoritesText += ' | ' + priceInfoText
+        return unavailableFavoritesText

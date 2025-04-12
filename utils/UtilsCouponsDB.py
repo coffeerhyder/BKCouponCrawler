@@ -6,7 +6,7 @@ from models.Coupon import Coupon
 from utils.CouponViews import CouponSortModes, getSortModeBySortCode, getAllCouponViews, CouponSortMode
 
 MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION = 6 * 30 * 24 * 60 * 60
-# X time before account would get deleted, we can inform the user X time before about upcoming auto account deletion
+# X days before account would get deleted, we can inform the user X time before about upcoming auto account deletion
 MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER = MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION - 9 * 24 * 60 * 60
 MAX_HOURS_ACTIVITY_TRACKING = 48
 MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION = 3
@@ -96,11 +96,11 @@ USER_SETTINGS_ON_OFF = {
         "description": f"Kategorie 'App Coupons versteckte' zeigen",
         "default": True
     },
-    # "displayCouponCategoryMeatWithoutPlantBased": {
-    #     "category": SettingCategories.MAIN_MENU,
-    #     "description": f"Kategorie Coupons ohne PlantBased ({SYMBOLS.MEAT}) zeigen",
-    #     "default": False
-    # },
+    "displayCouponCategoryMeatOnly": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": f"Kategorie Coupons mit Fleisch ({SYMBOLS.MEAT}) zeigen",
+        "default": True
+    },
     "displayCouponCategoryVeggie": {
         "category": SettingCategories.MAIN_MENU,
         "description": f"Kategorie Veggie Coupons ({SYMBOLS.BROCCOLI}) zeigen",

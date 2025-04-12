@@ -65,16 +65,6 @@ class CouponCategory:
             self.namePlural = "Online only"
             self.namePluralWithoutSymbol = "Online Only"
             self.description = "Coupons, die mit hoher Wahrscheinlichkeit nur online oder am Terminal bestellbar sind"
-        elif self.mainCouponType == CouponType.ONLINE_ONLY_STORE_SPECIFIC:
-            self.nameSingular = "Online only (store specific)"
-            self.namePlural = "Online only (store specific)"
-            self.namePluralWithoutSymbol = "Online only (store specific)"
-            self.description = "Coupons, die nur in bestimmten# Filialen gültig sind"
-        elif self.mainCouponType == CouponType.SPECIAL:
-            self.nameSingular = "Special Coupon"
-            self.namePlural = SYMBOLS.GIFT + "Special Coupons"
-            self.namePluralWithoutSymbol = "Special Coupons"
-            self.description = "Diese Coupons sind evtl. nicht in allen Filialen einlösbar!"
         elif self.mainCouponType == CouponType.PAYBACK:
             self.nameSingular = "Payback Coupon"
             self.namePlural = SYMBOLS.PARK + "ayback Coupons"

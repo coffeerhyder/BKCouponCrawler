@@ -7,7 +7,7 @@ from barcode.writer import ImageWriter
 from couchdb.mapping import Document, DictField, Mapping, BooleanField, IntegerField, TextField, DateTimeField, ListField, FloatField
 
 from Helper import getCurrentDate
-from UtilsCouponsDB import MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION, USER_SETTINGS_ON_OFF, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING, MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION, \
+from utils.UtilsCouponsDB import MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION, USER_SETTINGS_ON_OFF, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING, MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION, \
     MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER, MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING
 from utils.CouponViews import CouponViews, CouponView, getNextSortMode, getSortModeBySortCode, CouponSortMode
 from utils.UserFavoritesInfo import UserFavoritesInfo
@@ -19,6 +19,7 @@ class User(Document):
         Mapping.build(
             displayCouponCategoryAllCouponsLongListWithLongTitles=BooleanField(default=False),
             displayCouponCategoryAppCouponsHidden=BooleanField(default=True),
+            displayCouponCategoryMeatOnly=BooleanField(default=True),
             displayCouponCategoryVeggie=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
             displayCouponSortButton=BooleanField(default=True),

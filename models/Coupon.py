@@ -9,7 +9,7 @@ from couchdb.mapping import Document, TextField, IntegerField, FloatField, ListF
 
 from BotUtils import getImageBasePath
 from Helper import shortenProductNames, SYMBOLS, getCurrentDate, couponTitleContainsFriesAndDrink, couponTitleContainsChiliCheese, couponTitleContainsPlantBasedFood, \
-    couponTitleContainsVeggieFood, CouponType, getTimezone, formatDateGerman, formatPrice, getFilenameFromURL
+    productTitleContainsVeggieFood, CouponType, getTimezone, formatDateGerman, formatPrice, getFilenameFromURL
 
 COUPON_IS_NEW_FOR_SECONDS = 24 * 60 * 60
 
@@ -44,8 +44,6 @@ class Coupon(Document):
     isNewUntilDate = TextField()  # Date until which this coupon shall be treated as new. Use this as an override of default handling.
     isHidden = BooleanField(default=False)  # Typically only available for upsell App coupons
     description = TextField()
-    # TODO: Make use of this once it is possible for users to add coupons to DB via API
-    addedVia = IntegerField()
     tags = ListField(TextField())
     webviewID = TextField()
     webviewURL = TextField()
@@ -162,32 +160,29 @@ class Coupon(Document):
             return False
 
     def isVeggie(self) -> bool:
-        if self.isContainsMeat():
-            """ 
-            Check if coupon contains meat. Some of them are wrongly tagged so ket's fix that by also looking into the product titles.
-             """
-            return False
-        elif self.isPlantBased():
+        if self.isPlantBased():
             return True
-        elif couponTitleContainsVeggieFood(self.getTitle()):
-            # No result? Fallback to other, more unsafe methods.
-            return True
-        # Last resort: Check if tags contain any useful information.
-        if self.tags is not None:
+        couponTitle = self.getTitle()
+        products = couponTitle.split("+")
+        # Check if tags contain any useful information.
+        if self.tags:
             for tag in self.tags:
                 tag = tag.lower()
                 if tag == 'sweetkings':
                     return True
-        titlelower = self.title.lower()
-        if 'sundae' in titlelower:
-            return True
-        # If in doubt, the product is not veggie
-        return False
+        for product in products:
+            if not productTitleContainsVeggieFood(product):
+                # Coupon contains at least one non veggie product -> Not a veggie coupon
+                return False
+        # All products in this coupons are veggie -> It is a veggie coupon
+        return True
 
     def isContainsMeat(self) -> bool:
         """ Returns true if this coupon contains at least one article with meat. """
         """ First check for plant based stuff in title because BK sometimes has wrong tags (e.g. tag contains "chicken" when article is veggie lol)... """
         if self.isPlantBased():
+            return False
+        elif self.isVeggie():
             return False
         elif self.tags is not None:
             for tag in self.tags:
@@ -202,7 +197,14 @@ class Coupon(Document):
             return True
         elif 'beef' in titleLower:
             return True
+        elif 'nugget' in titleLower and 'chili' not in titleLower:
+            return True
+        elif 'whopper' in titleLower:
+            return True
+        elif 'chili cheese burger' in titleLower:
+            return True
         else:
+            # If in doubt, it's not meat
             return False
 
     def getPrice(self) -> Union[float, None]:

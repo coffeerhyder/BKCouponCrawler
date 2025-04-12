@@ -1,12 +1,12 @@
 import os
 
-from Helper import getFilenameFromURL, couponOrOfferGetImageURL, getPathImagesOffers, getDatetimeFromString, getCurrentDate
+from Helper import getFilenameFromURL, couponGetImageURL, getPathImagesOffers, getDatetimeFromString, getCurrentDate
 
 
 def offerGetImagePath(offer) -> str:
     """ Returns path to image of given offer. """
     uniqueOfferIDStr = str(offer['id'])
-    offerImageFilename = uniqueOfferIDStr + "_" + getFilenameFromURL(couponOrOfferGetImageURL(offer))
+    offerImageFilename = uniqueOfferIDStr + "_" + getFilenameFromURL(couponGetImageURL(offer))
     return getPathImagesOffers() + "/" + offerImageFilename
 
 

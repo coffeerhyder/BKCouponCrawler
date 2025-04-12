@@ -91,9 +91,9 @@ class CouponSortModes:
 
 class CouponViews:
     ALL = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), isEatable=True), title="Alle Coupons")
-    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=False, isEatable=True),
+    ALL_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=False),
                                   title="Alle Coupons ohne Menü")
-    ALL_WITH_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=True, isEatable=True), title="Alle Coupons mit Menü")
+    ALL_WITH_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), containsFriesAndCoke=True), title="Alle Coupons mit Menü")
     CATEGORY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), removeDuplicates=False))
     CATEGORY_WITHOUT_MENU = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.MENU_PRICE.getSortCode(), containsFriesAndCoke=False, removeDuplicates=False))
     HIDDEN_APP_COUPONS_ONLY = CouponView(
@@ -101,8 +101,8 @@ class CouponViews:
         title="App Coupons versteckte")
     VEGGIE = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isVeggie=True, isEatable=True), includeVeggieSymbol=False,
                         title=f"{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}")
-    MEAT_WITHOUT_PLANT_BASED = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isPlantBased=False, isEatable=True),
-                                          title="Fleisch ohne Plant Based Coupons")
+    MEAT_ONLY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isMeat=True),
+                           title="Fleischige Coupons")
     # Dummy item basically only used for holding default sortCode for users' favorites
     FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), removeDuplicates=False), highlightFavorites=False, allowModifyFilter=False,
                            title=f"{SYMBOLS.STAR}Favoriten{SYMBOLS.STAR}")
