@@ -134,13 +134,11 @@ optional arguments:
 |8 | PAYBACK | Payback Papiercoupons, die manuell über die ``config_extra_coupons.json`` eingefügt werden können.|
 
 # TODOs
-* Bug fixen: "Du hast deinen Account X Tage nicht benutzt" Benachrichtigung wird 2x geschickt
 * Crawler jede Stunde laufen lassen und Channel aktualisieren, sobald es neue Coupons gibt (+ erzwungenermaßen 1x am Tag)
 * Zeitberechnungen refactoring: timedelta überall verwenden wo möglich
 * MessageHandler für nicht unterstützte Kommandos/Text einbauen
 * Handling mit Datumsangaben prüfen/verbessern
 * couchdb-dump updaten, sodass es per Parameter beim restore die DB wahlweise vorher löschen- und neu erstellen oder Items überschreiben kann
-* resumechannelupdate verbessern
 * Channelupdate "fortsetzen" nach Abbruch ermöglichen --> Autom. Neuversuch bei Netzwerkfehlern o.ä.
 
 # Daten für den BotFather (Telegram Bot Konfiguration)

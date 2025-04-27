@@ -130,7 +130,6 @@ async def collectNewCouponsNotifications(bkbot) -> None:
 
 
 async def collectUserDeleteNotifications(bkbot) -> None:
-    userDB = bkbot.db.get_user_db()
     numberOfCollectedNotifications = 0
     users = bkbot.db.get_users()
     for user in users:
@@ -175,13 +174,13 @@ async def collectUserDeleteNotifications(bkbot) -> None:
         text += '\nÖffne das Hauptmenü einmalig mit /start, um dem Bot zu zeigen, dass du noch lebst.'
         text += f'\nWahlweise kannst du deinen Account mit /{Commands.DELETE_ACCOUNT} selbst löschen.'
 
-        await bkbot.sendMessageWithUserBlockedHandling(user=user, userDB=userDB, text=text, parse_mode='HTML', disable_web_page_preview=True)
+        await bkbot.sendMessageWithUserBlockedHandling(user=user, text=text, parse_mode='HTML', disable_web_page_preview=True, allowUpdateDB=False)
 
         if text not in user.pendingNotifications:
             notificationlist = user.pendingNotifications + [text]
             user.pendingNotifications = notificationlist
 
-        user.store(db=userDB)
+        bkbot.db.save_user(user)
         numberOfCollectedNotifications += 1
 
     logging.info('Number of users who will soon be informed about account deletion: ' + str(numberOfCollectedNotifications))
@@ -325,34 +324,37 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
                           InputMediaPhoto(media=bkbot.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
                           ]
             logging.debug("Sending new coupon messages 1/2: Coupon photos")
-            chatMessages = await asyncio.create_task(bkbot.sendMediaGroup(chat_id=bkbot.getPublicChannelChatID(), media=photoAlbum, disable_notification=True))
+            chatMessages = await bkbot.sendMediaGroup(chat_id=bkbot.getPublicChannelChatID(), media=photoAlbum, disable_notification=True)
 
             msgImage = chatMessages[0]
             msgImageQR = chatMessages[1]
             # Update bot cache
             bkbot.couponImageCache[coupon.id] = ImageCache(fileID=msgImage.photo[0].file_id)
             bkbot.couponImageQRCache[coupon.id] = ImageCache(fileID=msgImageQR.photo[0].file_id)
-            # Update DB
-            if coupon.id not in channelDB:
-                channelDB[coupon.id] = {}
-            channelCoupon = ChannelCoupon.load(channelDB, coupon.id)
+
+            # Load item from DB if possible
+            channelCoupon = bkbot.db.get_channel_coupon(coupon.id)
+            if channelCoupon is None:
+                # Create new item
+                channelCoupon = ChannelCoupon(id=coupon.id)
+
             channelCoupon.uniqueIdentifier = coupon.getUniqueIdentifier()
             channelCoupon.channelMessageID_image = msgImage.message_id
             channelCoupon.channelMessageID_qr = msgImageQR.message_id
             channelCoupon.channelMessageID_image_and_qr_date_posted = datetime.now()
 
             # Update DB
-            channelCoupon.store(channelDB)
+            bkbot.db.save_channel_coupon(channelCoupon)
 
             # Send coupon text information
             logging.debug("Sending new coupon messages 2/2: Coupon text")
-            couponTextMsg = await asyncio.create_task(bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=couponText, parse_mode='HTML', disable_notification=True,
-                                                                        disable_web_page_preview=True))
+            couponTextMsg = await bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=couponText, parse_mode='HTML', disable_notification=True,
+                                                                        disable_web_page_preview=True)
             channelCoupon.channelMessageID_text = couponTextMsg.message_id
             channelCoupon.channelMessageID_text_date_posted = datetime.now()
 
             # Update DB
-            channelCoupon.store(channelDB)
+            bkbot.db.save_channel_coupon(channelCoupon)
 
             # Update infoDoc
             if coupon.id in infoDoc.coupon_ids_to_send:
@@ -397,12 +399,12 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText += "\nStören dich die Benachrichtigungen?"
     infoText += "\nErstelle eine Verknüpfung: Drücke oben auf den Namen des Chats -> Rechts auf die drei Punkte -> Verknüpfung hinzufügen (funktioniert auch mit Bots)"
     infoText += "\nNun kannst du den Channel verlassen und ihn jederzeit wie eine App öffnen, ohne erneut beizutreten!"
-    infoText += "\n... oder verwende <a href=\"https://t.me/" + bkbot.botName + "\">den Bot</a>."
+    infoText += "\n... oder verwende <a href=\"https://t.me/" + bkbot.cfg.bot_name + "\">den Bot</a>."
     infoText += "\n<b>Der Bot kann außerdem deine Favoriten speichern, Coupons filtern und einiges mehr ;)</b>"
     infoText += "\nMöchtest du diesen Channel mit jemandem teilen, der kein Telegram verwendet?"
     infoText += "\nNimm <a href=\"https://t.me/s/" + bkbot.getPublicChannelName() + "\">diesen Link</a> oder <a href=\"" + URLs.ELEMENT + "\">Element per Matrix Bridge</a>."
     infoText += f"\nMehr Infos siehe <a href=\"{bkbot.getPublicChannelFAQLink()}\">FAQ</a>."
-    infoText += "\n<b>Guten Hunger!</b>"
+    infoText += "\n<b>Guten Wallraff!</b>"
     infoText += "\n" + getBotImpressum()
     """ 
     Did we only delete coupons and/or update existing ones while there were no new coupons coming in AND we were not forced to delete- and re-send all items?
@@ -412,8 +414,7 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     if infoDoc.informationMessageID is not None:
         infoDoc.addMessageIDToDelete(infoDoc.informationMessageID)
     # Send channel update overview message
-    newMsg = await asyncio.create_task(
-        bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True))
+    newMsg = await bkbot.sendMessage(chat_id=bkbot.getPublicChannelChatID(), text=infoText, parse_mode="HTML", disable_web_page_preview=True, disable_notification=True)
     # Store messageID of channel update overview message
     infoDoc.informationMessageID = newMsg.message_id
     infoDoc.dateLastSuccessfulChannelUpdate = datetime.now()
@@ -427,26 +428,6 @@ async def cleanupChannel(bkbot):
     infoDoc = bkbot.crawler.db.get_info_entry()
     await deleteLeftoverMessageIDsToDelete(bkbot, infoDoc)
     logging.info(f"Channel cleanup done | Total time needed: {datetime.now() - dateStart}")
-
-
-async def deleteLeftoverMessageIDsToDelete(bkbot, infoDoc) -> int:
-    """ Deletes all channel messages which were previously flagged for deletion.
-     @:returns Number of deleted messages
-      """
-    numberOfMsgsToDelete = len(infoDoc.messageIDsToDelete)
-    logging.info(f"Deleting {numberOfMsgsToDelete} old messages...")
-    if numberOfMsgsToDelete == 0:
-        # Do nothing
-        return 0
-    index = 0
-    for messageID in infoDoc.messageIDsToDelete:
-        logging.info(f"Deleting messageID {index + 1}/{numberOfMsgsToDelete} | {messageID}")
-        await asyncio.create_task(bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID))
-        index += 1
-    # Update DB so we won't try to delete the same messages again next time
-    infoDoc.messageIDsToDelete = []
-    bkbot.db.save_info_entry(infoDoc)
-    return numberOfMsgsToDelete
 
 
 async def nukeChannel(bkbot):
@@ -463,27 +444,24 @@ async def nukeChannel(bkbot):
             logging.info(f"Deleting channel coupon {position}/{len(channelCoupons)}")
             messageIDs = channelCoupon.getMessageIDs()
             for messageID in messageIDs:
-                await asyncio.create_task(bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID))
+                await bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID)
             bkbot.db.delete_channel_coupon(channelCoupon)
             position += 1
     # Delete coupon overview messages
     updateInfoDoc = False
-    hasLoggedDeletionOfCouponOverviewMessageIDs = False
-    for couponType in CouponType.all_types():
-        couponOverviewMessageIDs = infoDoc.getMessageIDsForCouponCategory(couponType)
-        if len(couponOverviewMessageIDs) == 0:
+    numberofDeletedCouponOverviewMessageIDs = 0
+    for messageIDs in infoDoc.couponTypeOverviewMessageIDs.values():
+        if len(messageIDs) == 0:
             continue
-        if not hasLoggedDeletionOfCouponOverviewMessageIDs:
-            # Only print this logger once
-            logging.info("Deleting information messages...")
-            hasLoggedDeletionOfCouponOverviewMessageIDs = True
-        await asyncio.create_task(bkbot.deleteMessages(chat_id=bkbot.getPublicChannelChatID(), messageIDs=couponOverviewMessageIDs))
-        infoDoc.deleteCouponCategoryMessageIDs(couponType)
+        await bkbot.deleteMessages(chat_id=bkbot.getPublicChannelChatID(), messageIDs=messageIDs)
         updateInfoDoc = True
+        numberofDeletedCouponOverviewMessageIDs += len(messageIDs)
+    infoDoc.couponTypeOverviewMessageIDs.clear()
+    logging.info(f"Deleted {numberofDeletedCouponOverviewMessageIDs} information messages...")
     # Delete coupon information message
     if infoDoc.informationMessageID is not None:
         logging.info(f'Deleting channel overview message with ID {infoDoc.informationMessageID}')
-        await asyncio.create_task(bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=infoDoc.informationMessageID))
+        await bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=infoDoc.informationMessageID)
         infoDoc.informationMessageID = None
         updateInfoDoc = True
     if updateInfoDoc:
@@ -491,4 +469,20 @@ async def nukeChannel(bkbot):
         bkbot.db.save_info_entry(infoDoc)
     await deleteLeftoverMessageIDsToDelete(bkbot, infoDoc)
     logging.info("Nuke channel DONE! --> Total time needed: " + getFormattedPassedTime(timestampStart))
+
+
+async def deleteLeftoverMessageIDsToDelete(bkbot, infoDoc) -> int:
+    """ Deletes all channel messages which were previously flagged for deletion.
+     @:returns Number of deleted messages
+      """
+    numberOfMsgsToDelete = len(infoDoc.messageIDsToDelete)
+    logging.info(f"Deleting {numberOfMsgsToDelete} old messages...")
+    if numberOfMsgsToDelete == 0:
+        # Do nothing
+        return 0
+    await bkbot.deleteMessages(chat_id=bkbot.getPublicChannelChatID(), messageIDs=infoDoc.messageIDsToDelete)
+    # Update DB
+    infoDoc.messageIDsToDelete = []
+    bkbot.db.save_info_entry(infoDoc)
+    return numberOfMsgsToDelete
 

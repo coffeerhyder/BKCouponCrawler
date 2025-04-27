@@ -2,6 +2,8 @@ from typing import List, Union
 
 from couchdb.mapping import Document, DateTimeField, TextField, DictField, ListField, IntegerField, BooleanField
 
+from Helper import CouponType
+
 
 class InfoEntry(Document):
     dateLastSuccessfulChannelUpdate = DateTimeField()
@@ -27,11 +29,11 @@ class InfoEntry(Document):
                 containsAtLeastOneNewID = True
         return containsAtLeastOneNewID
 
-    def addCouponCategoryMessageID(self, couponType: int, messageID: int):
-        self.couponTypeOverviewMessageIDs.setdefault(couponType, []).append(messageID)
+    def addCouponCategoryMessageID(self, couponType: CouponType, messageID: int):
+        self.couponTypeOverviewMessageIDs.setdefault(int(couponType), []).append(messageID)
 
-    def getMessageIDsForCouponCategory(self, couponType: Union[int, str]) -> List[int]:
-        return self.couponTypeOverviewMessageIDs.get(str(couponType), [])
+    def getMessageIDsForCouponCategory(self, couponType: CouponType) -> List[int]:
+        return self.couponTypeOverviewMessageIDs.get(str(int(couponType)), [])
 
     def getAllCouponCategoryMessageIDs(self) -> List[int]:
         messageIDs = []
@@ -39,9 +41,12 @@ class InfoEntry(Document):
             messageIDs += messageIDsTemp
         return messageIDs
 
-    def deleteCouponCategoryMessageIDs(self, couponType: Union[int, str]):
-        if str(couponType) in self.couponTypeOverviewMessageIDs:
+    def deleteCouponCategoryMessageIDs(self, couponType: Union[int, str]) -> bool:
+        if str(couponType) not in self.couponTypeOverviewMessageIDs:
+            return False
+        else:
             del self.couponTypeOverviewMessageIDs[str(couponType)]
+            return True
 
     def deleteAllCouponCategoryMessageIDs(self):
         self.couponTypeOverviewMessageIDs = {}

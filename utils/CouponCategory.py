@@ -23,6 +23,8 @@ class CouponCategory:
         self.numberofCouponsNew = 0
         self.numberofCouponsWithFriesAndDrink = 0
         self.numberofVeggieCoupons = 0
+        self.numberofPlantBasedCoupons = 0
+        self.numberofMeatCoupons = 0
         self.numberofChiliCheeseCoupons = 0
         self.totalPrice = 0
         if isinstance(coupons, dict):
@@ -98,11 +100,18 @@ class CouponCategory:
             return False
 
     def isVeggie(self):
-        """ Returns True if all coupons in this categorie are veggie. """
+        """ Returns True if all coupons in this category are veggie. """
         if len(self.couponTypes) == 1 and self.mainCouponType == CouponType.PAYBACK:
             # Only Payback coupons in this category -> Technically veggie but logically not ;)
             return False
         elif self.numberofCouponsTotal > 0 and self.numberofCouponsTotal == self.numberofVeggieCoupons:
+            return True
+        else:
+            return False
+
+    def isMeat(self):
+        """ Returns True if all coupons in this category are veggie. """
+        if self.numberofCouponsTotal > 0 and self.numberofCouponsTotal == self.numberofMeatCoupons:
             return True
         else:
             return False
@@ -212,8 +221,12 @@ class CouponCategory:
                 self.numberofCouponsNew += 1
             if coupon.isContainsFriesAndDrink():
                 self.numberofCouponsWithFriesAndDrink += 1
+            if coupon.isPlantBased():
+                self.numberofPlantBasedCoupons += 1
             if coupon.isVeggie():
                 self.numberofVeggieCoupons += 1
+            elif coupon.isContainsMeat():
+                self.numberofMeatCoupons += 1
             if coupon.isContainsChiliCheese():
                 self.numberofChiliCheeseCoupons += 1
             # Update expire-date info

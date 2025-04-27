@@ -128,10 +128,9 @@ class User(Document):
     def addFavoriteCoupon(self, coupon: Coupon):
         self.favoriteCoupons[coupon.id] = coupon._data
 
-    def deleteFavoriteCoupon(self, coupon: Coupon):
-        self.deleteFavoriteCouponID(coupon.id)
-
-    def deleteFavoriteCouponID(self, couponID: str):
+    def deleteFavoriteCouponID(self, couponID: Union[str, Coupon]):
+        if isinstance(couponID, Coupon):
+            couponID = couponID.id
         del self.favoriteCoupons[couponID]
 
     def isAllowSendFavoritesNotification(self):

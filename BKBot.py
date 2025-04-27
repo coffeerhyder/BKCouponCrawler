@@ -1,6 +1,8 @@
 import argparse
 import asyncio
+import base64
 import math
+import random
 import traceback
 from copy import deepcopy
 from typing import Tuple, List
@@ -113,7 +115,6 @@ class BKBot:
         self.crawler.exportCSVs = False
         self.crawler.storeCouponAPIDataAsJson = False
         self.publicChannelName = self.cfg.public_channel_name
-        self.botName = self.cfg.bot_name
         self.application = Application.builder().token(self.cfg.bot_token).read_timeout(30).write_timeout(30).build()
         self.initHandlers()
         self.application.add_error_handler(self.botErrorCallback)
@@ -250,7 +251,7 @@ class BKBot:
             raise BetterBotException(SYMBOLS.DENY + ' <b>Dir fehlen die Rechte zum Ausführen dieser Aktion!</b>')
 
     def isAdmin(self, user: User) -> bool:
-        if user is not None and self.cfg.admin_ids is not None and user.id in self.cfg.admin_ids:
+        if user and self.cfg.admin_ids and user.id in self.cfg.admin_ids:
             return True
         else:
             return False
@@ -281,8 +282,7 @@ class BKBot:
         """ Returns public channel chatID like "@ChannelName". """
         if self.getPublicChannelName() is None:
             return None
-        else:
-            return '@' + self.getPublicChannelName()
+        return '@' + self.getPublicChannelName()
 
     def getPublicChannelHyperlinkWithCustomizedText(self, linkText: str) -> str:
         """ Returns: e.g. <a href="https://t.me/channelName">linkText</a>
@@ -292,8 +292,7 @@ class BKBot:
     def getPublicChannelFAQLink(self) -> Union[str, None]:
         if self.publicChannelName is None:
             return None
-        else:
-            return f"https://t.me/{self.publicChannelName}/{self.cfg.public_channel_post_id_faq}"
+        return f"https://t.me/{self.publicChannelName}/{self.cfg.public_channel_post_id_faq}"
 
     async def botDisplayMaintenanceMode(self, update: Update, context: CallbackContext):
         text = SYMBOLS.DENY + '<b>Wartungsmodus!' + SYMBOLS.DENY + '</b>'
@@ -450,7 +449,7 @@ class BKBot:
         currentDatetime = getCurrentDate()
         if self.statsCached is None or currentDatetime.timestamp() - self.statsCachedTimestamp > 30 * 60:
             # Init/Refresh cache
-            loadingMessage = await asyncio.create_task(self.editOrSendMessage(update, text='Statistiken werden geladen...'))
+            loadingMessage = await self.editOrSendMessage(update, text='Statistiken werden geladen...')
             self.statsCached = self.db.get_user_stats()
             self.statsCachedTimestamp = currentDatetime.timestamp()
         couponDB = self.getFilteredCouponsAsList(couponFilter=CouponFilter())
@@ -599,7 +598,7 @@ class BKBot:
                 else:
                     # Add dummy button for a consistent button layout
                     navigationButtons.append(InlineKeyboardButton(SYMBOLS.GHOST, callback_data="DummyButtonPrevPage"))
-                navigationButtons.append(InlineKeyboardButton("Seite " + str(currentPage) + "/" + str(paginationMax), callback_data="DummyButtonMiddle"))
+                navigationButtons.append(InlineKeyboardButton(f"Seite {currentPage}/{paginationMax}", callback_data="DummyButtonMiddle"))
                 if currentPage < paginationMax:
                     # Add button to go to next page
                     nextPage = currentPage + 1
@@ -625,7 +624,7 @@ class BKBot:
             buttons.append([InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)])
             reply_markup = InlineKeyboardMarkup(buttons)
             try:
-                await self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML')
+                await self.editOrSendMessage(update, text=menuText, reply_markup=reply_markup, parse_mode='HTML', disable_web_page_preview=True)
             finally:
                 if saveUserToDB:
                     # User document has changed -> Update DB
@@ -641,26 +640,33 @@ class BKBot:
             coupons = self.db.get_filtered_coupons_as_dict(coupon_filter=CouponViews.FAVORITES.getFilter())
         userFavoritesInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, returnSortedCoupons=sortCoupons)
         if len(userFavoritesInfo.couponsAvailable) == 0:
-            errorMessage = '<b>' + SYMBOLS.WARNING + 'Derzeit ist keiner deiner ' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar:</b>'
-            errorMessage += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
+            errorMessage = f'<b>{SYMBOLS.WARNING}Derzeit ist keiner deiner {len(user.favoriteCoupons)} Favoriten verfügbar:</b>'
+            errorMessage += f'\n{userFavoritesInfo.getUnavailableFavoritesText()}'
             if user.isAllowSendFavoritesNotification():
-                errorMessage += '\n' + SYMBOLS.CONFIRM + 'Du wirst benachrichtigt, sobald abgelaufene Favoriten wieder verfügbar sind.'
+                errorMessage += f'\n{SYMBOLS.CONFIRM}Du wirst benachrichtigt, sobald abgelaufene Favoriten wieder verfügbar sind.'
             raise BetterBotException(errorMessage, InlineKeyboardMarkup([[InlineKeyboardButton(SYMBOLS.BACK, callback_data=CallbackVars.MENU_MAIN)]]))
 
         menuText = SYMBOLS.STAR
         if len(userFavoritesInfo.couponsUnavailable) == 0:
-            menuText += str(len(userFavoritesInfo.couponsAvailable)) + ' Favoriten verfügbar' + SYMBOLS.STAR
+            menuText += f'{len(userFavoritesInfo.couponsAvailable)} Favoriten verfügbar{SYMBOLS.STAR}'
         else:
-            menuText += str(len(userFavoritesInfo.couponsAvailable)) + '/' + str(len(user.favoriteCoupons)) + ' Favoriten verfügbar' + SYMBOLS.STAR
+            menuText += f'{len(userFavoritesInfo.couponsAvailable)}/{len(user.favoriteCoupons)} Favoriten verfügbar{SYMBOLS.STAR}'
         couponCategory = CouponCategory(coupons=userFavoritesInfo.couponsAvailable)
-        menuText += '\n' + couponCategory.getExpireDateInfoText()
+        menuText += f'\n{couponCategory.getExpireDateInfoText()}'
         priceInfo = couponCategory.getPriceInfoText()
         if priceInfo is not None:
-            menuText += "\n" + priceInfo
+            menuText += f"\n{priceInfo}"
+
+        if couponCategory.isMeat() or (couponCategory.numberofMeatCoupons >= 2 and couponCategory.numberofPlantBasedCoupons == 0):
+            urls = ["aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj1VSllzR3czTFBaTQ==", "aHR0cHM6Ly95b3V0dS5iZS92a1E1QjNfcFRxdz9zaT01c2U1U3lSN2NkdzhvWW9wJnQ9MTcz", "aHR0cHM6Ly95b3V0dS5iZS85YW9XcVlXc3JGYz9zaT1vSXNTcXF1YXpEcUdUel9fJnQ9NDk4", "aHR0cHM6Ly95b3V0dS5iZS85N2NLRC1KWGVDUT9zaT03SjlSRWJrTUlPMXBTY2JjJnQ9NjMy"]
+            texts = ["SHV1dXV1aG4=", "RVNTVCBNRUhSIEZMRUlTQ0ghISE="]
+            url = base64.b64decode(random.choice(urls)).decode('utf-8')
+            text = base64.b64decode(random.choice(texts)).decode('utf-8')
+            menuText += f'\n<a href=\"{url}\">{text}</a>'
 
         if len(userFavoritesInfo.couponsUnavailable) > 0:
-            menuText += '\n' + SYMBOLS.WARNING + str(len(userFavoritesInfo.couponsUnavailable)) + ' deiner Favoriten sind abgelaufen:'
-            menuText += '\n' + userFavoritesInfo.getUnavailableFavoritesText()
+            menuText += f'\n{SYMBOLS.WARNING}{len(userFavoritesInfo.couponsUnavailable)} deiner Favoriten sind abgelaufen:'
+            menuText += f'\n{userFavoritesInfo.getUnavailableFavoritesText()}'
             if user.isAllowSendFavoritesNotification():
                 menuText += f"\n{SYMBOLS.CONFIRM}Du wirst benachrichtigt, sobald abgelaufene Favoriten wieder verfügbar sind."
             if not user.settings.autoDeleteExpiredFavorites:
@@ -978,7 +984,7 @@ class BKBot:
             # We need to send two images -> Send as album
             photoCoupon = InputMediaPhoto(media=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML')
             photoQR = InputMediaPhoto(media=self.getCouponImageQR(coupon), caption=couponText, parse_mode='HTML')
-            chatMessages = await asyncio.create_task(self.sendMediaGroup(chat_id=chat_id, media=[photoCoupon, photoQR]))
+            chatMessages = await self.sendMediaGroup(chat_id=chat_id, media=[photoCoupon, photoQR])
             msgCoupon = chatMessages[0]
             msgQR = chatMessages[1]
             # Add to cache if not already present
@@ -987,8 +993,8 @@ class BKBot:
                                    disable_web_page_preview=True)
         else:
             # Send single image
-            msgCoupon = await asyncio.create_task(self.sendPhoto(chat_id=chat_id, photo=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML',
-                                                                 reply_markup=replyMarkupWithoutBackButton))
+            msgCoupon = await self.sendPhoto(chat_id=chat_id, photo=self.getCouponImage(coupon), caption=couponText, parse_mode='HTML',
+                                             reply_markup=replyMarkupWithoutBackButton)
         # Add to cache if not already present
         self.couponImageCache.setdefault(coupon.id, ImageCache(fileID=msgCoupon.photo[0].file_id))
         return CallbackVars.COUPON_LOOSE_WITH_FAVORITE_SETTING
@@ -1489,7 +1495,7 @@ class BKBot:
             # Mark old coupon overview messageIDs for deletion
             oldCategoryMsgIDs = info_entry.getAllCouponCategoryMessageIDs()
             if oldCategoryMsgIDs:
-                logging.info("Saving coupon category messageIDs for deletion: " + str(oldCategoryMsgIDs))
+                logging.info(f"Saving coupon category messageIDs for deletion: {oldCategoryMsgIDs}")
                 addedNewMessageIDsToDelete = info_entry.addMessageIDsToDelete(oldCategoryMsgIDs)
                 deletedOldCouponOverviewMessageIDs = False
                 if info_entry.couponTypeOverviewMessageIDs is not None and len(info_entry.couponTypeOverviewMessageIDs) > 0:
@@ -1560,9 +1566,8 @@ class BKBot:
                     if index == len(coupons) - 1:
                         break
                 # Send new post containing current page
-                couponCategoryOverviewMessage = await asyncio.create_task(
-                    self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
-                                     disable_notification=True))
+                couponCategoryOverviewMessage = await self.sendMessage(chat_id=chat_id, text=couponOverviewText, parse_mode="HTML", disable_web_page_preview=True,
+                                                                       disable_notification=True)
                 if info_entry is not None:
                     # Update DB
                     info_entry.addCouponCategoryMessageID(couponType, couponCategoryOverviewMessage.message_id)
@@ -1570,16 +1575,6 @@ class BKBot:
                     self.db.save_info_entry(info_entry)
             couponOverviewCounter += 1
         return
-
-    async def deleteMessages(self, chat_id: Union[int, str], messageIDs: Union[List[int], None]):
-        """ Deletes array of messageIDs. """
-        if messageIDs is None:
-            return
-        index = 0
-        for msgID in messageIDs:
-            logging.info("Deleting message " + str(index + 1) + "/" + str(len(messageIDs)) + " | " + str(msgID))
-            await self.deleteMessage(chat_id=chat_id, messageID=msgID)
-            index += 1
 
     async def editOrSendMessage(self, update: Update, text: str, parse_mode: str = None, reply_markup: ReplyMarkup = None, disable_web_page_preview: bool = False,
                                 disable_notification=False):
@@ -1610,7 +1605,7 @@ class BKBot:
                                          disable_web_page_preview=disable_web_page_preview,
                                          reply_markup=reply_markup)
 
-    async def sendMessageWithUserBlockedHandling(self, user: User, userDB: Database, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
+    async def sendMessageWithUserBlockedHandling(self, user: User, userDB: Union[Database, None] = None, text: Union[str, None] = None, parse_mode: Union[None, str] = None,
                                                  disable_notification: ODVInput[bool] = DEFAULT_NONE, disable_web_page_preview: Union[bool, None] = None,
                                                  reply_markup: ReplyMarkup = None,
                                                  allowUpdateDB: bool = True) -> Union[Message, None]:
@@ -1620,16 +1615,13 @@ class BKBot:
                                             disable_web_page_preview=disable_web_page_preview,
                                             reply_markup=reply_markup)
             if user.updateNotificationReceivedActivityTimestamp() or user.botBlockedCounter > 0:
+                user.botBlockedCounter = 0
                 if allowUpdateDB:
-                    user.store(db=userDB)
+                    self.db.save_user(user)
             return msg
         except Forbidden:
             logging.info(f"User blocked bot: {user.id}")
             botblockedHandling = True
-            user.botBlockedCounter += 1
-            user.timestampLastTimeBlockedBot = datetime.now().timestamp()
-            if allowUpdateDB:
-                user.store(db=userDB)
         except BadRequest as badrequesterror:
             if badrequesterror.message == 'Chat not found':
                 logging.info(f"User does not exist anymore or user blocked bot: {user.id}")
@@ -1640,8 +1632,8 @@ class BKBot:
             user.botBlockedCounter += 1
             user.timestampLastTimeBlockedBot = datetime.now().timestamp()
             if allowUpdateDB:
-                user.store(db=userDB)
-        # End
+                self.db.save_user(user)
+        return
 
     async def sendPhoto(self, chat_id: Union[int, str], photo, caption: Union[None, str] = None,
                         parse_mode: Union[None, str] = None, disable_notification: ODVInput[bool] = DEFAULT_NONE,
@@ -1699,21 +1691,34 @@ class BKBot:
                     raise requesterror
         raise lastException
 
-    async def deleteMessage(self, chat_id: Union[int, str], messageID: Union[int, None]):
-        if messageID is None:
-            return
+    async def deleteMessage(self, chat_id: Union[int, str], messageID: Union[int, None]) -> bool:
         try:
             await self.application.updater.bot.delete_message(chat_id=chat_id, message_id=messageID)
+            return True
         except BadRequest:
             """ Typically this means that this message has already been deleted """
             logging.warning("Failed to delete message with message_id: " + str(messageID))
+            return True
+        except Exception:
+            return False
+
+    async def deleteMessages(self, chat_id: Union[int, str], messageIDs: Union[List[int], None]):
+        """ Deletes list of messageIDs. """
+        if chat_id is None:
+            raise ValueError("chat_id cannot be None")
+        if not messageIDs:
+            raise ValueError("messageIDs cannot be None")
+        index = 0
+        for msgID in messageIDs:
+            logging.info("Deleting message " + str(index + 1) + "/" + str(len(messageIDs)) + " | " + str(msgID))
+            await self.deleteMessage(chat_id=chat_id, messageID=msgID)
+            index += 1
 
     async def sendPendingNotifications(self) -> None:
         usersWithPendingNotifications = self.db.get_users(withPendingNotifications=True)
         if len(usersWithPendingNotifications) == 0:
             logging.debug('User notify: Nothing to do')
             return
-        userDB = self.db.get_user_db()
         timeStart = datetime.now()
         index = 0
         dbDocumentUpdates = []
@@ -1723,7 +1728,7 @@ class BKBot:
             # Send all pending notifications to user
             try:
                 for notificationText in user.pendingNotifications:
-                    await self.sendMessageWithUserBlockedHandling(user=user, userDB=userDB, text=notificationText, parse_mode='HTML', disable_web_page_preview=True,
+                    await self.sendMessageWithUserBlockedHandling(user=user, text=notificationText, parse_mode='HTML', disable_web_page_preview=True,
                                                                   allowUpdateDB=False)
             except Exception as e:
                 logging.exception(e)

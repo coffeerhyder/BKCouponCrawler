@@ -263,7 +263,7 @@ class BKCrawler:
         numberofDownloadedImages = 0
         for coupon in coupons:
             # Step 1: Generate QR image
-            generateQRImageIfNonExistant(coupon.getUniqueIdentifier(), coupon.getImagePathQR())
+            generateQRImageIfNonExistant(coupon.id, coupon.getImagePathQR())
             # Step 2: Download coupon image
             if await self.downloadImageIfNonExistant(coupon):
                 numberofDownloadedImages += 1
