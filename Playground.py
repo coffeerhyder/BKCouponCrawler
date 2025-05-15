@@ -1,9 +1,7 @@
 from datetime import datetime
 
-from Helper import getTimezone
-from UtilsCouponsDB import CouponViews
-
-
+from Helper import getTimezone, getRandomUserAgentHeaders
+from utils.CouponViews import CouponViews
 
 allViews = CouponViews.__dict__
 
@@ -18,6 +16,11 @@ print("Formatted: " + testDatetime.strftime('%Y-%m-%dT%H:%M:%S.%f'))
 print('Timestamp: ' + str(testDatetime.timestamp()))
 print('Timestamp2: ' + str(testDatetime.timestamp()))
 print("utcoffset" + str(testDatetime.utcoffset()))
+
+uatest = True
+if uatest:
+    userAgentHeaders = getRandomUserAgentHeaders()
+    print(userAgentHeaders)
 
 
 print("End")

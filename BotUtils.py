@@ -1,14 +1,12 @@
 import json
 from datetime import datetime
-from typing import Optional, List
 
-import pydantic
-from pydantic import root_validator
 from telegram import InlineKeyboardMarkup
 
 from Helper import SYMBOLS
+from utils.Config import Config
 
-VERSION = '2.2.7'
+VERSION = '2.3.0'
 
 """ Place static stuff into this class. """
 
@@ -75,25 +73,6 @@ def getImageBasePath() -> str:
     return "crawler/images/couponsproductive"
 
 
-class Config(pydantic.BaseModel):
-
-    bot_token: str
-    bot_name: str
-    db_url: str
-    admin_ids: Optional[List]
-    public_channel_name: Optional[str]
-    public_channel_post_id_faq: Optional[int]
-
-    @root_validator
-    def check_config_values(cls, values):
-        """ https://docs.pydantic.dev/usage/validators/ """
-        public_channel_name, public_channel_post_id_faq = values.get('public_channel_name'), values.get('public_channel_post_id_faq')
-
-        if public_channel_name is not None and public_channel_post_id_faq is None:
-            raise ValueError(f'Bad config: public channel name is given: {public_channel_name=} and at the same time {public_channel_post_id_faq=} | Your public channel is expected to have a permanent postID stickied as a FAQ!')
-        return values
-
-
 def loadConfig() -> Config:
     with open('config.json', encoding='utf-8') as infile:
         jsondict = json.load(infile)
@@ -105,9 +84,7 @@ class ImageCache:
         self.imageFileID = fileID
         self.dateCreated = datetime.now()
         self.dateLastUsed = datetime.now()
-        # self.timesUsed = 0
 
     def updateLastUsedDate(self):
         """ Updates last used timestamp to current timestamp. """
         self.dateLastUsed = datetime.now()
-        # self.timesUsed += 1

@@ -1,10 +1,14 @@
 import os
 import random
 import re
+import zoneinfo
 from datetime import datetime, timedelta
+from enum import IntEnum
+from zoneinfo import ZoneInfo
+
+import ua_generator
 from typing import Union
 
-import pytz
 import simplejson as json
 from PIL import Image
 
@@ -47,7 +51,7 @@ def saveJson(path: str, data: Union[list, dict]):
         json.dump(data, f, indent=4, sort_keys=True)
 
 
-def couponOrOfferGetImageURL(data: dict) -> str:
+def couponGetImageURL(data: dict) -> str:
     """ Only for new API objects (coupons and offers)! Chooses lowest resolution to save traffic (Some URLs have a fixed resolution. In this case we cannot change it.) """
     image_url = data['image_url']
     """ 2020-12-25: Hardcoded lowest resolution. We assume that this is always available if a resolution has to be chosen.
@@ -160,11 +164,6 @@ def getPathImagesOffers() -> str:
     return 'crawler/images/offers'
 
 
-def getPathImagesProducts() -> str:
-    """ Returns path to directory containing all product images. """
-    return 'crawler/images/products'
-
-
 def convertCouponAndOfferDateToGermanFormat(date: str) -> str:
     """ 2020-12-22T09:10:13+01:00 --> 22.12.2020 10:13 Uhr """
     return formatDateGerman(getDatetimeFromString(date))
@@ -201,13 +200,39 @@ def getCurrentDate() -> datetime:
     return datetime.now(getTimezone())
 
 
-def getTimezone() -> pytz:
-    return pytz.timezone('Europe/Berlin')
+def getTimezone():
+    """Returns timezone object for Europe/Berlin."""
+    try:
+        # Try to use zoneinfo (Python 3.9+)
+        from zoneinfo import ZoneInfo
+        return ZoneInfo("Europe/Berlin")
+    except (ImportError, zoneinfo._common.ZoneInfoNotFoundError):
+        # Fall back to pytz if zoneinfo is not available or timezone data is missing
+        import pytz
+        return pytz.timezone('Europe/Berlin')
 
 
 def getCurrentDateIsoFormat() -> str:
     """ Returns current date in format yyyy-MM-dd """
     return getCurrentDate().isoformat()
+
+
+def formatTimedelta(tdelta: timedelta) -> str:
+    # Extract days, hours, minutes, and seconds
+    total_seconds = tdelta.total_seconds()
+    days, remainder = divmod(total_seconds, 86400)  # 86400 seconds in a day
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # Build the formatted time step by step
+    if days > 0:
+        return f"{int(days)}d:{int(hours)}h:{int(minutes)}m:{int(seconds)}s"
+    elif hours > 0:
+        return f"{int(hours)}h:{int(minutes)}m:{int(seconds)}s"
+    elif minutes > 0:
+        return f"{int(minutes)}m:{int(seconds)}s"
+    else:
+        return f"{int(seconds)}s"
 
 
 class SYMBOLS:
@@ -272,22 +297,18 @@ def couponTitleContainsFriesAndDrink(title: str) -> bool:
         return False
 
 
-def couponTitleContainsVeggieFood(title: str) -> bool:
+def productTitleContainsVeggieFood(title: str) -> bool:
     # Convert title to lowercase for more thoughtless string comparison
     titleLower = title.lower()
     if couponTitleContainsPlantBasedFood(titleLower):
         # All plant based articles are veggie
         return True
     if 'veggie' in titleLower:
+        # Coupons with one 'veggie' tagged product will contain only veggie products
         return True
     elif 'fusion' in titleLower:
         # Ice cream
         return True
-    elif '+' in titleLower:
-        """ Title contains multiple products. Could be e.g. fries + meat so as long as we cannot safely separate the products,
-         we can't determine a safe "veggie-status".
-         """
-        return False
     elif couponTitleContainsFries(titleLower):
         return True
     elif 'cheese nacho' in titleLower:
@@ -305,6 +326,12 @@ def couponTitleContainsVeggieFood(title: str) -> bool:
         # Country Potatoes
         return True
     elif 'churros' in titleLower:
+        return True
+    elif 'café' in titleLower:
+        return True
+    elif 'sundae' in titleLower:
+        return True
+    elif 'cheese snack' in titleLower:
         return True
     else:
         # Non veggie menus and all the stuff that this handling doesn't detect properly yet
@@ -416,8 +443,13 @@ def isValidImageFile(path: Union[str, None]) -> bool:
         return False
 
 
+def getRandomUserAgentHeaders() -> dict:
+    ua = ua_generator.generate()
+    return ua.headers.get()
+
+
 # All CouponTypes which will be used in our bot (will be displayed in bot menu as categories)
-class CouponType:
+class CouponType(IntEnum):
     UNKNOWN = -1
     APP = 0
     # APP_VALID_AFTER_DELETION = 1  # Deprecated!
@@ -425,13 +457,14 @@ class CouponType:
     PAPER = 3
     PAPER_UNSAFE = 4
     ONLINE_ONLY = 5
-    ONLINE_ONLY_STORE_SPECIFIC = 6  # Placeholder - not used
-    SPECIAL = 7
+    # ONLINE_ONLY_STORE_SPECIFIC = 6  # Placeholder - not used
+    # SPECIAL = 7
     PAYBACK = 8
 
-
-# TODO: Remove this
-BotAllowedCouponTypes = [CouponType.APP, CouponType.PAPER, CouponType.SPECIAL, CouponType.PAYBACK]
+    @classmethod
+    def all_types(cls):
+        """Returns all enum members/types."""
+        return list(cls)
 
 
 class Paths:

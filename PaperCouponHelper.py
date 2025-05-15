@@ -6,7 +6,7 @@ from typing import List
 import Helper
 from Helper import getTimezone, loadJson
 
-from UtilsCouponsDB import Coupon
+from models.Coupon import Coupon
 
 """ Helper for adding paper coupons to the coupon system. """
 

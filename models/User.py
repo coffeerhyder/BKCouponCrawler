@@ -1,89 +1,17 @@
 from datetime import datetime
 from io import BytesIO
-from typing import List, Union
+from typing import Union
 
 from barcode.ean import EuropeanArticleNumber13
 from barcode.writer import ImageWriter
-
-from couchdb.mapping import Document, DateTimeField, TextField, DictField, ListField, IntegerField, BooleanField, Mapping, FloatField
+from couchdb.mapping import Document, DictField, Mapping, BooleanField, IntegerField, TextField, DateTimeField, ListField, FloatField
 
 from Helper import getCurrentDate
-from UtilsCouponsDB import MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION, USER_SETTINGS_ON_OFF, Coupon, UserFavoritesInfo, CouponViews, sortCouponsAsList, CouponView, \
-    CouponSortMode, getSortModeBySortCode, getNextSortMode, MAX_HOURS_ACTIVITY_TRACKING, MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION, \
+from utils.UtilsCouponsDB import MAX_TIMES_INFORM_ABOUT_UPCOMING_AUTO_ACCOUNT_DELETION, USER_SETTINGS_ON_OFF, sortCouponsAsList, MAX_HOURS_ACTIVITY_TRACKING, MAX_SECONDS_WITHOUT_USAGE_UNTIL_AUTO_ACCOUNT_DELETION, \
     MAX_SECONDS_WITHOUT_USAGE_UNTIL_SEND_WARNING_TO_USER, MIN_SECONDS_BETWEEN_UPCOMING_AUTO_DELETION_WARNING
-
-
-class InfoEntry(Document):
-    dateLastSuccessfulChannelUpdate = DateTimeField()
-    dateLastSuccessfulCrawlRun = DateTimeField()
-    informationMessageID = TextField()
-    couponTypeOverviewMessageIDs = DictField(default={})
-    messageIDsToDelete = ListField(IntegerField(), default=[])
-    lastMaintenanceModeState = BooleanField()
-
-    def addMessageIDToDelete(self, messageID: int) -> bool:
-        # Avoid duplicates
-        if messageID not in self.messageIDsToDelete:
-            self.messageIDsToDelete.append(messageID)
-            return True
-        else:
-            return False
-
-    def addMessageIDsToDelete(self, messageIDs: List) -> bool:
-        containsAtLeastOneNewID = False
-        for messageID in messageIDs:
-            if self.addMessageIDToDelete(messageID):
-                containsAtLeastOneNewID = True
-        return containsAtLeastOneNewID
-
-    def addCouponCategoryMessageID(self, couponType: int, messageID: int):
-        self.couponTypeOverviewMessageIDs.setdefault(couponType, []).append(messageID)
-
-    def getMessageIDsForCouponCategory(self, couponType: int) -> List[int]:
-        return self.couponTypeOverviewMessageIDs.get(str(couponType), [])
-
-    def getAllCouponCategoryMessageIDs(self) -> List[int]:
-        messageIDs = []
-        for messageIDsTemp in self.couponTypeOverviewMessageIDs.values():
-            messageIDs += messageIDsTemp
-        return messageIDs
-
-    def deleteCouponCategoryMessageIDs(self, couponType: int):
-        if str(couponType) in self.couponTypeOverviewMessageIDs:
-            del self.couponTypeOverviewMessageIDs[str(couponType)]
-
-    def deleteAllCouponCategoryMessageIDs(self):
-        self.couponTypeOverviewMessageIDs = {}
-
-
-class ChannelCoupon(Document):
-    """ Represents a coupon posted in a Telegram channel.
-     Only contains minimum of required information as information about coupons itself is stored in another DB. """
-    uniqueIdentifier = TextField()
-    channelMessageID_image_and_qr_date_posted = DateTimeField()
-    channelMessageID_image = IntegerField()
-    channelMessageID_qr = IntegerField()
-    channelMessageID_text = IntegerField()
-    channelMessageID_text_date_posted = DateTimeField()
-
-    def getMessageIDs(self) -> List[int]:
-        messageIDs = []
-        if self.channelMessageID_image is not None:
-            messageIDs.append(self.channelMessageID_image)
-        if self.channelMessageID_qr is not None:
-            messageIDs.append(self.channelMessageID_qr)
-        if self.channelMessageID_text is not None:
-            messageIDs.append(self.channelMessageID_text)
-        return messageIDs
-
-    def deleteMessageIDs(self):
-        # Nullification
-        self.channelMessageID_image = None
-        self.channelMessageID_qr = None
-        self.channelMessageID_text = None
-
-    def getMessageIDForChatHyperlink(self) -> Union[None, int]:
-        return self.channelMessageID_image
+from utils.CouponViews import CouponViews, CouponView, getNextSortMode, getSortModeBySortCode, CouponSortMode
+from utils.UserFavoritesInfo import UserFavoritesInfo
+from models.Coupon import Coupon
 
 
 class User(Document):
@@ -91,6 +19,7 @@ class User(Document):
         Mapping.build(
             displayCouponCategoryAllCouponsLongListWithLongTitles=BooleanField(default=False),
             displayCouponCategoryAppCouponsHidden=BooleanField(default=True),
+            displayCouponCategoryMeatOnly=BooleanField(default=True),
             displayCouponCategoryVeggie=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
             displayCouponSortButton=BooleanField(default=True),
@@ -199,10 +128,9 @@ class User(Document):
     def addFavoriteCoupon(self, coupon: Coupon):
         self.favoriteCoupons[coupon.id] = coupon._data
 
-    def deleteFavoriteCoupon(self, coupon: Coupon):
-        self.deleteFavoriteCouponID(coupon.id)
-
-    def deleteFavoriteCouponID(self, couponID: str):
+    def deleteFavoriteCouponID(self, couponID: Union[str, Coupon]):
+        if isinstance(couponID, Coupon):
+            couponID = couponID.id
         del self.favoriteCoupons[couponID]
 
     def isAllowSendFavoritesNotification(self):

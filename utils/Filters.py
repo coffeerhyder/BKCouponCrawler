@@ -14,6 +14,7 @@ class CouponFilter(BaseModel):
     allowedCouponTypes: Optional[Union[List[int], None]] = None  # None = allow all sources!
     isNew: Optional[Union[bool, None]] = None
     isHidden: Optional[Union[bool, None]] = None
+    isMeat: Optional[Union[bool, None]] = None
     isVeggie: Optional[Union[bool, None]] = None
     isPlantBased: Optional[Union[bool, None]] = None
     isEatable: Optional[Union[bool, None]] = None

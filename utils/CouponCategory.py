@@ -1,7 +1,8 @@
 from typing import Union, List
 
 from Helper import SYMBOLS, formatDateGerman, CouponType, formatPrice
-from UtilsCouponsDB import Coupon, CouponSortMode, CouponSortModes
+from utils.CouponViews import CouponSortModes, CouponSortMode
+from models.Coupon import Coupon
 
 
 class CouponCategory:
@@ -22,6 +23,8 @@ class CouponCategory:
         self.numberofCouponsNew = 0
         self.numberofCouponsWithFriesAndDrink = 0
         self.numberofVeggieCoupons = 0
+        self.numberofPlantBasedCoupons = 0
+        self.numberofMeatCoupons = 0
         self.numberofChiliCheeseCoupons = 0
         self.totalPrice = 0
         if isinstance(coupons, dict):
@@ -64,16 +67,6 @@ class CouponCategory:
             self.namePlural = "Online only"
             self.namePluralWithoutSymbol = "Online Only"
             self.description = "Coupons, die mit hoher Wahrscheinlichkeit nur online oder am Terminal bestellbar sind"
-        elif self.mainCouponType == CouponType.ONLINE_ONLY_STORE_SPECIFIC:
-            self.nameSingular = "Online only (store specific)"
-            self.namePlural = "Online only (store specific)"
-            self.namePluralWithoutSymbol = "Online only (store specific)"
-            self.description = "Coupons, die nur in bestimmten# Filialen gültig sind"
-        elif self.mainCouponType == CouponType.SPECIAL:
-            self.nameSingular = "Special Coupon"
-            self.namePlural = SYMBOLS.GIFT + "Special Coupons"
-            self.namePluralWithoutSymbol = "Special Coupons"
-            self.description = "Diese Coupons sind evtl. nicht in allen Filialen einlösbar!"
         elif self.mainCouponType == CouponType.PAYBACK:
             self.nameSingular = "Payback Coupon"
             self.namePlural = SYMBOLS.PARK + "ayback Coupons"
@@ -107,11 +100,18 @@ class CouponCategory:
             return False
 
     def isVeggie(self):
-        """ Returns True if all coupons in this categorie are veggie. """
+        """ Returns True if all coupons in this category are veggie. """
         if len(self.couponTypes) == 1 and self.mainCouponType == CouponType.PAYBACK:
             # Only Payback coupons in this category -> Technically veggie but logically not ;)
             return False
         elif self.numberofCouponsTotal > 0 and self.numberofCouponsTotal == self.numberofVeggieCoupons:
+            return True
+        else:
+            return False
+
+    def isMeat(self):
+        """ Returns True if all coupons in this category are veggie. """
+        if self.numberofCouponsTotal > 0 and self.numberofCouponsTotal == self.numberofMeatCoupons:
             return True
         else:
             return False
@@ -221,8 +221,12 @@ class CouponCategory:
                 self.numberofCouponsNew += 1
             if coupon.isContainsFriesAndDrink():
                 self.numberofCouponsWithFriesAndDrink += 1
+            if coupon.isPlantBased():
+                self.numberofPlantBasedCoupons += 1
             if coupon.isVeggie():
                 self.numberofVeggieCoupons += 1
+            elif coupon.isContainsMeat():
+                self.numberofMeatCoupons += 1
             if coupon.isContainsChiliCheese():
                 self.numberofChiliCheeseCoupons += 1
             # Update expire-date info
