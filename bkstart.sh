@@ -4,9 +4,10 @@
 # */1 * * * * sh /root/betterking/BKCouponCrawler/bkstart.sh
 
 filepath=~/betterking/BKCouponCrawler/process.pid
+venv_path=~/betterking/BKCouponCrawler/venv
 
 start_betterking() {
-  cd ~/betterking/BKCouponCrawler && python3 BKBot.py > /tmp/bkbot.log 2>&1 & echo $! >$filepath
+  cd ~/betterking/BKCouponCrawler && source $venv_path/bin/activate && python3 BKBot.py > /tmp/bkbot.log 2>&1 & echo $! >$filepath
 }
 
 # Start if pid file does not exist
