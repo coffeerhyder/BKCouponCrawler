@@ -27,7 +27,23 @@ https://www.bitchute.com/video/eoMYCfag5oiM/
 5. `config.json.default` in `config.json` umbenennen und eigene Daten eintragen (siehe unten).
 6. Eine wichtige couchDB Einstellung festlegen:
 ``` max_document_id_number ``` --> Auf 1000 setzen siehe: https://docs.couchdb.org/en/latest/config/misc.html#purge
-7. `BKBot.py` einmalig mit dem Parameter `crawl` aufrufen.
+7. python 3.9 installieren siehe unten
+8. `BKBot.py` einmalig mit dem Parameter `crawl` aufrufen, um das erstmalige Crawlen der Coupons zu erzwingen.
+
+# Installation Python 3.9 mit VENV
+1. Python 3.9 installieren: https://askubuntu.com/questions/1318846/how-do-i-install-python-3-9
+2. Python 3.9 VENV installieren: `apt-get install python3.9-venv`
+3. `sudo apt-get -y install git-all`
+4. `sudo apt-get -y install pip`
+5. `pip install virtualenv`
+6. `git clone https://github.com/farOverNinethousand/WGTools`
+7. `python3.9 -m venv venv`
+8. `source venv/bin/activate`
+9. `pip install -r requirements.txt`
+
+# Verwendung
+1. Den Bot mit der `bkstart.sh` starten.
+2. Ggf Autostart in Crontab einrichten.
 
 # CouchDB (user-DB) Backup & Wiederherstellen
 Backup:
