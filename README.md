@@ -128,7 +128,7 @@ optional arguments:
 3. Folgendes hinzufügen:  
 ```
 # Bot Start Script alle X Minuten ausführen um sicherzugehen, dass der Bot immer läuft
-*/1 * * * * sh /root/betterking/BKCouponCrawler/bkstart.sh
+*/1 * * * * bash /root/betterking/BKCouponCrawler/bkstart.sh
 
 # Optionale Commands: Updates nachts automatisch ausführen
 00 03 * * * root /usr/bin/apt update -q -y >> /var/log/apt/automaticupdates.log
