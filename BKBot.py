@@ -1391,7 +1391,7 @@ class BKBot:
         """ Runs all processes which should only run once per day. """
         logging.info('Running batch process...')
         await self.crawl()
-        if not await self.renewPublicChannel():
+        if await self.renewPublicChannel() is False:
             """ The channel update is especially important so here we got some retries implemented.
              """
             attempts = 0

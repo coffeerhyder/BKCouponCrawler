@@ -248,37 +248,40 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
         logging.info("Passed seconds since last channel update: " + str(passedSeconds))
     activeCoupons = bkbot.getFilteredCouponsAsDict(
         CouponFilter(activeOnly=True, sortCode=CouponSortModes.TYPE_MENU_PRICE.getSortCode()))
-    channelDB = bkbot.db.get_telegram_channel_db()
+    channelCoupons = bkbot.db.get_channel_coupons()
+    channelCoupons_dict = {}
+    for channelCoupon in channelCoupons:
+        channelCoupons_dict[channelCoupon.id] = channelCoupon
+    channelCouponsUpdated = {}
     # All coupons we want to send out this run
     couponsToSendOut = {}
     # All new coupons
     newCoupons = {}
     numberOfCouponsNewToThisChannel = 0
-    updatedCoupons = {}
     # Collect new and updated items
     for coupon in activeCoupons.values():
-        if coupon.id not in channelDB:
+        channelCoupon = channelCoupons_dict.get(coupon.id)
+        if channelCoupon is None:
             # New coupon - save information into both dicts
             couponsToSendOut[coupon.id] = coupon
             if coupon.isNewCoupon():
                 newCoupons[coupon.id] = coupon
             numberOfCouponsNewToThisChannel += 1
-        elif ChannelCoupon.load(channelDB, coupon.id).uniqueIdentifier != coupon.getUniqueIdentifier():
+        elif channelCoupon.uniqueIdentifier != coupon.getUniqueIdentifier():
             # Current/new coupon data differs from coupon we've posted in channel (same unique ID but coupon data has changed)
-            updatedCoupons[coupon.id] = coupon
+            channelCouponsUpdated[coupon.id] = channelCoupon
     if len(infoDoc.messageIDsToDelete) > 0:
         # This can happen but should only be a rare occurance!
         logging.warning(f"Found {len(infoDoc.messageIDsToDelete)} leftover messageIDs to delete")
 
     # Collect coupons that need to be deleted from channel
     deletedChannelCoupons = []
-    for coupon_id in channelDB:
+    for coupon_id, channelCoupon in channelCoupons_dict.items():
         if coupon_id not in activeCoupons:
-            channelCoupon = ChannelCoupon.load(channelDB, coupon_id)
             infoDoc.addMessageIDsToDelete(channelCoupon.getMessageIDs())
             # Collect it here so we can delete it with only one DB request later.
             deletedChannelCoupons.append(channelCoupon)
-    bkbot.db.delete_channel_coupon(deletedChannelCoupons)
+    bkbot.db.delete_channel_coupons(deletedChannelCoupons)
 
     # Collect coupons to send out in this run.
     if updateMode == ChannelUpdateMode.RESEND_ALL:
@@ -372,8 +375,8 @@ async def updatePublicChannel(bkbot, updateMode: ChannelUpdateMode):
     infoText = '<b>Heutiges Update:</b>'
     if len(deletedChannelCoupons) > 0:
         infoText += '\n' + SYMBOLS.DENY + ' ' + str(len(deletedChannelCoupons)) + ' Coupons gelöscht'
-    if len(updatedCoupons) > 0:
-        infoText += '\n' + SYMBOLS.ARROW_UP_RIGHT + ' ' + str(len(updatedCoupons)) + ' Coupons aktualisiert'
+    if len(channelCouponsUpdated) > 0:
+        infoText += '\n' + SYMBOLS.ARROW_UP_RIGHT + ' ' + str(len(channelCouponsUpdated)) + ' Coupons aktualisiert'
     if len(newCoupons) > 0:
         # Add detailed information about added coupons. Limit the max. number of that so our information message doesn't get too big.
         infoText += '\n<b>' + SYMBOLS.NEW + ' ' + str(len(newCoupons)) + ' Coupons hinzugefügt:</b>'
@@ -445,7 +448,7 @@ async def nukeChannel(bkbot):
             messageIDs = channelCoupon.getMessageIDs()
             for messageID in messageIDs:
                 await bkbot.deleteMessage(chat_id=bkbot.getPublicChannelChatID(), messageID=messageID)
-            bkbot.db.delete_channel_coupon(channelCoupon)
+            bkbot.db.delete_channel_coupons(channelCoupon)
             position += 1
     # Delete coupon overview messages
     updateInfoDoc = False
