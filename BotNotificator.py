@@ -24,7 +24,7 @@ async def collectNewCouponsNotifications(bkbot) -> None:
     """
     logging.info("Checking for pending new coupons notifications")
     timeStart = datetime.now()
-    newCoupons = bkbot.getFilteredCouponsAsDict(CouponFilter(activeOnly=True, isNew=True, sortCode=CouponSortModes.PRICE.getSortCode()))
+    newCoupons = bkbot.getFilteredCouponsAsDict(CouponFilter(activeOnly=True, isNew=True, sortCode=CouponSortModes.PRICE.getSortCode()), raise_exception_on_no_coupons_available=False)
     if len(newCoupons) == 0:
         logging.info("No new coupons available to notify users about")
         return

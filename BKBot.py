@@ -452,7 +452,7 @@ class BKBot:
             loadingMessage = await self.editOrSendMessage(update, text='Statistiken werden geladen...')
             self.statsCached = self.db.get_user_stats()
             self.statsCachedTimestamp = currentDatetime.timestamp()
-        couponDB = self.getFilteredCouponsAsList(couponFilter=CouponFilter())
+        coupons = self.getFilteredCouponsAsList(couponFilter=CouponFilter(), raise_exception_on_no_coupons_available=False)
         userStats = self.statsCached
         user = await self.getUser(userID=update.effective_user.id)
         text = f'<b>Hallo <s>Nerd</s> {update.effective_user.first_name}</b>'
@@ -465,7 +465,7 @@ class BKBot:
         text += f'\nAnzahl User, die eine PB Karte hinzugefügt haben: {userStats.numberofUsersWhoAddedPaybackCard}'
         text += f'\nAnzahl User, die den BetterKing Newsletter aktiviert haben: {userStats.numberofUsersWhoEnabledBotNewsletter}'
         text += f'\nAnzahl User, die den Spenden Button deaktiviert haben haben: {userStats.numberofUsersWhoDisabledDonateButton}'
-        text += f'\nAnzahl gültige Coupons: {len(couponDB)}'
+        text += f'\nAnzahl gültige Coupons: {len(coupons)}'
         text += f'\nAnzahl bald verfügbarer Coupons: {len(self.crawler.cachedFutureCoupons)}'
         text += f'\nStatistiken generiert am: {formatDateGermanHuman(self.statsCachedTimestamp)}'
         text += '\n---'
@@ -1049,16 +1049,18 @@ class BKBot:
             text += f" | {priceFormatted}"
         return text
 
-    def getFilteredCouponsAsList(self, couponFilter: CouponFilter, sort_if_sort_code_given: bool = True) -> list:
+    def getFilteredCouponsAsList(self, couponFilter: CouponFilter, sort_if_sort_code_given: bool = True, raise_exception_on_no_coupons_available: bool = True) -> list:
         """  Wrapper for crawler.filterCouponsList with errorhandling when no coupons are available. """
         coupons = self.db.get_filtered_coupons_as_list(couponFilter, sort_if_sort_code_given=sort_if_sort_code_given)
-        self.checkForNoCoupons(coupons)
+        if raise_exception_on_no_coupons_available:
+            self.checkForNoCoupons(coupons)
         return coupons
 
-    def getFilteredCouponsAsDict(self, couponFilter: CouponFilter, sort_if_sort_code_given: bool = True) -> dict:
+    def getFilteredCouponsAsDict(self, couponFilter: CouponFilter, sort_if_sort_code_given: bool = True, raise_exception_on_no_coupons_available: bool = True) -> dict:
         """  Wrapper for crawler.filterCouponsList with errorhandling when no coupons are available. """
         coupons = self.db.get_filtered_coupons_as_dict(couponFilter, sort_if_sort_code_given)
-        self.checkForNoCoupons(coupons)
+        if raise_exception_on_no_coupons_available:
+            self.checkForNoCoupons(coupons)
         return coupons
 
     def checkForNoCoupons(self, coupons: Union[dict, list]):
@@ -1301,18 +1303,20 @@ class BKBot:
         users = self.db.get_users()
         await self.deleteUsersUnavailableFavorites(users)
 
-    async def deleteUsersUnavailableFavorites(self, users: list, force: bool = False):
+    async def deleteUsersUnavailableFavorites(self, users: Union[list, None] = None, force: bool = False) -> None:
         """ Deletes expired favorite coupons of all users who enabled auto deletion of those. """
-        if len(users) == 0:
+        if users is None:
+            users = self.db.get_users()
+        if users is None or len(users) == 0:
             return
         usersToDeleteExpiredFavorites = []
         for user in users:
             if (force or user.settings.autoDeleteExpiredFavorites) and len(user.favoriteCoupons) > 0:
                 usersToDeleteExpiredFavorites.append(user)
         if len(usersToDeleteExpiredFavorites) == 0:
-            logging.info("Failed to find any users eligable for favorite deletion")
+            logging.info("Did not find any users eligable for favorite deletion")
             return
-        coupons = self.getFilteredCouponsAsDict(couponFilter=CouponFilter())
+        coupons = self.getFilteredCouponsAsDict(couponFilter=CouponFilter(), raise_exception_on_no_coupons_available=False)
         dbUpdates = []
         for user in usersToDeleteExpiredFavorites:
             userUnavailableFavoriteCouponInfo = user.getUserFavoritesInfo(couponsFromDB=coupons, returnSortedCoupons=False)
