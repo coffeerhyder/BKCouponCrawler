@@ -105,7 +105,7 @@ class DBManager:
         else:
             raise TypeError("Expected ChannelCoupon object, list of ChannelCoupon objects, or set of ChannelCoupon objects")
 
-    def delete_channel_coupon(self, channel_coupon_input: Union[str, "ChannelCoupon", List[Union[str, "ChannelCoupon"]], Set[Union[str, "ChannelCoupon"]]]) -> None:
+    def delete_channel_coupons(self, channel_coupon_input: Union[str, "ChannelCoupon", List[Union[str, "ChannelCoupon"]], Set[Union[str, "ChannelCoupon"]]]) -> None:
         """
         Delete channel coupon(s) from the telegram channel database.
 

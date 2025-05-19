@@ -98,7 +98,7 @@ USER_SETTINGS_ON_OFF = {
     },
     "displayCouponCategoryMeatOnly": {
         "category": SettingCategories.MAIN_MENU,
-        "description": f"Kategorie Coupons mit Fleisch ({SYMBOLS.MEAT}) zeigen",
+        "description": f"Kategorie Fleisch Coupons ({SYMBOLS.MEAT}) zeigen",
         "default": True
     },
     "displayCouponCategoryVeggie": {
