@@ -362,58 +362,55 @@ class BKCrawler:
                         bkCoupons.append(upsellOption)
                 childindex = 0
                 for couponBK in bkCoupons:
+                    price = couponBK['offerPrice']
+                    plu = couponBK['shortCode']
                     vendorConfigs = couponBK['vendorConfigs']
                     try:
                         uniqueCouponID = vendorConfigs['rpos']['constantPlu']
                     except:
                         uniqueCouponID = None
                     if uniqueCouponID is None:
-                        uniqueCouponID = vendorConfigs['partner']['constantPlu']
-                    legacyInternalName = couponBK.get('internalName')
-                    # Find coupon-title. Prefer to get it from 'internalName' as the other title may contain crap we don't want.
-                    # 2022-11-02: Prefer normal titles again because internal ones are sometimes incomplete
-                    useInternalNameAsTitle = False
-                    legacyInternalNameRegex = None
-                    if legacyInternalName is not None:
-                        legacyInternalNameRegex = re.compile(r'[A-Za-z0-9]+_\d+_(?:UPSELL_|CRM_MYBK_|MYBK_|\d{3,}_)?(.+)').search(legacyInternalName)
+                        try:
+                            uniqueCouponID = vendorConfigs['partner']['constantPlu']
+                        except:
+                            pass
+                    if uniqueCouponID is None:
+                        """ 2025-07-03: Looks like for the first time now it is possible that a coupon can have no internal ID but only the short PLU code.
+                         Example: 294 -> Big King XXL + Crispy Chicken + große King Pommes + 0,5 l Coca-Cola
+                         """
+                        uniqueCouponID = plu
                     subtitle = None
                     try:
                         subtitle = couponBK['description']['localeRaw'][0]['children'][0]['text']
                     except:
                         # Subtitle is not always available
                         pass
-                    if legacyInternalNameRegex is not None and useInternalNameAsTitle:
-                        titleFull = legacyInternalNameRegex.group(1)
-                        titleFull = titleFull.replace('_', ' ')
+                    """ Decide how to use title and subtitle and if it makes sense to put both into one string. """
+                    title = couponBK['name']['localeRaw'][0]['children'][0]['text']
+                    title = title.strip()
+                    if subtitle is None:
+                        titleFull = title
                     else:
-                        """ Decide how to use title and subtitle and if it makes sense to put both into one string. """
-                        title = couponBK['name']['localeRaw'][0]['children'][0]['text']
-                        title = title.strip()
-                        if subtitle is None:
+                        subtitle = subtitle.strip()
+                        titleShortened = shortenProductNames(title)
+                        subtitleShortened = shortenProductNames(subtitle)
+                        if len(subtitleShortened) == 0 or subtitleShortened.isspace():
+                            # Useless subtitle -> Use title only
+                            titleFull = title
+                        elif len(titleShortened) == 0 or titleShortened.isspace():
+                            # Useless title -> Use subtitle only
+                            titleFull = subtitle
+                        elif titleShortened == subtitleShortened:  # Small hack: Shorten titles before comparing them
+                            # Title and subtitle are the same -> Use title only
+                            titleFull = title
+                        elif not subtitle.startswith('+'):
+                            logging.info(
+                                f'Coupon {uniqueCouponID}: Possible subtitle which should not be included in coupon title because it doesnt start with a plus sumbol: {subtitle=}')
                             titleFull = title
                         else:
-                            subtitle = subtitle.strip()
-                            titleShortened = shortenProductNames(title)
-                            subtitleShortened = shortenProductNames(subtitle)
-                            if len(subtitleShortened) == 0 or subtitleShortened.isspace():
-                                # Useless subtitle -> Use title only
-                                titleFull = title
-                            elif len(titleShortened) == 0 or titleShortened.isspace():
-                                # Useless title -> Use subtitle only
-                                titleFull = subtitle
-                            elif titleShortened == subtitleShortened:  # Small hack: Shorten titles before comparing them
-                                # Title and subtitle are the same -> Use title only
-                                titleFull = title
-                            elif not subtitle.startswith('+'):
-                                logging.info(
-                                    f'Coupon {uniqueCouponID}: Possible subtitle which should not be included in coupon title because it doesnt start with a plus sumbol: {subtitle=}')
-                                titleFull = title
-                            else:
-                                # Assume that subtitle is usable and add it to title
-                                titleFull = title + ' ' + subtitle
+                            # Assume that subtitle is usable and add it to title
+                            titleFull = title + ' ' + subtitle
 
-                    price = couponBK['offerPrice']
-                    plu = couponBK['shortCode']
                     coupon = Coupon(id=uniqueCouponID, uniqueID=uniqueCouponID, plu=plu, title=titleFull, subtitle=subtitle, type=CouponType.APP)
                     # ID which can be used to view coupon in browser
                     coupon.webviewID = couponBK.get('loyaltyEngineId')
