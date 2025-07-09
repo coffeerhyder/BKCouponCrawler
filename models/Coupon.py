@@ -9,7 +9,7 @@ from couchdb.mapping import Document, TextField, IntegerField, FloatField, ListF
 
 from BotUtils import getImageBasePath
 from Helper import shortenProductNames, SYMBOLS, getCurrentDate, couponTitleContainsFriesAndDrink, couponTitleContainsChiliCheese, couponTitleContainsPlantBasedFood, \
-    productTitleContainsVeggieFood, CouponType, getTimezone, formatDateGerman, formatPrice, getFilenameFromURL
+    productTitleIsVeggieFood, CouponType, getTimezone, formatDateGerman, formatPrice, getFilenameFromURL
 
 COUPON_IS_NEW_FOR_SECONDS = 24 * 60 * 60
 
@@ -171,7 +171,7 @@ class Coupon(Document):
                 if tag == 'sweetkings':
                     return True
         for product in products:
-            if not productTitleContainsVeggieFood(product):
+            if not productTitleIsVeggieFood(product):
                 # Coupon contains at least one non veggie product -> Not a veggie coupon
                 return False
         # All products in this coupons are veggie -> It is a veggie coupon

@@ -98,7 +98,7 @@ def shortenProductNames(couponTitle: str) -> str:
     """ Remove "KING" from some product titles """
     couponTitle = re.sub(r"(Bacon|Fish|Halloumi)\s*KING", r"\1", couponTitle, flags=re.IGNORECASE)
     """ E.g. "KING Shake" --> "Shake" """
-    couponTitle = re.sub(r"KING\s*(Jr\.?\s*Meal|Jr\.?\s*Menü|Shake|Sundae|Nuggets?|Wings?|Onion[\s-]*Rings?)", r"\1", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"KING\s*(Jr\.?\s*Meal|Jr\.?\s*Menü|Shake|Sundae|Nuggets?|Wings?|Onion[\s-]*Rings?|Churros)", r"\1", couponTitle, flags=re.IGNORECASE)
     """ 'Meta' replaces """
     # Normalize- and fix drink unit e.g. "0,3 L" or "0.3l" to "0.3" (remove unit character to save even more space)
     couponTitle = re.sub(r"(0[.,]\d{1,2})\s*L", r"\1", couponTitle, flags=re.IGNORECASE)
@@ -287,7 +287,7 @@ def getFilenameFromURL(url: str) -> str:
 
 def couponTitleContainsFriesAndDrink(title: str) -> bool:
     titleLower = title.lower()
-    if '+' in titleLower and couponTitleContainsFries(titleLower) and couponTitleContainsDrink(titleLower):
+    if '+' in titleLower and couponTitleContainsFries(titleLower) and productTitleIsDrink(titleLower):
         return True
     elif re.compile(r'.*jr\s*\.?\s*meal.*').search(titleLower):
         return True
@@ -297,7 +297,7 @@ def couponTitleContainsFriesAndDrink(title: str) -> bool:
         return False
 
 
-def productTitleContainsVeggieFood(title: str) -> bool:
+def productTitleIsVeggieFood(title: str) -> bool:
     # Convert title to lowercase for more thoughtless string comparison
     titleLower = title.lower()
     if couponTitleContainsPlantBasedFood(titleLower):
@@ -333,6 +333,8 @@ def productTitleContainsVeggieFood(title: str) -> bool:
         return True
     elif 'cheese snack' in titleLower:
         return True
+    elif productTitleIsDrink(titleLower):
+        return True
     else:
         # Non veggie menus and all the stuff that this handling doesn't detect properly yet
         return False
@@ -361,13 +363,16 @@ def couponTitleContainsFries(title: str) -> bool:
         return False
 
 
-def couponTitleContainsDrink(title: str) -> bool:
+def productTitleIsDrink(title: str) -> bool:
+    """ Returns true if the given product title is a drinkable product. """
     titleLower = title.lower()
     if 'cola' in titleLower:
         return True
     elif re.compile(r'red\s*bull').search(titleLower):
         return True
     elif re.compile(r'monster\s*energy').search(titleLower):
+        return True
+    elif re.compile(r'caff(è|e)').search(titleLower):
         return True
     else:
         return False
