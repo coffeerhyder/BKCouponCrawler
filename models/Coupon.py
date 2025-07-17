@@ -9,7 +9,7 @@ from couchdb.mapping import Document, TextField, IntegerField, FloatField, ListF
 
 from BotUtils import getImageBasePath
 from Helper import shortenProductNames, SYMBOLS, getCurrentDate, couponTitleContainsFriesAndDrink, couponTitleContainsChiliCheese, couponTitleContainsPlantBasedFood, \
-    productTitleIsVeggieFood, CouponType, getTimezone, formatDateGerman, formatPrice, getFilenameFromURL
+    productTitleIsVeggieFood, CouponType, getTimezone, formatDateGerman, formatPrice, getFilenameFromURL, productTitleIsDrink
 
 COUPON_IS_NEW_FOR_SECONDS = 24 * 60 * 60
 
@@ -91,7 +91,7 @@ class Coupon(Document):
         symbols = []
         if includeMeatSymbol and self.isContainsMeat():
             symbols.append(SYMBOLS.MEAT)
-        elif includeVeggieSymbol and self.isVeggie():
+        elif includeVeggieSymbol and not self.isDrink() and self.isVeggie():
             symbols.append(SYMBOLS.BROCCOLI)
         if includeChiliCheeseSymbol and self.isContainsChiliCheese():
             symbols.append(SYMBOLS.CHILI)
@@ -175,6 +175,16 @@ class Coupon(Document):
                 # Coupon contains at least one non veggie product -> Not a veggie coupon
                 return False
         # All products in this coupons are veggie -> It is a veggie coupon
+        return True
+
+    def isDrink(self) -> bool:
+        couponTitle = self.getTitle()
+        products = couponTitle.split("+")
+        for product in products:
+            if not productTitleIsDrink(product):
+                # Coupon contains at least one non drink product -> Not a drink coupon
+                return False
+        # All products in this coupon are drinks -> It is a drink coupon
         return True
 
     def isContainsMeat(self) -> bool:
