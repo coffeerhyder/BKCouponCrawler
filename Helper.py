@@ -93,12 +93,14 @@ def shortenProductNames(couponTitle: str) -> str:
     couponTitle = re.sub(r"große(\s*KING)?\s*Pommes", "L" + pommesReplacement, couponTitle, flags=re.IGNORECASE)
     couponTitle = re.sub(r"KING\s*(Pommes)", pommesReplacement, couponTitle, flags=re.IGNORECASE)
     couponTitle = re.sub(r"Fries", pommesReplacement, couponTitle, flags=re.IGNORECASE)  # E.g. 'Curly Fries'
-    couponTitle = re.sub(r"(Coca[\s-]*)?Cola", SYMBOLS.COLA, couponTitle, flags=re.IGNORECASE)
+    """ Important: This needs to be case-sensitive otherwise something like this will happen:
+     "Iced Coffee Chocolate" --> IcedCoffeeCho🥤te """
+    couponTitle = re.sub(r"(Coca[\s-]*)?Cola", SYMBOLS.COLA, couponTitle)
     couponTitle = re.sub(r"Big KING", r"BigK", couponTitle, flags=re.IGNORECASE)
     """ Remove "KING" from some product titles """
     couponTitle = re.sub(r"(Bacon|Fish|Halloumi)\s*KING", r"\1", couponTitle, flags=re.IGNORECASE)
     """ E.g. "KING Shake" --> "Shake" """
-    couponTitle = re.sub(r"KING\s*(Jr\.?\s*Meal|Jr\.?\s*Menü|Shake|Sundae|Nuggets?|Wings?|Onion[\s-]*Rings?)", r"\1", couponTitle, flags=re.IGNORECASE)
+    couponTitle = re.sub(r"KING\s*(Jr\.?\s*Meal|Jr\.?\s*Menü|Shake|Sundae|Nuggets?|Wings?|Onion[\s-]*Rings?|Churros)", r"\1", couponTitle, flags=re.IGNORECASE)
     """ 'Meta' replaces """
     # Normalize- and fix drink unit e.g. "0,3 L" or "0.3l" to "0.3" (remove unit character to save even more space)
     couponTitle = re.sub(r"(0[.,]\d{1,2})\s*L", r"\1", couponTitle, flags=re.IGNORECASE)
@@ -164,11 +166,6 @@ def getPathImagesOffers() -> str:
     return 'crawler/images/offers'
 
 
-def convertCouponAndOfferDateToGermanFormat(date: str) -> str:
-    """ 2020-12-22T09:10:13+01:00 --> 22.12.2020 10:13 Uhr """
-    return formatDateGerman(getDatetimeFromString(date))
-
-
 def formatDateGerman(date: Union[datetime, float]) -> str:
     """ Accepts timestamp as float or datetime instance.
     Returns date in format: 13.10.2020 21:36 Uhr """
@@ -189,11 +186,6 @@ def formatDateGermanHuman(date: Union[datetime, float, int]) -> str:
 def getDatetimeFromString(dateStr: str) -> datetime:
     """ Parses e.g.: "2020-12-22T09:10:13+01:00" """
     return datetime.strptime(dateStr, '%Y-%m-%dT%H:%M:%S%z')
-
-
-def getDatetimeFromString2(dateStr: str) -> datetime:
-    """ Parses e.g. "10.01.2021 23:59+01:00" """
-    return datetime.strptime(dateStr, '%d.%m.%Y %H:%M%z')
 
 
 def getCurrentDate() -> datetime:
@@ -287,17 +279,21 @@ def getFilenameFromURL(url: str) -> str:
 
 def couponTitleContainsFriesAndDrink(title: str) -> bool:
     titleLower = title.lower()
-    if '+' in titleLower and couponTitleContainsFries(titleLower) and couponTitleContainsDrink(titleLower):
-        return True
-    elif re.compile(r'.*jr\s*\.?\s*meal.*').search(titleLower):
+    if re.compile(r'.*jr\s*\.?\s*meal.*').search(titleLower):
         return True
     elif re.compile(r'.*jr\s*\.?\s*menü.*').search(titleLower):
         return True
-    else:
+    containsFries = couponTitleContainsFries(titleLower)
+    if not containsFries:
         return False
+    products = titleLower.split("+")
+    for productTitle in products:
+        if productTitleIsDrink(productTitle):
+            return True
+    return False
 
 
-def productTitleContainsVeggieFood(title: str) -> bool:
+def productTitleIsVeggieFood(title: str) -> bool:
     # Convert title to lowercase for more thoughtless string comparison
     titleLower = title.lower()
     if couponTitleContainsPlantBasedFood(titleLower):
@@ -333,6 +329,8 @@ def productTitleContainsVeggieFood(title: str) -> bool:
         return True
     elif 'cheese snack' in titleLower:
         return True
+    elif productTitleIsDrink(titleLower):
+        return True
     else:
         # Non veggie menus and all the stuff that this handling doesn't detect properly yet
         return False
@@ -361,13 +359,18 @@ def couponTitleContainsFries(title: str) -> bool:
         return False
 
 
-def couponTitleContainsDrink(title: str) -> bool:
+def productTitleIsDrink(title: str) -> bool:
+    """ Returns true if the given product title is a drinkable product. """
     titleLower = title.lower()
     if 'cola' in titleLower:
         return True
     elif re.compile(r'red\s*bull').search(titleLower):
         return True
     elif re.compile(r'monster\s*energy').search(titleLower):
+        return True
+    elif re.compile(r'caff(è|e)').search(titleLower):
+        return True
+    elif re.compile(r'wasser').search(titleLower):
         return True
     else:
         return False

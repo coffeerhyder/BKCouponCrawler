@@ -9,7 +9,7 @@ from couchdb.mapping import Document, TextField, IntegerField, FloatField, ListF
 
 from BotUtils import getImageBasePath
 from Helper import shortenProductNames, SYMBOLS, getCurrentDate, couponTitleContainsFriesAndDrink, couponTitleContainsChiliCheese, couponTitleContainsPlantBasedFood, \
-    productTitleContainsVeggieFood, CouponType, getTimezone, formatDateGerman, formatPrice, getFilenameFromURL
+    productTitleIsVeggieFood, CouponType, getTimezone, formatDateGerman, formatPrice, getFilenameFromURL, productTitleIsDrink
 
 COUPON_IS_NEW_FOR_SECONDS = 24 * 60 * 60
 
@@ -91,7 +91,7 @@ class Coupon(Document):
         symbols = []
         if includeMeatSymbol and self.isContainsMeat():
             symbols.append(SYMBOLS.MEAT)
-        elif includeVeggieSymbol and self.isVeggie():
+        elif includeVeggieSymbol and not self.isDrink() and self.isVeggie():
             symbols.append(SYMBOLS.BROCCOLI)
         if includeChiliCheeseSymbol and self.isContainsChiliCheese():
             symbols.append(SYMBOLS.CHILI)
@@ -171,10 +171,20 @@ class Coupon(Document):
                 if tag == 'sweetkings':
                     return True
         for product in products:
-            if not productTitleContainsVeggieFood(product):
+            if not productTitleIsVeggieFood(product):
                 # Coupon contains at least one non veggie product -> Not a veggie coupon
                 return False
         # All products in this coupons are veggie -> It is a veggie coupon
+        return True
+
+    def isDrink(self) -> bool:
+        couponTitle = self.getTitle()
+        products = couponTitle.split("+")
+        for product in products:
+            if not productTitleIsDrink(product):
+                # Coupon contains at least one non drink product -> Not a drink coupon
+                return False
+        # All products in this coupon are drinks -> It is a drink coupon
         return True
 
     def isContainsMeat(self) -> bool:
@@ -372,6 +382,18 @@ class Coupon(Document):
             elif len(description) > 0:
                 description += "\n"
             description += f"{SYMBOLS.WARNING}Achtung!\nDerzeit fehlen die original Produktbilder von Papiercoupons!\nDas Bild dieses Coupons stammt vom gleichnamigen App Coupon! Es gelten die Textangaben in den Buttons und hier im Post-Text, nicht die aus den Bildern!!"
+        if self.plu is None:
+            if description is None:
+                description = ""
+            elif len(description) > 0:
+                description += "\n"
+            description += f'\n{SYMBOLS.WARNING} Keine nennbare PLU verfügbar -> QR Code zeigen!'
+        elif self.plu == self.id:
+            if description is None:
+                description = ""
+            elif len(description) > 0:
+                description += "\n"
+            description += f'\n{SYMBOLS.WARNING} Hinweis für Terminal-Besteller: Dieser Coupon ist möglicherweise nicht- oder nur mit einem MyBK Account per Terminal bestellbar.'
         return description
 
     def generateCouponShortText(self, highlightIfNew: bool = True, includeVeggieSymbol: bool = True, includeChiliCheeseSymbol: bool = True, plumode: CouponTextRepresentationPLUMode = CouponTextRepresentationPLUMode.ALL_PLUS) -> str:
@@ -460,8 +482,6 @@ class Coupon(Document):
         if description is not None:
             couponText += "\n" + description
         webviewURL = self.getWebviewURL()
-        if self.plu is None:
-            couponText += f'\n{SYMBOLS.WARNING} Keine nennbare PLU verfügbar -> QR Code zeigen!'
         if webviewURL is not None:
             couponText += f"\n{SYMBOLS.ARROW_RIGHT}<a href=\"{webviewURL}\">Webansicht</a>"
         return couponText
