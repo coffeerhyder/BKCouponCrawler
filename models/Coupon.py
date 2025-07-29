@@ -382,6 +382,18 @@ class Coupon(Document):
             elif len(description) > 0:
                 description += "\n"
             description += f"{SYMBOLS.WARNING}Achtung!\nDerzeit fehlen die original Produktbilder von Papiercoupons!\nDas Bild dieses Coupons stammt vom gleichnamigen App Coupon! Es gelten die Textangaben in den Buttons und hier im Post-Text, nicht die aus den Bildern!!"
+        if self.plu is None:
+            if description is None:
+                description = ""
+            elif len(description) > 0:
+                description += "\n"
+            description += f'\n{SYMBOLS.WARNING} Keine nennbare PLU verfügbar -> QR Code zeigen!'
+        elif self.plu == self.id:
+            if description is None:
+                description = ""
+            elif len(description) > 0:
+                description += "\n"
+            description += f'\n{SYMBOLS.WARNING} Hinweis für Terminal-Besteller: Dieser Coupon ist möglicherweise nicht- oder nur mit einem MyBK Account per Terminal bestellbar.'
         return description
 
     def generateCouponShortText(self, highlightIfNew: bool = True, includeVeggieSymbol: bool = True, includeChiliCheeseSymbol: bool = True, plumode: CouponTextRepresentationPLUMode = CouponTextRepresentationPLUMode.ALL_PLUS) -> str:
@@ -470,8 +482,6 @@ class Coupon(Document):
         if description is not None:
             couponText += "\n" + description
         webviewURL = self.getWebviewURL()
-        if self.plu is None:
-            couponText += f'\n{SYMBOLS.WARNING} Keine nennbare PLU verfügbar -> QR Code zeigen!'
         if webviewURL is not None:
             couponText += f"\n{SYMBOLS.ARROW_RIGHT}<a href=\"{webviewURL}\">Webansicht</a>"
         return couponText

@@ -24,6 +24,10 @@ def main() -> List[Coupon]:
         "25.04.2025": {
             "thx": "Danke an den MyDealz User HalloTheEngineer für das Digitalisieren der Coupons und den Dealersteller, siehe: mydealz.de/deals/burger-king-coupons-gultig-vom-sa-08032025-bis-fr-25042025-2531675",
             "start_date": "08.03.2025"
+        },
+        "05.09.2025": {
+            "thx": "Danke an den MyDealz User Mucho_Mitchi für das Bereitstellen der Coupons siehe: mydealz.de/deals/burger-king-aktuelle-coupons-0825-bei-burger-king-bundesweit-in-teilnehmenden-restaurants-gultig-bis-fr-05092025-2611425",
+            "start_date": "08.03.2025"
         }
     }
 

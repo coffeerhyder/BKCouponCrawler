@@ -6,7 +6,7 @@ from telegram import InlineKeyboardMarkup
 from Helper import SYMBOLS
 from utils.Config import Config
 
-VERSION = '2.3.3'
+VERSION = '2.3.4'
 
 """ Place static stuff into this class. """
 

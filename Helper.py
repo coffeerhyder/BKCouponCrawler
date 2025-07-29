@@ -279,14 +279,18 @@ def getFilenameFromURL(url: str) -> str:
 
 def couponTitleContainsFriesAndDrink(title: str) -> bool:
     titleLower = title.lower()
-    if '+' in titleLower and couponTitleContainsFries(titleLower) and productTitleIsDrink(titleLower):
-        return True
-    elif re.compile(r'.*jr\s*\.?\s*meal.*').search(titleLower):
+    if re.compile(r'.*jr\s*\.?\s*meal.*').search(titleLower):
         return True
     elif re.compile(r'.*jr\s*\.?\s*menü.*').search(titleLower):
         return True
-    else:
+    containsFries = couponTitleContainsFries(titleLower)
+    if not containsFries:
         return False
+    products = titleLower.split("+")
+    for productTitle in products:
+        if productTitleIsDrink(productTitle):
+            return True
+    return False
 
 
 def productTitleIsVeggieFood(title: str) -> bool:
@@ -365,6 +369,8 @@ def productTitleIsDrink(title: str) -> bool:
     elif re.compile(r'monster\s*energy').search(titleLower):
         return True
     elif re.compile(r'caff(è|e)').search(titleLower):
+        return True
+    elif re.compile(r'wasser').search(titleLower):
         return True
     else:
         return False
