@@ -393,7 +393,7 @@ class Coupon(Document):
                 description = ""
             elif len(description) > 0:
                 description += "\n"
-            description += f'\n{SYMBOLS.WARNING} Hinweis für Terminal-Besteller: Dieser Coupon ist möglicherweise nicht- oder nur mit einem MyBK Account per Terminal bestellbar.'
+            description += f'{SYMBOLS.WARNING} Hinweis für Terminal-Besteller: Dieser Coupon ist möglicherweise nicht- oder nur mit einem MyBK Account per Terminal bestellbar.'
         return description
 
     def generateCouponShortText(self, highlightIfNew: bool = True, includeVeggieSymbol: bool = True, includeChiliCheeseSymbol: bool = True, plumode: CouponTextRepresentationPLUMode = CouponTextRepresentationPLUMode.ALL_PLUS) -> str:
