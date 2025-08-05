@@ -658,7 +658,14 @@ class BKBot:
             menuText += f"\n{priceInfo}"
 
         if couponCategory.isMeat() or (couponCategory.numberofMeatCoupons >= 2 and couponCategory.numberofPlantBasedCoupons == 0):
-            urls = ["aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj1VSllzR3czTFBaTQ==", "aHR0cHM6Ly95b3V0dS5iZS92a1E1QjNfcFRxdz9zaT01c2U1U3lSN2NkdzhvWW9wJnQ9MTcz", "aHR0cHM6Ly95b3V0dS5iZS85YW9XcVlXc3JGYz9zaT1vSXNTcXF1YXpEcUdUel9fJnQ9NDk4", "aHR0cHM6Ly95b3V0dS5iZS85N2NLRC1KWGVDUT9zaT03SjlSRWJrTUlPMXBTY2JjJnQ9NjMy"]
+            urls = [
+                "aHR0cHM6Ly95b3V0dS5iZS9VSllzR3czTFBaTQ==",
+                "aHR0cHM6Ly95b3V0dS5iZS92a1E1QjNfcFRxdz90PTE3Mw==",
+                "aHR0cHM6Ly95b3V0dS5iZS85YW9XcVlXc3JGYz90PTQ5OA==",
+                "aHR0cHM6Ly95b3V0dS5iZS85N2NLRC1KWGVDUT90PTYzMg=="
+            ]
+            for url in urls:
+                url = base64.b64decode(url).decode('utf-8')
             texts = ["SHV1dXV1aG4=", "RVNTVCBNRUhSIEZMRUlTQ0ghISE="]
             url = base64.b64decode(random.choice(urls)).decode('utf-8')
             text = base64.b64decode(random.choice(texts)).decode('utf-8')
