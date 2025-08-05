@@ -664,8 +664,6 @@ class BKBot:
                 "aHR0cHM6Ly95b3V0dS5iZS85YW9XcVlXc3JGYz90PTQ5OA==",
                 "aHR0cHM6Ly95b3V0dS5iZS85N2NLRC1KWGVDUT90PTYzMg=="
             ]
-            for url in urls:
-                url = base64.b64decode(url).decode('utf-8')
             texts = ["SHV1dXV1aG4=", "RVNTVCBNRUhSIEZMRUlTQ0ghISE="]
             url = base64.b64decode(random.choice(urls)).decode('utf-8')
             text = base64.b64decode(random.choice(texts)).decode('utf-8')
