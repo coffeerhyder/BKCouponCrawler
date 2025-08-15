@@ -585,6 +585,7 @@ class BKCrawler:
         # Get rid of invalid coupons so we won't even bother adding them to our DB.
         notYetActiveCoupons = []
         expiredCoupons = []
+        # Decide which coupons should be added to DB
         for coupon in crawledCouponsDict.values():
             if coupon.isExpired():
                 expiredCoupons.append(coupon)
