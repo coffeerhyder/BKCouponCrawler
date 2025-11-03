@@ -276,6 +276,8 @@ class DBManager:
             elif cf.isPlantBased is not None and coupon.isPlantBased() != cf.isPlantBased:
                 # print(f"Filtered non plant based:{coupon.id} | {coupon.getTitle()}")
                 continue
+            elif cf.isKingDesMonats is not None and coupon.isKingDesMonats() != cf.isKingDesMonats:
+                continue
 
             desired_coupons[coupon_id] = coupon
 

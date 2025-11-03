@@ -21,6 +21,7 @@ class User(Document):
             displayCouponCategoryAppCouponsHidden=BooleanField(default=True),
             displayCouponCategoryMeatOnly=BooleanField(default=True),
             displayCouponCategoryVeggie=BooleanField(default=True),
+            displayCouponCategoryKingDesMonats=BooleanField(default=True),
             displayCouponCategoryPayback=BooleanField(default=True),
             displayCouponSortButton=BooleanField(default=True),
             enableTerminalMode=BooleanField(default=False),

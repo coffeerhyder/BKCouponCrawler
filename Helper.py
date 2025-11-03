@@ -370,7 +370,11 @@ def productTitleIsDrink(title: str) -> bool:
         return True
     elif re.compile(r'caff(è|e)').search(titleLower):
         return True
+    elif re.compile(r'coffee').search(titleLower):
+        return True
     elif re.compile(r'wasser').search(titleLower):
+        return True
+    elif re.compile(r'summernade').search(titleLower):
         return True
     else:
         return False

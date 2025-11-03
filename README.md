@@ -164,6 +164,7 @@ optional arguments:
 start - Hauptmenü
 coupons - Alle Coupons
 coupons2 - Coupons ohne Menü
+kdm - King des Monats Coupons
 favoriten - ⭐Favoriten⭐
 angebote - Angebote
 payback - 🅿️ayback Karte
@@ -311,13 +312,14 @@ Tabelle: Buchstabencodes für alle Monate:
 
 ### Danke an
 * https://github.com/3dik/bkoder
-* https://edik.ch/posts/hack-the-burger-king.html
+* http://edik.ch/posts/hack-the-burger-king.html
 * https://www.mydealz.de/gutscheine/burger-king-bk-plu-code-sammlung-uber-270-bkplucs-822614
 * https://limits.tginfo.me/de-DE
 * https://www.mydealz.de/profile/jokergermany
 * Alle MyDealz User, die die neuen Papiercoupons posten
 
 ### Kleine Linksammlung
+* https://www.mydealz.de/deals/alle-burgerking-coupons-auch-ohne-app-nutzen-betterkingbot-2135813
 * https://www.mydealz.de/diskussion/burger-king-gutschein-api-1741838
 * https://www.burgerking.de/rewards/offers (Coupons direkt über die BK Webseite)
 * https://pr0gramm.com/user/FishEater23/uploads/4730464

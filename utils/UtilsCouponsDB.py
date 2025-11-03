@@ -106,6 +106,11 @@ USER_SETTINGS_ON_OFF = {
         "description": f"Kategorie Veggie Coupons ({SYMBOLS.BROCCOLI}) zeigen",
         "default": True
     },
+    "displayCouponCategoryKingDesMonats": {
+        "category": SettingCategories.MAIN_MENU,
+        "description": f"Kategorie King des Monats Coupons zeigen",
+        "default": True
+    },
     "displayCouponCategoryPayback": {
         "category": SettingCategories.MAIN_MENU,
         "description": "Kategorie Payback Buttons zeigen",
