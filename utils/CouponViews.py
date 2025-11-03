@@ -103,6 +103,8 @@ class CouponViews:
                         title=f"{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}")
     MEAT_ONLY = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isMeat=True),
                            title="Fleischige Coupons")
+    KING_DES_MONATS = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), isKingDesMonats=True),
+                                 title="King des Monats Coupons")
     # Dummy item basically only used for holding default sortCode for users' favorites
     FAVORITES = CouponView(couponfilter=CouponFilter(sortCode=CouponSortModes.PRICE.getSortCode(), removeDuplicates=False), highlightFavorites=False, allowModifyFilter=False,
                            title=f"{SYMBOLS.STAR}Favoriten{SYMBOLS.STAR}")

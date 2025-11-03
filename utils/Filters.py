@@ -18,4 +18,5 @@ class CouponFilter(BaseModel):
     isVeggie: Optional[Union[bool, None]] = None
     isPlantBased: Optional[Union[bool, None]] = None
     isEatable: Optional[Union[bool, None]] = None
+    isKingDesMonats: Optional[Union[bool, None]] = None
     sortCode: Optional[Union[None, int]] = None

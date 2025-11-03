@@ -46,6 +46,7 @@ class CouponCallbackVars:
     MEAT_ONLY = f"?a=dcs&m={CouponViews.MEAT_ONLY.getViewCode()}&cs="
     VEGGIE = f"?a=dcs&m={CouponViews.VEGGIE.getViewCode()}&cs="
     FAVORITES = f"?a=dcs&m={CouponViews.FAVORITES.getViewCode()}&cs="
+    KING_DES_MONATS = f"?a=dcs&m={CouponViews.KING_DES_MONATS.getViewCode()}&cs="
 
 
 class CallbackPattern:
@@ -128,6 +129,7 @@ class BKBot:
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler('start', self.botDisplayMenuMain), CommandHandler('favoriten', self.botDisplayFavoritesCOMMAND),
                           CommandHandler('coupons', self.botDisplayAllCouponsCOMMAND), CommandHandler('coupons2', self.botDisplayAllCouponsWithoutMenuCOMMAND),
+                          CommandHandler('kdm', self.botDisplayKingDesMonatsCOMMAND),
                           CommandHandler('angebote', self.botDisplayOffers), CommandHandler('payback', self.botDisplayPaybackCard),
                           CommandHandler('einstellungen', self.botDisplayMenuSettings),
                           CommandHandler(Commands.MAINTENANCE, self.botAdminToggleMaintenanceMode),
@@ -336,6 +338,8 @@ class BKBot:
             allButtons.append([InlineKeyboardButton(f'{SYMBOLS.MEAT}Fleisch Coupons{SYMBOLS.MEAT}', callback_data=CouponCallbackVars.MEAT_ONLY)])
         if user.settings.displayCouponCategoryVeggie:
             allButtons.append([InlineKeyboardButton(f'{SYMBOLS.BROCCOLI}Veggie Coupons{SYMBOLS.BROCCOLI}', callback_data=CouponCallbackVars.VEGGIE)])
+        if user.settings.displayCouponCategoryKingDesMonats:
+            allButtons.append([InlineKeyboardButton(f'King des Monats Coupons', callback_data=CouponCallbackVars.KING_DES_MONATS)])
         keyboardCouponsFavorites = [InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten' + SYMBOLS.STAR, callback_data=f"?a=dcs&m={CouponViews.FAVORITES.getViewCode()}"),
                                     InlineKeyboardButton(SYMBOLS.STAR + 'Favoriten + Pics' + SYMBOLS.STAR, callback_data=CallbackVars.MENU_COUPONS_FAVORITES_WITH_IMAGES)]
         allButtons.append(keyboardCouponsFavorites)
@@ -343,7 +347,7 @@ class BKBot:
             if user.getPaybackCardNumber() is None:
                 allButtons.append([InlineKeyboardButton(SYMBOLS.CIRLCE_BLUE + 'Payback Karte hinzufügen', callback_data=CallbackVars.MENU_SETTINGS_ADD_PAYBACK_CARD)])
             else:
-                allButtons.append([InlineKeyboardButton(SYMBOLS.PARK + 'ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
+                allButtons.append([InlineKeyboardButton(f'{SYMBOLS.PARK}ayback Karte', callback_data=CallbackVars.MENU_DISPLAY_PAYBACK_CARD)])
         alwaysShowOfferButton = True  # 2022-09-28: Always show offer button because BK website may have some offers
         if user.settings.displayOffersButton or alwaysShowOfferButton:
             allButtons.append(
@@ -370,6 +374,7 @@ class BKBot:
         if isNewUser:
             menuText += '\nEi guude du bist ja neu hier :)'
         menuText += '\n' + getBotImpressum()
+        menuText += f"\n King des Monats: burgerking.de/kingdesmonats"
         if self.crawler.cachedMissingPaperCouponsText:
             menuText += '\n---'
             menuText += f"\n<b>{SYMBOLS.WARNING}Infos zu fehlenden Papiercoupons - es fehlen:</b>"
@@ -441,6 +446,11 @@ class BKBot:
         await self.displayCoupons(update, context, CouponCallbackVars.FAVORITES)
         return CallbackVars.MENU_DISPLAY_COUPON
 
+    async def botDisplayKingDesMonatsCOMMAND(self, update: Update, context: CallbackContext):
+        """ Wrapper and this is only to be used for commands. """
+        await self.displayCoupons(update, context, CouponCallbackVars.KING_DES_MONATS)
+        return CallbackVars.MENU_DISPLAY_COUPON
+
     async def botDisplayStats(self, update: Update, context: CallbackContext):
         query = update.callback_query
         if query is not None:
@@ -489,12 +499,6 @@ class BKBot:
         """ Displays all coupons in a pre selected mode """
         # Important! This is required so that we can e.g. jump from "Category 'App coupons' page 2 display single coupon" back into "Category 'App coupons' page 2"
         callbackVar += "&cb=" + urllib.parse.quote(callbackVar)
-        """ 2023-04-02:
-         Log output to find cause of:
-             view = getCouponViewByIndex(index=int(urlinfo["m"]))
-            ValueError: invalid literal for int() with base 10: 'v'
-         """
-        logging.debug(f'{callbackVar=}')
         urlquery = furl(callbackVar)
         urlinfo = urlquery.args
         view = getCouponViewByIndex(index=int(urlinfo["m"]))

@@ -271,6 +271,16 @@ class Coupon(Document):
                 return False
         return False
 
+    def isKingDesMonats(self) -> bool:
+        if not self.plu:
+            # No PLU given -> We cannot check for KDM status and assume it's not a KDM.
+            return False
+        elif "KDM" in self.plu.upper():
+            return True
+        else:
+            return False
+
+
     def getStartDatetime(self) -> Union[datetime, None]:
         """ Returns datetime from which coupon is valid. Not all coupons got a startDatetime. """
         if self.timestampStart is not None and self.timestampStart > 0:

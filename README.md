@@ -164,6 +164,7 @@ optional arguments:
 start - Hauptmenü
 coupons - Alle Coupons
 coupons2 - Coupons ohne Menü
+kdm - King des Monats Coupons
 favoriten - ⭐Favoriten⭐
 angebote - Angebote
 payback - 🅿️ayback Karte
