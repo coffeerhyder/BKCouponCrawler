@@ -374,7 +374,10 @@ class BKBot:
         if isNewUser:
             menuText += '\nEi guude du bist ja neu hier :)'
         menuText += '\n' + getBotImpressum()
-        menuText += f"\n King des Monats: burgerking.de/kingdesmonats"
+        menuText += f"\n King des Monats: {URLs.BK_KING_DES_MONATS}"
+        menuText += f"\n King Deals: {URLs.BK_KING_DEALS}"
+        menuText += f"\n 5 Schnapper: {URLs.BK_5_SCHNAPPER}"
+        menuText += f"\n BK Coupons auf der Webseite: {URLs.BK_COUPONS_ON_WEBSITE}"
         if self.crawler.cachedMissingPaperCouponsText:
             menuText += '\n---'
             menuText += f"\n<b>{SYMBOLS.WARNING}Infos zu fehlenden Papiercoupons - es fehlen:</b>"

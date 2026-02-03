@@ -35,9 +35,11 @@ class URLs:
     PROTOCOL_BK = 'https://www.'
     ELEMENT = 'https://app.element.io/#/room/#BetterKingDE:matrix.org'
     BK_SPAR_KINGS = 'burgerking.de/sparkings'  # 2025-01-25: Does not exist anymore
+    BK_5_SCHNAPPER = 'burgerking.de/5schnapper'
+    BK_KING_DES_MONATS = 'burgerking.de/kingdesmonats'
     BK_KING_FINDER = 'burgerking.de/store-locator'
     BK_KING_DEALS = 'burgerking.de/kingdeals'
-    NO_PROTOCOL_COUPONS = 'burgerking.de/rewards/offers'
+    BK_COUPONS_ON_WEBSITE = 'burgerking.de/rewards/offers'
 
 
 def loadJson(path: str):
@@ -375,6 +377,8 @@ def productTitleIsDrink(title: str) -> bool:
     elif re.compile(r'wasser').search(titleLower):
         return True
     elif re.compile(r'summernade').search(titleLower):
+        return True
+    elif re.compile(r'ayran').search(titleLower):
         return True
     else:
         return False
