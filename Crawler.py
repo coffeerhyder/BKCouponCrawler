@@ -20,8 +20,6 @@ from utils.CouponCategory import CouponCategory
 from utils.DBManager import DBManager
 
 
-
-
 class BKCrawler:
 
     def __init__(self, cfg: Config = None, db: DBManager = None, allowAddExtraCouponsOnInit: bool = True):
@@ -338,8 +336,11 @@ class BKCrawler:
         couponArrayBK = apiResponse['data']['LoyaltyOffersUI']['sortedSystemwideOffers']
         appCoupons = []
         appCouponsNotYetActive = []
+        appCouponsExpired = []
         totalindex = 0
         childindex = 0
+        # Temporäres Dict zur Speicherung: id -> [coupons]
+        couponsByID = {}
 
         for couponBKTmp in couponArrayBK:
             try:
@@ -350,12 +351,12 @@ class BKCrawler:
                 bkCoupons = [couponBKTmp]
                 # Collect hidden coupons
                 upsellOptions = couponBKTmp.get('upsellOptions')
-                if upsellOptions is not None:
+                if upsellOptions:
                     for upsellOption in upsellOptions:
                         upsellID = upsellOption.get('_id')
                         upsellType = upsellOption.get('_type')
                         upsellShortCode = upsellOption.get('shortCode')
-                        if upsellType != 'offer' or upsellShortCode is None:
+                        if upsellType != 'offer' or not upsellShortCode:
                             # Skip invalid items: This should never happen
                             logging.info(f"Found invalid/unsupported upsell object: {upsellID=}")
                             continue
@@ -364,20 +365,23 @@ class BKCrawler:
                 for couponBK in bkCoupons:
                     price = couponBK['offerPrice']
                     plu = couponBK['shortCode']
-                    vendorConfigs = couponBK['vendorConfigs']
+                    constantPlu = None
                     try:
-                        uniqueCouponID = vendorConfigs['rpos']['constantPlu']
+                        partners = couponBK['pluConfigs']['partner']
+                        for partner in partners:
+                            vendorConfig = partner.get('vendorConfig')
+                            if not vendorConfig:
+                                continue
+                            pluType = vendorConfig.get('pluType')
+                            if pluType == 'constantPlu':
+                                constantPlu = vendorConfig["constantPlu"]
+                                break
                     except:
-                        uniqueCouponID = None
-                    if uniqueCouponID is None:
-                        try:
-                            uniqueCouponID = vendorConfigs['partner']['constantPlu']
-                        except:
-                            pass
-                    if uniqueCouponID is None:
-                        """ 2025-07-03: Looks like for the first time now it is possible that a coupon can have no internal ID but only the short PLU code.
-                         Example: 294 -> Big King XXL + Crispy Chicken + große King Pommes + 0,5 l Coca-Cola
-                         """
+                        pass
+                    if constantPlu is not None:
+                        uniqueCouponID = constantPlu
+                    else:
+                        # Fallback
                         uniqueCouponID = plu
                     subtitle = None
                     try:
@@ -446,10 +450,10 @@ class BKCrawler:
                     except:
                         # Dontcare
                         logging.warning('Failed to find BetterExpiredate for coupon: ' + coupon.id)
-                    rulesHere = couponBK.get('rules')
-                    if rulesHere is not None:
+                    rules = couponBK.get('rules')
+                    if rules:
                         rulesAll = []
-                        for ruleSet in rulesHere:
+                        for ruleSet in rules:
                             ruleSetsChilds = ruleSet.get('rules')
                             if ruleSetsChilds is not None:
                                 for ruleSetsChild in ruleSetsChilds:
@@ -471,14 +475,17 @@ class BKCrawler:
                     if datetimeExpire1 is not None:
                         # Prefer this expiredate
                         coupon.timestampExpire = datetimeExpire1.timestamp()
-                    else:
+                    else:#
                         coupon.timestampExpire = datetimeExpire2.timestamp()
                     if datetimeStart is not None:
                         coupon.timestampStart = datetimeStart.timestamp()
-                    crawledCouponsDict[uniqueCouponID] = coupon
+
+                    # Speichere coupon im temporären Dict statt direkt in crawledCouponsDict
+                    if uniqueCouponID not in couponsByID:
+                        couponsByID[uniqueCouponID] = []
+                    couponsByID[uniqueCouponID].append(coupon)
+
                     appCoupons.append(coupon)
-                    if datetimeStart is not None and datetimeStart > datetime.now():
-                        appCouponsNotYetActive.append(coupon)
                     childindex += 1
                     totalindex += 1
             except Exception:
@@ -486,15 +493,38 @@ class BKCrawler:
                 logging.warning(f"Failed to process coupon object with index {totalindex=} | {childindex=} -> Maybe new MyBK code??")
                 continue
 
-        logging.info(f'Coupons in app total: {len(appCoupons)}')
-        logging.info(f'Coupons in app not yet active: {len(appCouponsNotYetActive)}')
+        # Dedupliziere coupons: Behalte nur den mit dem längsten Ablaufdatum
+        finalCoupons = []
+        for couponID, coupons in couponsByID.items():
+            if len(coupons) == 1:
+                # Kein Duplikat vorhanden
+                finalCoupon = coupons[0]
+            else:
+                # Mehrere coupons mit derselben ID: Wähle den mit dem längsten Ablaufdatum
+                logging.info(f'Found {len(coupons)} coupons with same ID: {couponID}. Selecting the one with longest expiration date.')
+                finalCoupon = max(coupons, key=lambda c: c.timestampExpire)
+                # Logge die aussortierten Coupons
+                for coupon in coupons:
+                    if coupon is not finalCoupon:
+                        expireDate = datetime.fromtimestamp(coupon.timestampExpire)
+                        finalExpireDate = datetime.fromtimestamp(finalCoupon.timestampExpire)
+                        logging.info(f'  Discarding duplicate: {coupon.title} (expires: {expireDate}) -> Keeping: {finalCoupon.title} (expires: {finalExpireDate})')
+
+            crawledCouponsDict[couponID] = finalCoupon
+            finalCoupons.append(finalCoupon)
+            if finalCoupon.isNotYetActive():
+                appCouponsNotYetActive.append(finalCoupon)
+            elif finalCoupon.isExpired():
+                appCouponsExpired.append(finalCoupon)
+
+        logging.info(f'Coupons in app total: {len(finalCoupons)} | Not yet active: {len(appCouponsNotYetActive)} | Expired: {len(appCouponsExpired)}')
         if len(appCouponsNotYetActive) > 0:
             logging.info(getLogSeparatorString())
             for coupon in appCouponsNotYetActive:
                 logging.info(coupon)
             logging.info(getLogSeparatorString())
         logging.info(f'Total coupons crawl time: {getFormattedPassedTime(timestampCrawlStart)}')
-        if len(appCoupons) > 0:
+        if len(finalCoupons) > 0:
             """ Update timestamp of last complete run in DB. Assume that the app always contains at least one valid- or upcoming coupon. """
             self.db.update_last_successful_crawl()
 
@@ -708,6 +738,7 @@ class BKCrawler:
                     'Ablaufdatum': coupon.getExpireDateFormatted()
                 })
 
+
 def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
     """ Returns True if a key of newData is not on originalData or a value has changed. """
     if ignoreKeys is None:
@@ -721,6 +752,7 @@ def hasChanged(originalData, newData, ignoreKeys=None) -> bool:
         elif newValue != originalData[key]:
             return True
     return False
+
 
 def generateQRImageIfNonExistant(qrCodeData: str, path: str) -> bool:
     if os.path.exists(path):
@@ -737,8 +769,10 @@ def generateQRImageIfNonExistant(qrCodeData: str, path: str) -> bool:
     img.save(path)
     return True
 
+
 def getLogSeparatorString() -> str:
     return '**************************'
+
 
 if __name__ == '__main__':
     crawler = BKCrawler()
